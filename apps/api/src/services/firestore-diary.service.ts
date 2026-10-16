@@ -71,6 +71,16 @@ export function getEmptyMeals(): MealMap {
   };
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 export class FirestoreDiaryService {
   private firestore: Firestore | null = null;
   private readonly pepper: string;
@@ -122,7 +132,7 @@ export class FirestoreDiaryService {
     if (db) {
       try {
         const docRef = db.collection('diaries').doc(docId);
-        const snapshot = await docRef.get();
+        const snapshot = await withTimeout(docRef.get());
 
         if (snapshot.exists) {
           const data = snapshot.data() as DailyDiaryDoc;
@@ -186,7 +196,7 @@ export class FirestoreDiaryService {
     if (db) {
       try {
         const docRef = db.collection('diaries').doc(docId);
-        await docRef.set(diaryDoc, { merge: true });
+        await withTimeout(docRef.set(diaryDoc, { merge: true }));
       } catch {
         // Salva no in-memory fallback se Firestore falhar
       }
@@ -239,10 +249,9 @@ export class FirestoreDiaryService {
 
     if (db) {
       try {
-        const snapshot = await db
-          .collection('diaries')
-          .where('blindUserId', '==', blindUserId)
-          .get();
+        const snapshot = await withTimeout(
+          db.collection('diaries').where('blindUserId', '==', blindUserId).get()
+        );
 
         const batch = db.batch();
         for (const doc of snapshot.docs) {
@@ -250,7 +259,7 @@ export class FirestoreDiaryService {
           deletedCount++;
         }
         if (deletedCount > 0) {
-          await batch.commit();
+          await withTimeout(batch.commit());
         }
       } catch {
         // Ignora erro de rede e limpa fallback

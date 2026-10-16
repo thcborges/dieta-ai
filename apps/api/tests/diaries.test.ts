@@ -2,15 +2,41 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { FastifyInstance } from 'fastify';
 
+import net from 'net';
+
+async function isPortOpen(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(600);
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host);
+  });
+}
+
 describe('Firestore Daily Food Diary API (/api/v1/diaries)', { timeout: 20000 }, () => {
   let app: FastifyInstance;
   const testUserId = 'usr_lider_tecnico_190cm';
   const testDate = '2026-10-16';
 
   beforeAll(async () => {
-    // Configura o host do Firestore Emulator para testes
-    process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
     process.env.FIRESTORE_PROJECT_ID = 'thcborges-dieta-ai-dev';
+    const isEmulatorRunning = await isPortOpen(8080, '127.0.0.1');
+    if (isEmulatorRunning) {
+      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+    } else {
+      delete process.env.FIRESTORE_EMULATOR_HOST;
+    }
     app = await buildApp();
   });
 
