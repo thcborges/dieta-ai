@@ -1,0 +1,21 @@
+{
+  "name": "@dieta-ai/error-healer",
+  "version": "0.1.0",
+  "description": "Pub/Sub consumer for automated Telegram alerts and AGY self-healing loop",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@dieta-ai/types": "workspace:*",
+    "@google-cloud/pubsub": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@vitest/coverage-v8": "^3.0.5",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
