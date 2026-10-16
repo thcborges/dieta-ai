@@ -33,14 +33,14 @@ ENV PORT=8080
 
 RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
 
-# Copiar pacotes e builds
+# Copiar pacotes e builds compilados do estágio builder
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json ./packages/core/
-COPY packages/core/dist ./packages/core/dist
+COPY --from=builder /app/packages/core/dist ./packages/core/dist
 COPY packages/types/package.json ./packages/types/
-COPY packages/types/dist ./packages/types/dist
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY apps/api/package.json ./apps/api/
-COPY apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 # Instala apenas dependências de produção
 RUN pnpm install --prod --frozen-lockfile

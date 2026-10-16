@@ -43,3 +43,9 @@ android/.gradle/
 android/app/build/
 ios/App/Pods/
 ios/App/build/
+
+# Local AI tooling & memory
+.agents/
+.claude/
+CLAUDE.md
+.ai-memory*
