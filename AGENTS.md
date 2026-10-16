@@ -20,13 +20,30 @@
 
 ## 2. Meta-Regras Inquebráveis de Desenvolvimento
 
-### 2.1. Versionamento Git e Commits
-1. O repositório git está configurado localmente.
-2. **Todo resultado de prompt DEVE ser commitado** com uma mensagem clara, semântica e objetiva resumindo exatamente o que foi adicionado ou modificado.
-3. Fluxo de branches:
-   * `develop`: Ambiente de desenvolvimento (aciona CI/CD para deploy em `thcborges-dieta-ai-dev`).
-   * `main`: Ambiente de produção (aciona CI/CD para deploy em `thcborges-dieta-ai-prd`).
-   * Branches de feature/fix: `feat/<nome>` ou `fix/<nome>` integradas via Pull Request.
+### 2.1. Versionamento Git, Ciclo de Branches & Agente Revisor de PR
+1. O repositório git está configurado localmente e remoto em `git@github.com:thcborges/dieta-ai.git`.
+2. **Branch Isolada por Iteração:**
+   * Toda e qualquer implementação DEVE ser realizada em branch separada (`feat/<nome>` ou `fix/<nome>`).
+   * Salvo se o usuário iniciar expressamente uma nova worktree, uma nova branch **a partir da branch `main`** DEVE ser criada para cada interação.
+3. **Validação Remota com Trivy & Merge em Develop:**
+   * Ao finalizar o desenvolvimento e os testes locais, realiza-se o push da branch para o repositório remoto (`git push origin <branch>`).
+   * Abre-se o Pull Request apontando para a branch `develop`, disparando a esteira de CI do GitHub Actions com validação de segurança pelo **Trivy** e a suíte completa de testes.
+   * Após a validação com sucesso dos checks de CI e Trivy, a branch é mesclada (*merge*) com a branch `develop` para publicação no ambiente de desenvolvimento.
+4. **Agente Revisor de Pull Request (`pr-ui-reviewer`) & Testes de Estresse de UI:**
+   * Um agente dedicado (`pr-ui-reviewer`) executa a auditoria de usabilidade e estresse da UI.
+   * O agente utiliza o **Playwright E2E** executando testes automatizados herméticos (Desktop e Mobile) contra o servidor local do Vite e conectando-se ao **Firestore Emulator** local para validar a integridade da persistência e interações analíticas.
+5. **Conclusão da Iteração, PR para `main` e Telegram:**
+   * Somente após a aprovação integral dos testes de UI pelo revisor, cria-se o Pull Request apontando para a branch de produção `main`.
+   * A descrição do Pull Request DEVE conter um relatório completo e detalhado de tudo o que foi implementado na iteração.
+   * Dispara-se simultaneamente uma notificação estruturada via **Telegram Bot** informando o encerramento da iteração, contendo a mesma descrição detalhada e o link direto do Pull Request aprovado e pronto para o merge.
+6. **Deploy Dev sob Demanda via Telegram:**
+   * O Telegram Bot escuta o comando interativo `/deploy-dev` via long-polling no serviço `error-healer`.
+   * Ao receber `/deploy-dev` de um chat autorizado, dispara o workflow `ci-dev.yml` no GitHub Actions via API para criar ou atualizar a infraestrutura de desenvolvimento sob demanda, evitando custos desnecessários em nuvem.
+7. **Documentação Obrigatória no GitHub Pages:**
+   * A documentação oficial do projeto é mantida em **VitePress** dentro do diretório `docs/`, com tema dark alinhado ao Material Design 3 e suporte a Markdown e fórmulas LaTeX.
+   * É publicada continuamente no **GitHub Pages** no endereço: `https://thcborges.github.io/dieta-ai/`.
+   * A documentação deve permitir um entendimento superficial na visão geral (Nível 1) e aprofundamento técnico modular nos detalhes de domínio (Nível 2).
+8. **Todo resultado de prompt DEVE ser commitado** com uma mensagem clara, semântica e objetiva.
 
 ### 2.2. Metodologia BDD (Behavior Driven Development) & TDD (Test Driven Development)
 1. **Nenhum código de produção deve ser escrito sem um teste prévio que falhe.**
@@ -45,16 +62,18 @@ O projeto é estruturado como um **Monorepo TypeScript** gerenciado com `pnpm`:
 ```
 dieta-ai/
 ├── apps/
-│   ├── web/               # Frontend: React 19 + Vite (PWA) + Capacitor 6 + Tailwind M3
+│   ├── web/               # Frontend: React 19 + Vite (PWA) + Capacitor 6 + Playwright E2E
 │   ├── api/               # Backend: Fastify + TypeScript (Google Cloud Run)
-│   └── error-healer/      # Consumer Pub/Sub para acionamento do AGY e Telegram
+│   └── error-healer/      # Consumer Pub/Sub para auto-cura AGY e bot do Telegram
 ├── packages/
 │   ├── core/              # Regras puras de domínio: fórmulas, auditor, solvers (100% test coverage)
 │   └── types/             # Tipagens e DTOs compartilhados entre cliente e servidor
+├── docs/                  # Documentação oficial VitePress publicada no GitHub Pages
+├── docker-compose.emulator.yml # Firestore Emulator local hermético (custo zero)
 ├── infra/
 │   └── terraform/         # Infraestrutura como Código (us-central1, dev e prd)
 └── .github/
-    └── workflows/         # CI/CD (GitHub Actions + Trivy + HuskyCI)
+    └── workflows/         # CI/CD (GitHub Actions + Trivy + HuskyCI + GitHub Pages)
 ```
 
 ### 3.1. Frontend & Multiplataforma
