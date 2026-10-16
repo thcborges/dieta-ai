@@ -1,5 +1,6 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+  - 'infra/terraform'
 allowBuilds:
   esbuild: true
