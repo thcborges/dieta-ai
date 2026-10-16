@@ -3,6 +3,7 @@ export interface MacroBudget {
   proteinGrams: number;
   carbGrams: number;
   fatGrams: number;
+  fiberGrams?: number;
 }
 
 export interface EventBufferInput {
@@ -11,6 +12,7 @@ export interface EventBufferInput {
   proteinGrams: number;
   carbGrams: number;
   fatGrams: number;
+  fiberGrams?: number;
 }
 
 export type FeasibilityStatus = 'BALANCED' | 'COMPRESSED' | 'EXTREME' | 'IMPOSSIBLE';
@@ -30,6 +32,7 @@ export const EVENT_PRESETS: Record<string, EventBufferInput> = {
     proteinGrams: 38,
     carbGrams: 120,
     fatGrams: 52,
+    fiberGrams: 8,
   },
   KIDS_PARTY: {
     name: 'Festa Infantil (Salgadinhos/Doces)',
@@ -37,6 +40,7 @@ export const EVENT_PRESETS: Record<string, EventBufferInput> = {
     proteinGrams: 18,
     carbGrams: 130,
     fatGrams: 42,
+    fiberGrams: 4,
   },
   FAMILY_BARBECUE: {
     name: 'Churrasco em Família',
@@ -44,6 +48,7 @@ export const EVENT_PRESETS: Record<string, EventBufferInput> = {
     proteinGrams: 75,
     carbGrams: 60,
     fatGrams: 95,
+    fiberGrams: 6,
   },
 };
 
@@ -58,12 +63,16 @@ export function calculateEventBuffer(
   const remainingProtein = dailyTarget.proteinGrams - event.proteinGrams;
   const remainingCarbs = dailyTarget.carbGrams - event.carbGrams;
   const remainingFat = dailyTarget.fatGrams - event.fatGrams;
+  const remainingFiber =
+    (dailyTarget.fiberGrams !== undefined ? dailyTarget.fiberGrams : 38) -
+    (event.fiberGrams ?? 0);
 
   const remainingBudget: MacroBudget = {
     calories: remainingCalories,
     proteinGrams: remainingProtein,
     carbGrams: remainingCarbs,
     fatGrams: remainingFat,
+    fiberGrams: remainingFiber,
   };
 
   // Verificação termodinâmica: 1g proteína = 4 kcal

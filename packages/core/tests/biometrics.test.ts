@@ -3,6 +3,7 @@ import {
   calculateBMR,
   calculateTDEE,
   calculateMacroTargets,
+  calculateRecommendedFiber,
   type BiometricProfile,
   type ActivityLevel,
 } from '../src/biometrics.js';
@@ -115,5 +116,62 @@ describe('Biometrics & Dynamic Targets (Módulo 1)', () => {
 
       expect(targets.proteinGrams).toBe(240); // 110 * 2.5 seria 275g, mas trava em 240g
     });
+
+    it('deve calcular a meta de fibras com base na idade e sexo do usuário', () => {
+      const targets = calculateMacroTargets({
+        tdee: 2800,
+        weightKg: 95,
+        age: 40,
+        gender: 'male',
+        proteinStrategy: { type: 'fixed', grams: 220 },
+      });
+
+      // Homem de 40 anos: meta de fibras é 38g
+      expect(targets.fiberGrams).toBe(38);
+    });
+
+    it('deve permitir customizar a meta de fibras diretamente', () => {
+      const targets = calculateMacroTargets({
+        tdee: 2800,
+        weightKg: 95,
+        customFiberGrams: 45,
+        proteinStrategy: { type: 'fixed', grams: 220 },
+      });
+
+      expect(targets.fiberGrams).toBe(45);
+    });
+  });
+
+  describe('calculateRecommendedFiber (Diretrizes DRI por Idade e Gênero)', () => {
+    it('deve recomendar 38g para homens adultos entre 19 e 50 anos (perfil do usuário: 40 anos)', () => {
+      expect(calculateRecommendedFiber(40, 'male')).toBe(38);
+      expect(calculateRecommendedFiber(19, 'male')).toBe(38);
+      expect(calculateRecommendedFiber(50, 'male')).toBe(38);
+    });
+
+    it('deve recomendar 25g para mulheres adultas entre 19 e 50 anos', () => {
+      expect(calculateRecommendedFiber(40, 'female')).toBe(25);
+      expect(calculateRecommendedFiber(25, 'female')).toBe(25);
+    });
+
+    it('deve ajustar para maiores de 50 anos (30g para homens e 21g para mulheres)', () => {
+      expect(calculateRecommendedFiber(55, 'male')).toBe(30);
+      expect(calculateRecommendedFiber(65, 'female')).toBe(21);
+    });
+
+    it('deve calcular corretamente para crianças e adolescentes', () => {
+      expect(calculateRecommendedFiber(3, 'male')).toBe(19);
+      expect(calculateRecommendedFiber(7, 'female')).toBe(25);
+      expect(calculateRecommendedFiber(12, 'male')).toBe(31);
+      expect(calculateRecommendedFiber(12, 'female')).toBe(26);
+      expect(calculateRecommendedFiber(16, 'male')).toBe(38);
+      expect(calculateRecommendedFiber(16, 'female')).toBe(26);
+    });
+
+    it('deve lançar erro se a idade for zero ou negativa', () => {
+      expect(() => calculateRecommendedFiber(0, 'male')).toThrow('Idade deve ser maior que zero');
+      expect(() => calculateRecommendedFiber(-5, 'female')).toThrow('Idade deve ser maior que zero');
+    });
   });
 });
+

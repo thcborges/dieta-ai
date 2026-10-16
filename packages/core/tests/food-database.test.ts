@@ -72,4 +72,22 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     expect(lunchSuggestions).toContain('feijao_preto');
     expect(lunchSuggestions).not.toContain('pao_integral');
   });
+
+  it('deve conter informações de fibras nos alimentos pré-populados e calcular fibra em receitas', () => {
+    const feijao = PREPOPULATED_FOODS.find(f => f.id === 'feijao_preto');
+    expect(feijao?.fiberPer100g).toBeGreaterThan(0);
+
+    const recipe: RecipeInput = {
+      name: 'Prato com Fibra',
+      servings: 2,
+      ingredients: [
+        { foodId: 'feijao_preto', gramsOrUnits: 200 },
+        { foodId: 'arroz_branco', gramsOrUnits: 200 },
+      ],
+    };
+    const result = calculateRecipeMacros(recipe);
+    expect(result.totalMacros.fiberGrams).toBeDefined();
+    expect(result.totalMacros.fiberGrams).toBeGreaterThan(0);
+    expect(result.perServing.fiberGrams).toBeDefined();
+  });
 });

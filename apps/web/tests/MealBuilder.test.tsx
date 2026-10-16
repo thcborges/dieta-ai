@@ -5,7 +5,7 @@ import { MealBuilder } from '../src/components/MealBuilder.js';
 describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', () => {
   const mockMeals = {
     breakfast: [
-      { id: '1', foodId: 'ovos_inteiros', name: 'Ovos Inteiros', grams: 100, calories: 143, protein: 13, carbs: 1, fat: 10 },
+      { id: '1', foodId: 'ovos_inteiros', name: 'Ovos Inteiros', grams: 100, calories: 143, protein: 13, carbs: 1, fat: 10, fiber: 0 },
     ],
     lunch: [],
     afternoon_snack: [],
@@ -125,6 +125,7 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     const calledArgs = onAddFood.mock.calls[0];
     expect(calledArgs[0]).toBe('lunch');
     expect(calledArgs[1].foodId).toBe('feijao_preto');
+    expect(calledArgs[1].fiber).toBe(8.5);
   });
 
   it('deve chamar onRemoveFood ao clicar no botão de lixeira de um alimento', () => {

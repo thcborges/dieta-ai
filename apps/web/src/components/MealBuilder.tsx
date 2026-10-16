@@ -24,6 +24,7 @@ export interface LoggedFood {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number;
 }
 
 export type MealMap = Record<MealWindow, LoggedFood[]>;
@@ -83,6 +84,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       protein: Math.round(selectedFood.proteinPer100g * factor * 10) / 10,
       carbs: Math.round(selectedFood.carbsPer100g * factor * 10) / 10,
       fat: Math.round(selectedFood.fatPer100g * factor * 10) / 10,
+      fiber: Math.round((selectedFood.fiberPer100g ?? 0) * factor * 10) / 10,
     };
     onAddFood(window, newFood);
   };
@@ -102,6 +104,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       protein: Math.round(food.proteinPer100g * factor * 10) / 10,
       carbs: Math.round(food.carbsPer100g * factor * 10) / 10,
       fat: Math.round(food.fatPer100g * factor * 10) / 10,
+      fiber: Math.round((food.fiberPer100g ?? 0) * factor * 10) / 10,
     };
     onAddFood(window, newFood);
   };
@@ -287,7 +290,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                           </span>
                         </div>
                         <div className="font-mono text-[11px] text-m3-outline">
-                          {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G
+                          {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G • {item.fiber ?? 0}g Fibra
                         </div>
                       </div>
 
