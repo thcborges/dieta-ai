@@ -7,6 +7,7 @@ export interface FoodRegistrationModalProps {
   onClose: () => void;
   onSave: (food: FoodItem) => void;
   initialName?: string;
+  initialBarcode?: string;
 }
 
 export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
@@ -14,6 +15,7 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
   onClose,
   onSave,
   initialName = '',
+  initialBarcode = '',
 }) => {
   const [name, setName] = useState(initialName);
   const [servingSizeGrams, setServingSizeGrams] = useState<number>(100);
@@ -22,15 +24,16 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
   const [carbsPer100g, setCarbsPer100g] = useState<number>(0);
   const [fatPer100g, setFatPer100g] = useState<number>(0);
   const [fiberPer100g, setFiberPer100g] = useState<number>(0);
-  const [barcode, setBarcode] = useState<string>('');
+  const [barcode, setBarcode] = useState<string>(initialBarcode);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName(initialName);
+      setBarcode(initialBarcode);
       setError(null);
     }
-  }, [isOpen, initialName]);
+  }, [isOpen, initialName, initialBarcode]);
 
   if (!isOpen) return null;
 
