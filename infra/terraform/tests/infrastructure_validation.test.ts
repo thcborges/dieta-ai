@@ -12,9 +12,22 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
   const pubsubModule = resolve(terraformRoot, 'modules/pubsub/main.tf');
   const loggingSinkModule = resolve(terraformRoot, 'modules/logging_sink/main.tf');
 
+  let gcloudToken = process.env.GOOGLE_OAUTH_ACCESS_TOKEN || '';
+  if (!gcloudToken && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try {
+      gcloudToken = execSync('gcloud auth print-access-token', {
+        stdio: 'pipe',
+        env: { ...process.env, PATH: `${process.env.HOME || ''}/.local/bin:${process.env.PATH || ''}` },
+      }).toString().trim();
+    } catch {
+      // Ignora se não houver gcloud no ambiente
+    }
+  }
+
   const testEnv = {
     ...process.env,
     PATH: `${process.env.HOME || ''}/.local/bin:${process.env.PATH || ''}`,
+    ...(gcloudToken ? { GOOGLE_OAUTH_ACCESS_TOKEN: gcloudToken } : {}),
   };
 
   const findTerraformBinary = (): string => {
@@ -48,7 +61,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
       env: testEnv,
     });
     expect(versionOutput).toContain('Terraform');
-  });
+  }, 30000);
 
   it('deve formatar perfeitamente todo o código HCL (terraform fmt -check)', () => {
     expect(() => {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MacroMetrics Pro</string>
+    <string name="title_activity_main">MacroMetrics Pro</string>
+    <string name="package_name">com.thcborges.dietaai</string>
+    <string name="custom_url_scheme">com.thcborges.dietaai</string>
+</resources>

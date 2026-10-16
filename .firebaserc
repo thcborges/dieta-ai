@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "thcborges-dieta-ai-dev",
+    "dev": "thcborges-dieta-ai-dev",
+    "prd": "thcborges-dieta-ai-prd"
+  }
+}

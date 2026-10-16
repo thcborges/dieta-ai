@@ -10,6 +10,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/types/package.json ./packages/types/
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
@@ -18,10 +19,12 @@ RUN pnpm install --frozen-lockfile
 COPY packages/core ./packages/core
 COPY packages/types ./packages/types
 COPY apps/api ./apps/api
+COPY apps/web ./apps/web
 
-# Build de pacotes compartilhados e API
+# Build de pacotes compartilhados, frontend e API
 RUN pnpm --filter @dieta-ai/core build && \
     pnpm --filter @dieta-ai/types build && \
+    pnpm --filter @dieta-ai/web build && \
     pnpm --filter @dieta-ai/api build
 
 # Stage 2: Runtime enxuto (< 90MB) para sub-50ms cold-start
@@ -40,7 +43,9 @@ COPY --from=builder /app/packages/core/dist ./packages/core/dist
 COPY packages/types/package.json ./packages/types/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
 # Instala apenas dependências de produção
 RUN pnpm install --prod --frozen-lockfile
