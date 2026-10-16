@@ -19,15 +19,15 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     expect(screen.queryByText(/Auto-Completar Proteína/i)).not.toBeInTheDocument();
   });
 
-  it('deve permitir realizar o login com Google, acessando o dashboard e liberando lançamento de alimentos', () => {
+  it('deve permitir realizar o login com Google, acessando o dashboard e liberando lançamento de alimentos', async () => {
     render(<App />);
 
     const loginBtn = screen.getByRole('button', { name: /Entrar com Google/i });
     fireEvent.click(loginBtn);
 
     // Agora o dashboard está visível
+    expect(await screen.findByText(/Buffer de Evento Social/i)).toBeInTheDocument();
     expect(screen.getByText(/MacroMetrics Pro/i)).toBeInTheDocument();
-    expect(screen.getByText(/Buffer de Evento Social/i)).toBeInTheDocument();
     expect(screen.getByText(/Auto-Completar Proteína/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Controlar Macros/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sair/i })).toBeInTheDocument();
