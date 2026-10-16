@@ -99,4 +99,267 @@ describe('TelegramService (Observabilidade & Notificações de Erro)', () => {
     const success = await service.notifyErrorDetected(dummyEvent);
     expect(success).toBe(false);
   });
+
+  it('deve formatar e enviar notificação de iteração concluída e PR pronto para merge', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: 'test-chat',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+    });
+
+    const description = '1. Login Google obrigatório\n2. Controle de macros por usuário\n3. Fibra por idade';
+    const prUrl = 'https://github.com/thcborges/dieta-ai/pull/50';
+
+    const success = await service.notifyIterationCompleted(prUrl, description);
+
+    expect(success).toBe(true);
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.text).toContain('🚀 *ITERAÇÃO CONCLUÍDA: PR PRONTO PARA MERGE*');
+    expect(body.text).toContain(prUrl);
+    expect(body.text).toContain('Login Google obrigatório');
+    expect(body.text).toContain('Fibra por idade');
+  });
+
+  it('deve processar comando /deploy-dev de usuário autorizado e disparar deploy', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+
+    const mockDeployCallback = vi.fn().mockResolvedValue({
+      success: true,
+      workflowRunUrl: 'https://github.com/thcborges/dieta-ai/actions/runs/123456',
+    });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+      onDeployDevRequest: mockDeployCallback,
+    });
+
+    const result = await service.processIncomingMessage({
+      chatId: '12345678',
+      text: '/deploy-dev',
+      messageId: 99,
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.action).toBe('DEPLOY_DEV');
+    expect(mockDeployCallback).toHaveBeenCalledTimes(1);
+
+    // Deve ter enviado resposta de confirmação no Telegram
+    expect(mockFetch).toHaveBeenCalled();
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+    const body = JSON.parse(lastCall[1].body as string);
+    expect(body.text).toContain('🚀 Deploy do ambiente de desenvolvimento (branch `develop`) acionado com sucesso!');
+  });
+
+  it('deve rejeitar comando /deploy-dev de usuário não autorizado', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+
+    const mockDeployCallback = vi.fn();
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+      onDeployDevRequest: mockDeployCallback,
+    });
+
+    const result = await service.processIncomingMessage({
+      chatId: '99999999', // Usuário não autorizado
+      text: '/deploy-dev',
+      messageId: 100,
+    });
+
+    expect(result.handled).toBe(false);
+    expect(result.error).toContain('Não autorizado');
+    expect(mockDeployCallback).not.toHaveBeenCalled();
+  });
+
+  it('deve consultar getUpdates e despachar mensagens pendentes no long-polling', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: [
+            {
+              update_id: 1001,
+              message: {
+                message_id: 55,
+                chat: { id: 12345678 },
+                text: '/deploy-dev',
+              },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true }),
+      });
+
+    const mockDeployCallback = vi.fn().mockResolvedValue({ success: true });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+      onDeployDevRequest: mockDeployCallback,
+    });
+
+    const processedCount = await service.pollUpdatesOnce();
+
+    expect(processedCount).toBe(1);
+    expect(service.getLastUpdateId()).toBe(1001);
+    expect(mockDeployCallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('deve executar triggerGithubDeploy com sucesso quando GITHUB_TOKEN estiver presente', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: 'No Content',
+    });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      githubToken: 'ghp_secret_token_1234',
+      repoOwner: 'thcborges',
+      repoName: 'dieta-ai',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await service.triggerGithubDeploy();
+
+    expect(result.success).toBe(true);
+    expect(result.workflowRunUrl).toContain('actions/workflows/ci-dev.yml');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/thcborges/dieta-ai/actions/workflows/ci-dev.yml/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer ghp_secret_token_1234',
+        }),
+      })
+    );
+  });
+
+  it('deve retornar erro em triggerGithubDeploy quando GITHUB_TOKEN estiver ausente', async () => {
+    const originalToken = process.env.GITHUB_TOKEN;
+    delete process.env.GITHUB_TOKEN;
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+    });
+
+    const result = await service.triggerGithubDeploy();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('GITHUB_TOKEN não configurado');
+
+    if (originalToken) process.env.GITHUB_TOKEN = originalToken;
+  });
+
+  it('deve retornar erro em triggerGithubDeploy quando a API do GitHub falhar', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+    });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      githubToken: 'ghp_token',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await service.triggerGithubDeploy();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('GitHub API error: 403 Forbidden');
+  });
+
+  it('deve tratar exceção e avisar usuário quando deploy-dev falhar na execução', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+
+    const mockDeployCallback = vi.fn().mockRejectedValue(new Error('GitHub workflow trigger timeout'));
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+      onDeployDevRequest: mockDeployCallback,
+    });
+
+    const result = await service.processIncomingMessage({
+      chatId: '12345678',
+      text: '/deploy-dev',
+    });
+
+    expect(result.handled).toBe(false);
+    expect(result.error).toBe('GitHub workflow trigger timeout');
+
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+    const body = JSON.parse(lastCall[1].body as string);
+    expect(body.text).toContain('Falha ao acionar deploy dev');
+  });
+
+  it('deve ignorar comandos não mapeados', async () => {
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+    });
+
+    const result = await service.processIncomingMessage({
+      chatId: '12345678',
+      text: '/ajuda',
+    });
+
+    expect(result.handled).toBe(false);
+  });
+
+  it('deve tratar falhas de rede no pollUpdatesOnce sem interromper o serviço', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Network offline'));
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+    });
+
+    const count = await service.pollUpdatesOnce();
+    expect(count).toBe(0);
+  });
+
+  it('deve retornar 0 quando getUpdates responder com status HTTP inválido ou payload inesperado', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+    });
+
+    const service = new TelegramService({
+      botToken: 'test-token',
+      chatId: '12345678',
+      fetchImpl: mockFetch as unknown as typeof fetch,
+    });
+
+    const count = await service.pollUpdatesOnce();
+    expect(count).toBe(0);
+  });
 });

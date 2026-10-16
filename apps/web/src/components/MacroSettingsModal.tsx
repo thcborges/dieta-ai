@@ -115,10 +115,12 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="age-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Idade (Anos)
               </label>
               <input
+                id="age-input"
+                aria-label="Idade"
                 type="number"
                 value={form.ageYears}
                 onChange={e =>
