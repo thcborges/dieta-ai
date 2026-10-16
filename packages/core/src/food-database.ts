@@ -262,3 +262,45 @@ export function getMealFrequentFoodSuggestions(
     .slice(0, limit)
     .map(([foodId]) => foodId);
 }
+
+export const COMMON_FOOD_PRESETS_BY_WINDOW: Record<MealWindow, string[]> = {
+  breakfast: ['ovos_inteiros', 'claras_pasteurizadas', 'pao_integral', 'cafe_especial'],
+  lunch: ['sassami', 'feijao_preto', 'arroz_branco', 'batata_doce'],
+  afternoon_snack: ['whey_growth_30g', 'ovos_inteiros', 'pao_integral'],
+  dinner_event: ['sassami', 'batata_doce', 'pizza_calabresa', 'salgadinho_festa'],
+};
+
+/**
+ * Retorna os alimentos mais comuns para uma janela de refeição específica.
+ */
+export function getCommonFoodsForMeal(
+  window: MealWindow,
+  availableFoods: FoodItem[] = PREPOPULATED_FOODS
+): FoodItem[] {
+  const commonIds = COMMON_FOOD_PRESETS_BY_WINDOW[window] || [];
+  const foodMap = new Map<string, FoodItem>(availableFoods.map(f => [f.id, f]));
+  const result: FoodItem[] = [];
+  for (const id of commonIds) {
+    const found = foodMap.get(id);
+    if (found) {
+      result.push(found);
+    }
+  }
+  return result;
+}
+
+/**
+ * Busca alimentos por nome (case-insensitive) ou código de barras na lista fornecida.
+ */
+export function searchFoodItems(items: FoodItem[], query: string): FoodItem[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return items;
+  return items.filter(item => {
+    return (
+      item.name.toLowerCase().includes(normalized) ||
+      item.id.toLowerCase().includes(normalized) ||
+      ((item as { barcode?: string }).barcode?.toLowerCase().includes(normalized) ?? false)
+    );
+  });
+}
+

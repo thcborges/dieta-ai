@@ -33,6 +33,27 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  // Listagem de alimentos no banco de dados / cache
+  app.get('/api/v1/foods', async () => {
+    const foods = foodCacheService.getAllFoods();
+    return {
+      foods,
+      total: foods.length,
+    };
+  });
+
+  // Busca de alimentos (Cache/Banco de dados primeiro -> Open Food Facts API -> Salva no banco de dados)
+  app.get<{ Querystring: { q?: string } }>('/api/v1/foods/search', async (req) => {
+    const query = req.query.q || '';
+    const result = await foodCacheService.searchFoods(query);
+    return {
+      source: result.source,
+      query,
+      foods: result.foods,
+      total: result.foods.length,
+    };
+  });
+
   // Cadastro de alimento customizado
   app.post('/api/v1/foods/custom', async (req, reply) => {
     const parseResult = customFoodSchema.safeParse(req.body);
@@ -47,3 +68,4 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(saved);
   });
 };
+

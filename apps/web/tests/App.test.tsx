@@ -145,4 +145,64 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     expect(screen.getByRole('button', { name: /Entrar com Google/i })).toBeInTheDocument();
     expect(screen.queryByText(/Lançamento Rápido de Alimentos/i)).not.toBeInTheDocument();
   });
+
+  it('deve permitir cadastrar novo alimento na interface gráfica e lançá-lo no diário de refeições', () => {
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+
+    render(<App />);
+
+    // Clica no botão para abrir o modal de cadastro de novo alimento
+    const newFoodBtn = screen.getByRole('button', { name: /\+ Novo Alimento/i });
+    fireEvent.click(newFoodBtn);
+
+    expect(screen.getByText(/Cadastrar Novo Alimento/i)).toBeInTheDocument();
+
+    // Preenche o formulário M3
+    fireEvent.change(screen.getByLabelText(/Nome do Alimento/i), {
+      target: { value: 'Atum Ralado em Água' },
+    });
+    fireEvent.change(screen.getByLabelText(/Porção Padrão \(g\)/i), {
+      target: { value: '120' },
+    });
+    fireEvent.change(screen.getByLabelText(/Calorias \(100g\)/i), {
+      target: { value: '110' },
+    });
+    fireEvent.change(screen.getByLabelText(/Proteínas \(100g\)/i), {
+      target: { value: '26' },
+    });
+    fireEvent.change(screen.getByLabelText(/Carboidratos \(100g\)/i), {
+      target: { value: '0' },
+    });
+    fireEvent.change(screen.getByLabelText(/Gorduras \(100g\)/i), {
+      target: { value: '0.5' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fibras \(100g\)/i), {
+      target: { value: '0' },
+    });
+
+    const saveBtn = screen.getByRole('button', { name: /Salvar Alimento/i });
+    fireEvent.click(saveBtn);
+
+    // Modal fechou
+    expect(screen.queryByText(/Cadastrar Novo Alimento/i)).not.toBeInTheDocument();
+
+    // Alimento cadastrado foi selecionado no select
+    const select = screen.getByLabelText(/Alimento Selecionado/i) as HTMLSelectElement;
+    expect(select.value).toContain('custom_');
+
+    // Lança o alimento na janela de refeição ativa (Almoço)
+    const launchBtn = screen.getByRole('button', { name: /Lançar/i });
+    fireEvent.click(launchBtn);
+
+    // Deve estar visível na lista de alimentos consumidos
+    expect(screen.getAllByText(/Atum Ralado em Água/i).length).toBeGreaterThanOrEqual(1);
+  });
 });
+

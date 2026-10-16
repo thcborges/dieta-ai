@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import {
   auditDailyIntake,
   solveProteinDeficit,
+  PREPOPULATED_FOODS,
   type EventBufferInput,
   type MealWindow,
+  type FoodItem,
 } from '@dieta-ai/core';
 import { MacroSummary } from './components/MacroSummary.js';
 import { AuditorBanner } from './components/AuditorBanner.js';
@@ -149,6 +151,25 @@ export default function App() {
     }
   });
 
+  // Banco de Alimentos do usuário (Cache offline-first + pré-populado)
+  const [availableFoods, setAvailableFoods] = useState<FoodItem[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('macrometrics_auth_user');
+      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${userId}`);
+      if (savedFoods) {
+        const parsed = JSON.parse(savedFoods) as FoodItem[];
+        const map = new Map<string, FoodItem>();
+        for (const f of PREPOPULATED_FOODS) map.set(f.id, f);
+        for (const f of parsed) map.set(f.id, f);
+        return Array.from(map.values());
+      }
+      return PREPOPULATED_FOODS;
+    } catch {
+      return PREPOPULATED_FOODS;
+    }
+  });
+
   // Modais
   const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -157,7 +178,7 @@ export default function App() {
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
 
-  // Sincroniza persistência de perfil e refeições ao trocar usuário
+  // Sincroniza persistência de perfil, refeições e alimentos ao trocar usuário
   useEffect(() => {
     if (user) {
       try {
@@ -173,6 +194,17 @@ export default function App() {
           setMeals(JSON.parse(savedMeals));
         } else {
           setMeals(INITIAL_MEALS);
+        }
+
+        const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${user.id}`);
+        if (savedFoods) {
+          const parsed = JSON.parse(savedFoods) as FoodItem[];
+          const map = new Map<string, FoodItem>();
+          for (const f of PREPOPULATED_FOODS) map.set(f.id, f);
+          for (const f of parsed) map.set(f.id, f);
+          setAvailableFoods(Array.from(map.values()));
+        } else {
+          setAvailableFoods(PREPOPULATED_FOODS);
         }
       } catch {
         // Ignora erro de storage
@@ -191,6 +223,20 @@ export default function App() {
     }
   }, [meals, user]);
 
+  // Persiste alimentos customizados do usuário logado
+  useEffect(() => {
+    if (user) {
+      try {
+        const customOnly = availableFoods.filter(
+          f => f.isCustom || f.id.startsWith('off_') || f.id.startsWith('custom_')
+        );
+        localStorage.setItem(`macrometrics_custom_foods_${user.id}`, JSON.stringify(customOnly));
+      } catch {
+        // Ignora erro de storage
+      }
+    }
+  }, [availableFoods, user]);
+
   // Persiste metas de macros do usuário logado
   useEffect(() => {
     if (user) {
@@ -201,6 +247,34 @@ export default function App() {
       }
     }
   }, [macroSettings, user]);
+
+  const handleRegisterFood = async (newFood: FoodItem) => {
+    setAvailableFoods(prev => {
+      if (prev.some(f => f.id === newFood.id)) return prev;
+      return [newFood, ...prev];
+    });
+
+    if (newFood.isCustom) {
+      try {
+        await fetch('/api/v1/foods/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newFood.name,
+            servingSizeGrams: newFood.servingSizeGrams,
+            caloriesPer100g: newFood.caloriesPer100g,
+            proteinPer100g: newFood.proteinPer100g,
+            carbsPer100g: newFood.carbsPer100g,
+            fatPer100g: newFood.fatPer100g,
+            fiberPer100g: newFood.fiberPer100g,
+            barcode: (newFood as { barcode?: string }).barcode,
+          }),
+        });
+      } catch {
+        // Ignora erro offline-first
+      }
+    }
+  };
 
   const handleLogin = (loggedUser: AuthUser) => {
     setUser(loggedUser);
@@ -409,10 +483,12 @@ export default function App() {
         {/* Construtor de Refeições com UX Cronometer */}
         <MealBuilder
           meals={meals}
+          availableFoods={availableFoods}
           onAddFood={handleAddFood}
           onRemoveFood={handleRemoveFood}
           onCopyMeal={handleCopyMeal}
           onAutoCompleteProtein={handleAutoCompleteProtein}
+          onRegisterFood={handleRegisterFood}
           missingProtein={missingProtein}
           remainingCalories={remainingCalories}
         />

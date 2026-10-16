@@ -131,4 +131,83 @@ describe('Foods & Open Food Facts Cache API', () => {
     const body = response.json();
     expect(body.error).toBe('INVALID_PAYLOAD');
   });
+
+  it('deve buscar alimentos primeiro no banco de dados / cache', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=Iogurte',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.source).toBe('cache');
+    expect(body.foods.length).toBeGreaterThan(0);
+    expect(body.foods[0].name).toContain('Iogurte');
+  });
+
+  it('deve consultar Open Food Facts se não encontrado no cache e salvar o alimento no banco de dados', async () => {
+    const mockOFFSearchResponse = {
+      count: 1,
+      products: [
+        {
+          code: '7893000300030',
+          product_name: 'Granola Artesanal Zero Açúcar',
+          serving_quantity: '40',
+          nutriments: {
+            'energy-kcal_100g': 380,
+            proteins_100g: 11,
+            carbohydrates_100g: 58,
+            fat_100g: 10,
+            fiber_100g: 12,
+          },
+        },
+      ],
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockOFFSearchResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    // 1. Busca na API (não está no cache ainda)
+    const response1 = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=Granola',
+    });
+
+    expect(response1.statusCode).toBe(200);
+    const body1 = response1.json();
+    expect(body1.source).toBe('open_food_facts');
+    expect(body1.foods.length).toBe(1);
+    expect(body1.foods[0].name).toBe('Granola Artesanal Zero Açúcar');
+    expect(body1.foods[0].fiberPer100g).toBe(12);
+
+    fetchSpy.mockRestore();
+
+    // 2. Segunda busca deve vir do CACHE (pois foi salvo no banco de dados) sem chamar o fetch
+    const response2 = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=Granola',
+    });
+
+    expect(response2.statusCode).toBe(200);
+    const body2 = response2.json();
+    expect(body2.source).toBe('cache');
+    expect(body2.foods[0].name).toBe('Granola Artesanal Zero Açúcar');
+  });
+
+  it('deve listar todos os alimentos do banco de dados via GET /api/v1/foods', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(Array.isArray(body.foods)).toBe(true);
+    expect(body.foods.length).toBeGreaterThan(0);
+  });
 });
+

@@ -3,6 +3,8 @@ import {
   PREPOPULATED_FOODS,
   calculateRecipeMacros,
   getMealFrequentFoodSuggestions,
+  getCommonFoodsForMeal,
+  searchFoodItems,
   type RecipeInput,
   type MealLogEntry,
 } from '../src/food-database.js';
@@ -90,4 +92,35 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     expect(result.totalMacros.fiberGrams).toBeGreaterThan(0);
     expect(result.perServing.fiberGrams).toBeDefined();
   });
+
+  it('deve retornar os alimentos mais comuns para uma janela de refeição específica via getCommonFoodsForMeal', () => {
+    // Café da Manhã deve trazer ovos, claras, pão, café
+    const breakfastFoods = getCommonFoodsForMeal('breakfast');
+    const breakfastIds = breakfastFoods.map(f => f.id);
+    expect(breakfastIds).toContain('ovos_inteiros');
+    expect(breakfastIds).toContain('claras_pasteurizadas');
+    expect(breakfastIds).toContain('pao_integral');
+    expect(breakfastIds).not.toContain('feijao_preto');
+
+    // Almoço deve trazer sassami, feijão, arroz, batata doce
+    const lunchFoods = getCommonFoodsForMeal('lunch');
+    const lunchIds = lunchFoods.map(f => f.id);
+    expect(lunchIds).toContain('sassami');
+    expect(lunchIds).toContain('feijao_preto');
+    expect(lunchIds).toContain('arroz_branco');
+    expect(lunchIds).not.toContain('cafe_especial');
+  });
+
+  it('deve buscar alimentos por nome (case-insensitive) via searchFoodItems', () => {
+    const results = searchFoodItems(PREPOPULATED_FOODS, 'sassami');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]?.name).toContain('Sassami');
+
+    const eggResults = searchFoodItems(PREPOPULATED_FOODS, 'ovo');
+    expect(eggResults.length).toBeGreaterThanOrEqual(2); // ovos_inteiros e claras
+
+    const notFound = searchFoodItems(PREPOPULATED_FOODS, 'alimento_inexistente_xyz');
+    expect(notFound.length).toBe(0);
+  });
 });
+
