@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  calculateBMR,
-  calculateTDEE,
-  calculateMacroTargets,
   auditDailyIntake,
   solveProteinDeficit,
   type EventBufferInput,
@@ -13,7 +10,9 @@ import { AuditorBanner } from './components/AuditorBanner.js';
 import { ReverseBufferCard } from './components/ReverseBufferCard.js';
 import { MealBuilder, type LoggedFood, type MealMap } from './components/MealBuilder.js';
 import { AccountManagementModal } from './components/AccountManagementModal.js';
-import { User } from 'lucide-react';
+import { LoginPage, type AuthUser } from './components/LoginPage.js';
+import { MacroSettingsModal, type UserMacroSettings } from './components/MacroSettingsModal.js';
+import { User, Sliders, LogOut } from 'lucide-react';
 
 const INITIAL_MEALS: MealMap = {
   breakfast: [
@@ -26,6 +25,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 13,
       carbs: 1,
       fat: 10,
+      fiber: 0,
     },
     {
       id: 'init_2',
@@ -36,6 +36,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 16.5,
       carbs: 1,
       fat: 0.3,
+      fiber: 0,
     },
     {
       id: 'init_3',
@@ -46,6 +47,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 4.5,
       carbs: 21.5,
       fat: 1.8,
+      fiber: 3.0,
     },
   ],
   lunch: [
@@ -58,6 +60,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 62,
       carbs: 0,
       fat: 7.2,
+      fiber: 0,
     },
     {
       id: 'init_5',
@@ -68,6 +71,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 4.5,
       carbs: 14,
       fat: 0.5,
+      fiber: 8.5,
     },
     {
       id: 'init_6',
@@ -78,6 +82,7 @@ const INITIAL_MEALS: MealMap = {
       protein: 2.4,
       carbs: 30.1,
       fat: 0.2,
+      fiber: 4.5,
     },
   ],
   afternoon_snack: [
@@ -90,51 +95,144 @@ const INITIAL_MEALS: MealMap = {
       protein: 24,
       carbs: 3,
       fat: 1.8,
+      fiber: 0,
     },
   ],
   dinner_event: [],
 };
 
-export default function App() {
-  // Biometria do Usuário-Alvo (190cm, 40 anos, 95kg)
-  const [weightKg] = useState(95);
-  const [dailyDeficit] = useState(500);
+const DEFAULT_SETTINGS: UserMacroSettings = {
+  ageYears: 40,
+  gender: 'male',
+  weightKg: 95,
+  activityLevel: 'moderate',
+  dailyDeficitKcal: 500,
+  calories: 2400,
+  proteinGrams: 220,
+  carbGrams: 180,
+  fatGrams: 75,
+  fiberGrams: 38,
+};
 
-  // Metas calculadas via Core Mifflin-St Jeor
-  const bmr = calculateBMR({ gender: 'male', age: 40, heightCm: 190, weightKg });
-  const tdee = calculateTDEE(bmr, 'moderate');
-  const targetMacros = calculateMacroTargets({
-    tdee,
-    weightKg,
-    deficitKcal: dailyDeficit,
-    proteinStrategy: { type: 'fixed', grams: 220 },
-    fatPerKg: 0.8,
+export default function App() {
+  // Estado de Autenticação (Obrigatório para lançar alimentos)
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('macrometrics_auth_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
 
-  // Estado das refeições persistido em localStorage
+  // Configurações de Macros controladas por usuário
+  const [macroSettings, setMacroSettings] = useState<UserMacroSettings>(() => {
+    try {
+      const savedUser = localStorage.getItem('macrometrics_auth_user');
+      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const savedProfile = localStorage.getItem(`macrometrics_profile_${userId}`);
+      return savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
+
+  // Refeições isoladas por usuário
   const [meals, setMeals] = useState<MealMap>(() => {
     try {
-      const saved = localStorage.getItem('macrometrics_meals');
+      const savedUser = localStorage.getItem('macrometrics_auth_user');
+      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const saved = localStorage.getItem(`macrometrics_meals_${userId}`);
       return saved ? JSON.parse(saved) : INITIAL_MEALS;
     } catch {
       return INITIAL_MEALS;
     }
   });
 
+  // Modais
+  const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isAdmin] = useState(true);
+
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
 
-  // Modal de Conta e LGPD
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [isAdmin] = useState(true); // Capacidade de admin
-
+  // Sincroniza persistência de perfil e refeições ao trocar usuário
   useEffect(() => {
-    try {
-      localStorage.setItem('macrometrics_meals', JSON.stringify(meals));
-    } catch {
-      // Ignora erro de cota de storage
+    if (user) {
+      try {
+        const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
+        if (savedProfile) {
+          setMacroSettings(JSON.parse(savedProfile));
+        } else {
+          setMacroSettings(DEFAULT_SETTINGS);
+        }
+
+        const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
+        if (savedMeals) {
+          setMeals(JSON.parse(savedMeals));
+        } else {
+          setMeals(INITIAL_MEALS);
+        }
+      } catch {
+        // Ignora erro de storage
+      }
     }
-  }, [meals]);
+  }, [user]);
+
+  // Persiste refeições do usuário logado
+  useEffect(() => {
+    if (user) {
+      try {
+        localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(meals));
+      } catch {
+        // Ignora erro de storage
+      }
+    }
+  }, [meals, user]);
+
+  // Persiste metas de macros do usuário logado
+  useEffect(() => {
+    if (user) {
+      try {
+        localStorage.setItem(`macrometrics_profile_${user.id}`, JSON.stringify(macroSettings));
+      } catch {
+        // Ignora erro de storage
+      }
+    }
+  }, [macroSettings, user]);
+
+  const handleLogin = (loggedUser: AuthUser) => {
+    setUser(loggedUser);
+    try {
+      localStorage.setItem('macrometrics_auth_user', JSON.stringify(loggedUser));
+    } catch {
+      // Ignora erro de storage
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('macrometrics_auth_user');
+    } catch {
+      // Ignora erro de storage
+    }
+  };
+
+  // Se o usuário NÃO estiver logado, exibe a Página Principal de Login
+  // Nenhum alimento pode ser lançado sem autenticação
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  const targetMacros = {
+    calories: macroSettings.calories,
+    proteinGrams: macroSettings.proteinGrams,
+    carbGrams: macroSettings.carbGrams,
+    fatGrams: macroSettings.fatGrams,
+    fiberGrams: macroSettings.fiberGrams,
+  };
 
   // Totais consumidos no dia
   const allFoods = Object.values(meals).flat();
@@ -158,12 +256,18 @@ export default function App() {
         (allFoods.reduce((acc, f) => acc + f.fat, 0) + (activeEvent ? activeEvent.fatGrams : 0)) *
           10
       ) / 10,
+    fiberGrams:
+      Math.round(
+        (allFoods.reduce((acc, f) => acc + (f.fiber || 0), 0) +
+          (activeEvent?.fiberGrams ?? 0)) *
+          10
+      ) / 10,
   };
 
   // Auditoria Lógica em tempo real
   const auditReport = auditDailyIntake({
-    weightKg,
-    plannedDailyDeficitKcal: dailyDeficit,
+    weightKg: macroSettings.weightKg,
+    plannedDailyDeficitKcal: macroSettings.dailyDeficitKcal,
     targetCalories: targetMacros.calories,
     targetProteinGrams: targetMacros.proteinGrams,
     currentCalories: currentTotals.calories,
@@ -218,6 +322,7 @@ export default function App() {
       protein: solution.proteinProvided,
       carbs: solution.carbsAdded,
       fat: solution.fatAdded,
+      fiber: 0,
     };
 
     handleAddFood(targetWindow, newFood);
@@ -248,6 +353,17 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Botão de Controle de Macros */}
+            <button
+              type="button"
+              onClick={() => setIsMacroModalOpen(true)}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs text-m3-on-surface px-3 py-1.5 rounded-xl transition-colors font-medium"
+            >
+              <Sliders className="w-3.5 h-3.5 text-m3-metric-protein" />
+              <span>Controlar Macros</span>
+            </button>
+
+            {/* Modal de Conta e LGPD */}
             <button
               type="button"
               onClick={() => setIsAccountModalOpen(true)}
@@ -255,6 +371,17 @@ export default function App() {
             >
               <User className="w-3.5 h-3.5 text-m3-primary" />
               <span>Conta & LGPD</span>
+            </button>
+
+            {/* Botão de Logout */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Sair da Conta"
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-red-950/40 hover:text-red-400 border border-m3-outline-variant text-xs text-m3-outline px-2.5 py-1.5 rounded-xl transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sair</span>
             </button>
           </div>
         </div>
@@ -269,7 +396,7 @@ export default function App() {
         <MacroSummary
           target={targetMacros}
           current={currentTotals}
-          weeklyBankKcal={450} // Exemplo de saldo semanal acumulado
+          weeklyBankKcal={450}
         />
 
         {/* Simulador de Buffer de Evento Social (Engenharia Reversa) */}
@@ -290,6 +417,14 @@ export default function App() {
           remainingCalories={remainingCalories}
         />
       </main>
+
+      {/* Modal de Controle de Macros */}
+      <MacroSettingsModal
+        isOpen={isMacroModalOpen}
+        onClose={() => setIsMacroModalOpen(false)}
+        currentSettings={macroSettings}
+        onSave={newSettings => setMacroSettings(newSettings)}
+      />
 
       {/* Modal de Gestão de Conta e LGPD */}
       <AccountManagementModal

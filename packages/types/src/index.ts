@@ -60,6 +60,7 @@ export interface MacroBreakdown {
   proteinGrams: number;
   carbsGrams: number;
   fatsGrams: number;
+  fiberGrams?: number;
 }
 
 export interface FoodItemDto {
@@ -69,6 +70,7 @@ export interface FoodItemDto {
   proteinPer100g: number;
   carbsPer100g: number;
   fatsPer100g: number;
+  fiberPer100g?: number;
   servingUnit: string;
   defaultServingGrams: number;
   isSocialEventFood?: boolean;
@@ -84,6 +86,24 @@ export interface LoggedFoodItemDto {
   proteinGrams: number;
   carbsGrams: number;
   fatsGrams: number;
+  fiberGrams?: number;
+}
+
+export interface UserMacroTargetsDto {
+  calories: number;
+  proteinGrams: number;
+  carbGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+}
+
+export interface UserProfileDto {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  biometrics?: UserBiometrics;
+  customMacros?: UserMacroTargetsDto;
 }
 
 export interface LgpdDeletionRequestDto {
@@ -93,3 +113,4 @@ export interface LgpdDeletionRequestDto {
   scheduledPurgeAt: string;
   status: 'PENDING_15_DAYS' | 'COMPLETED' | 'CANCELLED';
 }
+

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "./scripts/run-e2e.sh",
     "android:build": "pnpm build && node ./scripts/build-android.js",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android"
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.2",
+    "@playwright/test": "1.51.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/react": "^19.0.8",

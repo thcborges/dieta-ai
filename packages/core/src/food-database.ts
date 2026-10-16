@@ -7,6 +7,7 @@ export interface FoodItem {
   proteinPer100g: number;
   carbsPer100g: number;
   fatPer100g: number;
+  fiberPer100g: number;
   isCustom?: boolean;
 }
 
@@ -29,12 +30,14 @@ export interface RecipeCalculationResult {
     proteinGrams: number;
     carbGrams: number;
     fatGrams: number;
+    fiberGrams: number;
   };
   perServing: {
     calories: number;
     proteinGrams: number;
     carbGrams: number;
     fatGrams: number;
+    fiberGrams: number;
   };
 }
 
@@ -56,6 +59,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 31,
     carbsPer100g: 0,
     fatPer100g: 3.6,
+    fiberPer100g: 0,
   },
   {
     id: 'feijao_preto',
@@ -66,6 +70,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 4.5,
     carbsPer100g: 14.0,
     fatPer100g: 0.5,
+    fiberPer100g: 8.5,
   },
   {
     id: 'batata_doce',
@@ -76,6 +81,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 1.6,
     carbsPer100g: 20.1,
     fatPer100g: 0.1,
+    fiberPer100g: 3.0,
   },
   {
     id: 'ovos_inteiros',
@@ -86,6 +92,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 13.0,
     carbsPer100g: 1.0,
     fatPer100g: 10.0,
+    fiberPer100g: 0,
   },
   {
     id: 'claras_pasteurizadas',
@@ -96,6 +103,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 11.0,
     carbsPer100g: 0.7,
     fatPer100g: 0.2,
+    fiberPer100g: 0,
   },
   {
     id: 'whey_growth_30g',
@@ -106,6 +114,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 80.0,
     carbsPer100g: 10.0,
     fatPer100g: 6.0,
+    fiberPer100g: 0,
   },
   {
     id: 'arroz_branco',
@@ -116,6 +125,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 2.7,
     carbsPer100g: 28.2,
     fatPer100g: 0.3,
+    fiberPer100g: 0.4,
   },
   {
     id: 'pao_integral',
@@ -126,6 +136,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 9.0,
     carbsPer100g: 43.0,
     fatPer100g: 3.5,
+    fiberPer100g: 6.0,
   },
   {
     id: 'cafe_especial',
@@ -136,6 +147,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 0.2,
     carbsPer100g: 0.3,
     fatPer100g: 0.0,
+    fiberPer100g: 0,
   },
   {
     id: 'pizza_calabresa',
@@ -146,6 +158,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 11.5,
     carbsPer100g: 29.0,
     fatPer100g: 13.0,
+    fiberPer100g: 2.0,
   },
   {
     id: 'pizza_mussarela',
@@ -156,6 +169,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 12.0,
     carbsPer100g: 27.0,
     fatPer100g: 15.0,
+    fiberPer100g: 1.5,
   },
   {
     id: 'salgadinho_festa',
@@ -166,6 +180,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 6.5,
     carbsPer100g: 35.0,
     fatPer100g: 17.5,
+    fiberPer100g: 1.2,
   },
   {
     id: 'bolo_festa_recheado',
@@ -176,6 +191,7 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     proteinPer100g: 4.0,
     carbsPer100g: 55.0,
     fatPer100g: 14.0,
+    fiberPer100g: 1.0,
   },
 ];
 
@@ -189,6 +205,7 @@ export function calculateRecipeMacros(recipe: RecipeInput): RecipeCalculationRes
   let totalProtein = 0;
   let totalCarbs = 0;
   let totalFat = 0;
+  let totalFiber = 0;
 
   for (const item of recipe.ingredients) {
     const food = FOOD_MAP.get(item.foodId);
@@ -200,6 +217,7 @@ export function calculateRecipeMacros(recipe: RecipeInput): RecipeCalculationRes
     totalProtein += food.proteinPer100g * factor;
     totalCarbs += food.carbsPer100g * factor;
     totalFat += food.fatPer100g * factor;
+    totalFiber += (food.fiberPer100g ?? 0) * factor;
   }
 
   const servings = Math.max(1, recipe.servings);
@@ -212,12 +230,14 @@ export function calculateRecipeMacros(recipe: RecipeInput): RecipeCalculationRes
       proteinGrams: Math.round(totalProtein * 10) / 10,
       carbGrams: Math.round(totalCarbs * 10) / 10,
       fatGrams: Math.round(totalFat * 10) / 10,
+      fiberGrams: Math.round(totalFiber * 10) / 10,
     },
     perServing: {
       calories: Math.round(totalCalories / servings),
       proteinGrams: Math.round((totalProtein / servings) * 10) / 10,
       carbGrams: Math.round((totalCarbs / servings) * 10) / 10,
       fatGrams: Math.round((totalFat / servings) * 10) / 10,
+      fiberGrams: Math.round((totalFiber / servings) * 10) / 10,
     },
   };
 }

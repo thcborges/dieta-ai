@@ -113,4 +113,17 @@ describe('Social Event Buffer Simulator (Módulo 2: Engenharia Reversa)', () => 
     expect(EVENT_PRESETS.KIDS_PARTY).toBeDefined();
     expect(EVENT_PRESETS.FAMILY_BARBECUE).toBeDefined();
   });
+
+  it('deve calcular o orçamento de fibras restante após abater o evento social', () => {
+    const targetWithFiber: MacroBudget = {
+      ...dailyTarget,
+      fiberGrams: 38,
+    };
+    const eventWithFiber: EventBufferInput = {
+      ...EVENT_PRESETS.PIZZA_NIGHT,
+      fiberGrams: 8,
+    };
+    const result = calculateEventBuffer(targetWithFiber, eventWithFiber);
+    expect(result.remainingBudget.fiberGrams).toBe(30);
+  });
 });

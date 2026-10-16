@@ -18,6 +18,9 @@ export interface TargetCalculationInput {
   deficitKcal?: number;
   proteinStrategy: ProteinStrategy;
   fatPerKg?: number;
+  age?: number;
+  gender?: Gender;
+  customFiberGrams?: number;
 }
 
 export interface MacroTargets {
@@ -25,6 +28,7 @@ export interface MacroTargets {
   proteinGrams: number;
   carbGrams: number;
   fatGrams: number;
+  fiberGrams: number;
 }
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
@@ -64,6 +68,44 @@ export function calculateTDEE(bmr: number, activityLevel: ActivityLevel): number
 }
 
 /**
+ * Calcula a recomendação diária de fibras (g/dia) segundo diretrizes DRI (Dietary Reference Intakes)
+ * com base na idade e sexo do indivíduo.
+ */
+export function calculateRecommendedFiber(age: number, gender: Gender = 'male'): number {
+  if (age <= 0) {
+    throw new Error('Idade deve ser maior que zero');
+  }
+
+  // Crianças pequenas (1 a 3 anos): 19g
+  if (age <= 3) {
+    return 19;
+  }
+
+  // Crianças (4 a 8 anos): 25g
+  if (age <= 8) {
+    return 25;
+  }
+
+  // Adolescentes (9 a 13 anos): Homens 31g, Mulheres 26g
+  if (age <= 13) {
+    return gender === 'female' ? 26 : 31;
+  }
+
+  // Jovens (14 a 18 anos): Homens 38g, Mulheres 26g
+  if (age <= 18) {
+    return gender === 'female' ? 26 : 38;
+  }
+
+  // Adultos (19 a 50 anos): Homens 38g, Mulheres 25g
+  if (age <= 50) {
+    return gender === 'female' ? 25 : 38;
+  }
+
+  // Adultos mais velhos / Idosos (> 50 anos): Homens 30g, Mulheres 21g
+  return gender === 'female' ? 21 : 30;
+}
+
+/**
  * Calcula as metas diárias de calorias e macronutrientes.
  */
 export function calculateMacroTargets(input: TargetCalculationInput): MacroTargets {
@@ -91,10 +133,19 @@ export function calculateMacroTargets(input: TargetCalculationInput): MacroTarge
   const remainingCaloriesForCarbs = Math.max(0, targetCalories - (caloriesFromProtein + caloriesFromFat));
   const carbGrams = Math.round(remainingCaloriesForCarbs / 4);
 
+  // Fibras: meta recomendada por idade e sexo ou valor customizado
+  let fiberGrams = 38;
+  if (input.customFiberGrams !== undefined) {
+    fiberGrams = input.customFiberGrams;
+  } else if (input.age !== undefined) {
+    fiberGrams = calculateRecommendedFiber(input.age, input.gender ?? 'male');
+  }
+
   return {
     calories: targetCalories,
     proteinGrams,
     carbGrams,
     fatGrams,
+    fiberGrams,
   };
 }

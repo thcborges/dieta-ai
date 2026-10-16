@@ -55,6 +55,7 @@ export class FoodCacheService {
         proteinPer100g: Math.round((Number(nutriments['proteins_100g']) || 0) * 10) / 10,
         carbsPer100g: Math.round((Number(nutriments['carbohydrates_100g']) || 0) * 10) / 10,
         fatPer100g: Math.round((Number(nutriments['fat_100g']) || 0) * 10) / 10,
+        fiberPer100g: Math.round((Number(nutriments['fiber_100g']) || 0) * 10) / 10,
         barcode,
         source: 'open_food_facts',
         updatedAt: new Date().toISOString(),
@@ -75,6 +76,7 @@ export class FoodCacheService {
     proteinPer100g: number;
     carbsPer100g: number;
     fatPer100g: number;
+    fiberPer100g?: number;
     barcode?: string;
   }): Promise<CachedFood> {
     const id = foodData.barcode ? `custom_${foodData.barcode}` : `custom_${Date.now()}`;
@@ -87,6 +89,7 @@ export class FoodCacheService {
       proteinPer100g: foodData.proteinPer100g,
       carbsPer100g: foodData.carbsPer100g,
       fatPer100g: foodData.fatPer100g,
+      fiberPer100g: foodData.fiberPer100g ?? 0,
       barcode: foodData.barcode,
       isCustom: true,
       source: 'manual',

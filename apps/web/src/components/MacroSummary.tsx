@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MacroBudget } from '@dieta-ai/core';
-import { Target, Activity, Flame, ShieldCheck } from 'lucide-react';
+import { Target, Activity, Flame, ShieldCheck, Leaf } from 'lucide-react';
 
 interface MacroSummaryProps {
   target: MacroBudget;
@@ -9,6 +9,7 @@ interface MacroSummaryProps {
     proteinGrams: number;
     carbGrams: number;
     fatGrams: number;
+    fiberGrams?: number;
   };
   weeklyBankKcal?: number;
 }
@@ -22,6 +23,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
   const proteinPercent = Math.min(100, Math.round((current.proteinGrams / Math.max(1, target.proteinGrams)) * 100));
   const carbsPercent = Math.min(100, Math.round((current.carbGrams / Math.max(1, target.carbGrams)) * 100));
   const fatPercent = Math.min(100, Math.round((current.fatGrams / Math.max(1, target.fatGrams)) * 100));
+  const targetFiber = target.fiberGrams ?? 38;
+  const currentFiber = current.fiberGrams ?? 0;
+  const fiberPercent = Math.min(100, Math.round((currentFiber / Math.max(1, targetFiber)) * 100));
+  const remainingFiber = Math.max(0, targetFiber - currentFiber);
 
   const remainingKcal = target.calories - current.calories;
   const isSurplus = remainingKcal < 0;
@@ -58,7 +63,7 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
       </div>
 
       {/* Grid de Macros */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3.5 mt-4">
         {/* Calorias */}
         <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5">
@@ -147,6 +152,29 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
             <div
               className="h-full bg-m3-metric-fat transition-all duration-300"
               style={{ width: `${fatPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Fibras (Macro Essencial & Meta por Idade) */}
+        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+          <div className="flex justify-between items-center text-xs mb-1.5">
+            <span className="font-semibold text-m3-on-surface flex items-center gap-1.5">
+              <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+              Fibras
+            </span>
+            <span className="font-mono text-m3-outline text-[11px]">
+              {remainingFiber}g rest.
+            </span>
+          </div>
+          <div className="text-xl font-bold font-mono text-emerald-400 mb-1">
+            {currentFiber}g{' '}
+            <span className="text-xs font-normal text-m3-outline">/ {targetFiber}g</span>
+          </div>
+          <div className="w-full bg-m3-surface-container-highest h-1.5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${fiberPercent}%` }}
             />
           </div>
         </div>

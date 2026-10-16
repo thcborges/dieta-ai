@@ -9,6 +9,7 @@ const customFoodSchema = z.object({
   proteinPer100g: z.number().nonnegative(),
   carbsPer100g: z.number().nonnegative(),
   fatPer100g: z.number().nonnegative(),
+  fiberPer100g: z.number().nonnegative().optional(),
   barcode: z.string().optional(),
 });
 

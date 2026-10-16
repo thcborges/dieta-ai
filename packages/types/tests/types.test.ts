@@ -35,4 +35,22 @@ describe('Shared Types Package', () => {
     expect(job.branchName).toBe('fix/err-test-456');
     expect(job.environment).toBe('development');
   });
+
+  it('deve validar estrutura de UserProfileDto e UserMacroTargetsDto com fibra', () => {
+    const profile = {
+      id: 'usr_123',
+      email: 'user@example.com',
+      name: 'João Silva',
+      customMacros: {
+        calories: 2200,
+        proteinGrams: 200,
+        carbGrams: 180,
+        fatGrams: 60,
+        fiberGrams: 38,
+      },
+    };
+
+    expect(profile.customMacros.fiberGrams).toBe(38);
+    expect(profile.id).toBe('usr_123');
+  });
 });

@@ -9,6 +9,7 @@ describe('MacroSummary (Dashboard de Métricas & Banco Semanal)', () => {
     proteinGrams: 220,
     carbGrams: 200,
     fatGrams: 80,
+    fiberGrams: 38,
   };
 
   const current = {
@@ -16,6 +17,7 @@ describe('MacroSummary (Dashboard de Métricas & Banco Semanal)', () => {
     proteinGrams: 170,
     carbGrams: 140,
     fatGrams: 60,
+    fiberGrams: 28,
   };
 
   it('deve renderizar totais atuais versus metas com precisão analítica', () => {
@@ -25,6 +27,10 @@ describe('MacroSummary (Dashboard de Métricas & Banco Semanal)', () => {
     expect(screen.getByText(/2400/i)).toBeInTheDocument();
     expect(screen.getByText(/170g/i)).toBeInTheDocument();
     expect(screen.getByText(/220g/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fibras/i)).toBeInTheDocument();
+    expect(screen.getByText(/28g/i)).toBeInTheDocument();
+    expect(screen.getByText(/\/ 38g/i)).toBeInTheDocument();
+    expect(screen.getByText(/10g rest\./i)).toBeInTheDocument();
     expect(screen.getByText(/Banco Semanal/i)).toBeInTheDocument();
     expect(screen.getByText(/\+450 kcal/i)).toBeInTheDocument();
   });

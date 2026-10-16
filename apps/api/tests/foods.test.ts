@@ -21,6 +21,7 @@ describe('Foods & Open Food Facts Cache API', () => {
       proteinPer100g: 10,
       carbsPer100g: 4.5,
       fatPer100g: 0,
+      fiberPer100g: 2.5,
       barcode: '7891000100010',
     };
 
@@ -35,6 +36,7 @@ describe('Foods & Open Food Facts Cache API', () => {
     expect(body.id).toBeDefined();
     expect(body.name).toBe(payload.name);
     expect(body.barcode).toBe(payload.barcode);
+    expect(body.fiberPer100g).toBe(2.5);
   });
 
   it('deve retornar do cache quando o código de barras já foi cadastrado', async () => {
@@ -62,6 +64,7 @@ describe('Foods & Open Food Facts Cache API', () => {
           proteins_100g: 12.5,
           carbohydrates_100g: 3.2,
           fat_100g: 0.3,
+          fiber_100g: 0.8,
         },
       },
     };
@@ -83,6 +86,7 @@ describe('Foods & Open Food Facts Cache API', () => {
     expect(body.source).toBe('open_food_facts');
     expect(body.food.name).toBe('Queijo Cottage Zero Gordura');
     expect(body.food.proteinPer100g).toBe(12.5);
+    expect(body.food.fiberPer100g).toBe(0.8);
 
     fetchSpy.mockRestore();
   });
