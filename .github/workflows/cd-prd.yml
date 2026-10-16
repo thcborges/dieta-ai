@@ -1,0 +1,117 @@
+name: CD Pipeline - Production (Prd GCP)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  GCP_REGION: us-central1
+  PRD_PROJECT_ID: thcborges-dieta-ai-prd
+
+jobs:
+  quality-gate:
+    name: Quality Gate & Testes de Integração
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 12.11.2
+
+      - name: Instalar Dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Global
+        run: pnpm build
+
+      - name: Executar Testes Unitários & BDD com Cobertura >= 90%
+        run: pnpm test:coverage
+
+      - name: Testes de Integração de Infraestrutura
+        run: pnpm --filter @dieta-ai/terraform test
+
+  trivy-security-gate:
+    name: Trivy Security Scan & SAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Trivy Vulnerability & Secret Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  terraform-prd:
+    name: Terraform Apply Production (us-central1)
+    runs-on: ubuntu-latest
+    needs: [quality-gate, trivy-security-gate]
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.5
+
+      - name: Validar Sintaxe Prd (terraform validate)
+        run: |
+          terraform -chdir=infra/terraform/environments/prd init -backend=false
+          terraform -chdir=infra/terraform/environments/prd validate
+
+      - name: Autenticação Google Cloud (Prd)
+        if: env.GCP_SA_KEY_PRD != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PRD }}
+
+      - name: Terraform Apply Prd (GCP us-central1)
+        if: env.GCP_SA_KEY_PRD != ''
+        run: |
+          terraform -chdir=infra/terraform/environments/prd init
+          terraform -chdir=infra/terraform/environments/prd apply -auto-approve -no-color
+
+  deploy-cloud-run:
+    name: Deploy Cloud Run Production (us-central1)
+    runs-on: ubuntu-latest
+    needs: [terraform-prd]
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Autenticação Google Cloud (Prd)
+        if: env.GCP_SA_KEY_PRD != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PRD }}
+
+      - name: Configurar Docker para Artifact Registry (us-central1)
+        if: env.GCP_SA_KEY_PRD != ''
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build & Push da Imagem da API
+        if: env.GCP_SA_KEY_PRD != ''
+        run: |
+          IMAGE_TAG="us-central1-docker.pkg.dev/${PRD_PROJECT_ID}/dieta-ai-registry/api:${{ github.sha }}"
+          docker build -f apps/api/Dockerfile -t "${IMAGE_TAG}" .
+          docker push "${IMAGE_TAG}"
+          gcloud run deploy dieta-ai-api \
+            --image "${IMAGE_TAG}" \
+            --region "${GCP_REGION}" \
+            --project "${PRD_PROJECT_ID}" \
+            --platform managed \
+            --allow-unauthenticated

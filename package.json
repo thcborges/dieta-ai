@@ -4,8 +4,8 @@
   "private": true,
   "description": "MacroMetrics Pro - Analytical diet planning & reverse engineering engine",
   "scripts": {
-    "test": "pnpm -r --filter './packages/*' --filter './apps/*' test",
-    "test:coverage": "pnpm -r --filter './packages/*' --filter './apps/*' test:coverage",
+    "test": "pnpm --workspace-concurrency=1 -r test",
+    "test:coverage": "pnpm --workspace-concurrency=1 -r test:coverage",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint"
   },

@@ -1,0 +1,92 @@
+name: CI/CD Pipeline - Develop (Dev GCP)
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+env:
+  GCP_REGION: us-central1
+  DEV_PROJECT_ID: thcborges-dieta-ai-dev
+
+jobs:
+  test-and-coverage:
+    name: Testes BDD/TDD & Auditoria de Cobertura (>= 90%)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 12.11.2
+
+      - name: Instalar Dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dos Pacotes
+        run: pnpm build
+
+      - name: Executar Suíte Completa de Testes BDD/TDD com Cobertura
+        run: pnpm test:coverage
+
+      - name: Validar Cobertura Mínima Global de 90%
+        run: |
+          echo "Verificando se a cobertura atende ao limiar estrito de >= 90% definido no AGENTS.md..."
+          pnpm -r exec npx vitest run --coverage --coverage.thresholds.100=false --coverage.thresholds.lines=90
+
+  security-scan:
+    name: Análise de Segurança & Vulnerabilidades (Trivy & SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Trivy Vulnerability & Secret Scanner (HuskyCI/SAST)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  terraform-dev:
+    name: Terraform Dev Validation & Plan (us-central1)
+    runs-on: ubuntu-latest
+    needs: [test-and-coverage, security-scan]
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.5
+
+      - name: Verificar Formatação HCL (terraform fmt)
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+
+      - name: Validar Ambiente Dev (terraform validate)
+        run: |
+          terraform -chdir=infra/terraform/environments/dev init -backend=false
+          terraform -chdir=infra/terraform/environments/dev validate
+
+      - name: Autenticação Google Cloud (Dev)
+        if: github.event_name == 'push' && env.GCP_SA_KEY != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - name: Terraform Plan Dev (GCP us-central1)
+        if: github.event_name == 'push' && env.GCP_SA_KEY != ''
+        run: |
+          terraform -chdir=infra/terraform/environments/dev init
+          terraform -chdir=infra/terraform/environments/dev plan -no-color
