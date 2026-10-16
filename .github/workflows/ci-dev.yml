@@ -23,6 +23,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.5
+
       - name: Instalar pnpm
         uses: pnpm/action-setup@v3
         with:
@@ -40,7 +45,7 @@ jobs:
       - name: Validar Cobertura Mínima Global de 90%
         run: |
           echo "Verificando se a cobertura atende ao limiar estrito de >= 90% definido no AGENTS.md..."
-          pnpm -r exec npx vitest run --coverage --coverage.thresholds.100=false --coverage.thresholds.lines=90
+          pnpm --filter @dieta-ai/core --filter @dieta-ai/api --filter @dieta-ai/web --filter @dieta-ai/error-healer exec vitest run --coverage --coverage.thresholds.lines=90
 
   security-scan:
     name: Análise de Segurança & Vulnerabilidades (Trivy & SAST)

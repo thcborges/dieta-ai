@@ -21,6 +21,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.5
+
       - name: Instalar pnpm
         uses: pnpm/action-setup@v3
         with:
@@ -36,7 +41,7 @@ jobs:
         run: pnpm test:coverage
 
       - name: Testes de Integração de Infraestrutura
-        run: pnpm --filter @dieta-ai/terraform test
+        run: pnpm --filter @dieta-ai/infra test
 
   trivy-security-gate:
     name: Trivy Security Scan & SAST

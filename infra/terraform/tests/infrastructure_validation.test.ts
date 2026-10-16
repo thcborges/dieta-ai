@@ -12,11 +12,17 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
   const pubsubModule = resolve(terraformRoot, 'modules/pubsub/main.tf');
   const loggingSinkModule = resolve(terraformRoot, 'modules/logging_sink/main.tf');
 
+  const testEnv = {
+    ...process.env,
+    PATH: `${process.env.HOME || ''}/.local/bin:${process.env.PATH || ''}`,
+  };
+
   it('deve formatar perfeitamente todo o código HCL (terraform fmt -check)', () => {
     expect(() => {
-      execSync('export PATH="/home/thcborges/.local/bin:$PATH" && terraform fmt -check -recursive', {
+      execSync('terraform fmt -check -recursive', {
         cwd: terraformRoot,
         stdio: 'pipe',
+        env: testEnv,
       });
     }).not.toThrow();
   });
@@ -64,28 +70,32 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
 
   it('deve validar sintaxe e inicialização dos ambientes dev e prd (terraform validate)', () => {
     // Inicializa dev localmente sem backend remoto
-    execSync('export PATH="/home/thcborges/.local/bin:$PATH" && terraform init -backend=false', {
+    execSync('terraform init -backend=false', {
       cwd: devEnvPath,
       stdio: 'pipe',
+      env: testEnv,
     });
 
-    const devValidate = execSync('export PATH="/home/thcborges/.local/bin:$PATH" && terraform validate', {
+    const devValidate = execSync('terraform validate', {
       cwd: devEnvPath,
       stdio: 'pipe',
       encoding: 'utf-8',
+      env: testEnv,
     });
     expect(devValidate).toContain('The configuration is valid');
 
     // Inicializa prd localmente sem backend remoto
-    execSync('export PATH="/home/thcborges/.local/bin:$PATH" && terraform init -backend=false', {
+    execSync('terraform init -backend=false', {
       cwd: prdEnvPath,
       stdio: 'pipe',
+      env: testEnv,
     });
 
-    const prdValidate = execSync('export PATH="/home/thcborges/.local/bin:$PATH" && terraform validate', {
+    const prdValidate = execSync('terraform validate', {
       cwd: prdEnvPath,
       stdio: 'pipe',
       encoding: 'utf-8',
+      env: testEnv,
     });
     expect(prdValidate).toContain('The configuration is valid');
   }, 60000);
