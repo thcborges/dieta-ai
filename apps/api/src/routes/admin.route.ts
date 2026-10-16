@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { firestoreDiaryService } from '../services/firestore-diary.service.js';
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-secret-token-key-us-central1';
 
@@ -16,10 +17,13 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
     const { userId } = req.params;
 
-    // Em produção: Remove registros do Firestore, Auth e Storage permanentemente
+    // Remove registros do Firestore permanentemente em conformidade com a LGPD
+    const deletedCount = await firestoreDiaryService.purgeUserDiaries(userId);
+
     return reply.status(200).send({
       success: true,
       purgedUserId: userId,
+      purgedDiariesCount: deletedCount,
       message: `Usuário ${userId} e todos os seus dados biométricos e alimentares foram irreversivelmente eliminados.`,
       purgedAt: new Date().toISOString(),
     });
