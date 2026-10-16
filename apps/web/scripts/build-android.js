@@ -55,12 +55,20 @@ if (hasLocalAndroidSdk && hasJava) {
   console.log('-> Ambiente local do Android SDK não detectado.');
   console.log('-> Executando build hermético no container Docker (ghcr.io/cirruslabs/android-sdk:34)...');
 
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 1000;
+  const gid = typeof process.getgid === 'function' ? process.getgid() : 1000;
+
+  const buildInsideContainer = [
+    './gradlew assembleDebug --no-daemon',
+    `chown -R ${uid}:${gid} /workspace/apps/web/android/app/build /workspace/apps/web/android/.gradle /workspace/apps/web/android/capacitor-cordova-android-plugins 2>/dev/null || true`,
+  ].join(' && ');
+
   const dockerCmd = [
     'docker run --rm',
     `-v "${repoRoot}:/workspace"`,
     '-w /workspace/apps/web/android',
     'ghcr.io/cirruslabs/android-sdk:34',
-    './gradlew assembleDebug --no-daemon',
+    `bash -c "${buildInsideContainer}"`,
   ].join(' ');
 
   execSync(dockerCmd, { cwd: repoRoot, stdio: 'inherit' });
