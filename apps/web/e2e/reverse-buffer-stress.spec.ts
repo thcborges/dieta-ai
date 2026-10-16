@@ -4,10 +4,18 @@ test.describe('Buffer Reverso de Evento & Estresse de UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     const loginButton = page.getByRole('button', { name: /Entrar com Google/i });
-    if (await loginButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await loginButton.click();
+    const isLogged = await page.getByRole('button', { name: /Controlar Macros/i }).isVisible().catch(() => false);
+    if (!isLogged) {
+      if (await loginButton.isVisible().catch(() => false)) {
+        await loginButton.click();
+      } else {
+        await loginButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await loginButton.isVisible().catch(() => false)) {
+          await loginButton.click();
+        }
+      }
     }
-    await expect(page.getByRole('button', { name: /Controlar Macros/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Controlar Macros/i })).toBeVisible({ timeout: 15000 });
   });
 
   test('deve selecionar preset de Noite da Pizza e recalcular orçamento limpo', async ({ page }) => {
