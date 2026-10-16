@@ -303,5 +303,66 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     expect(foodLaunched.name).toBe('Tilápia Grelhada');
     expect(foodLaunched.protein).toBeGreaterThan(0);
   });
+
+  it('deve abrir modal de scanner de código de barras/QR code ao clicar no botão de scanner', () => {
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={vi.fn()}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const scanBtn = screen.getByRole('button', { name: /Escanear Código/i });
+    expect(scanBtn).toBeInTheDocument();
+    fireEvent.click(scanBtn);
+
+    expect(screen.getByText(/Leitor de Código de Barras \/ QR Code/i)).toBeInTheDocument();
+  });
+
+  it('deve processar código escaneado consultando o banco e selecionando alimento', async () => {
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        availableFoods={[
+          {
+            id: 'prod_com_barcode',
+            name: 'Queijo Cottage Proteico',
+            servingDescription: '100g',
+            servingSizeGrams: 100,
+            caloriesPer100g: 72,
+            proteinPer100g: 12,
+            carbsPer100g: 3,
+            fatPer100g: 0.5,
+            fiberPer100g: 0,
+            isCustom: true,
+          },
+        ]}
+        onAddFood={vi.fn()}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const scanBtn = screen.getByRole('button', { name: /Escanear Código/i });
+    fireEvent.click(scanBtn);
+
+    // Usa o fallback de digitação/validação do scanner
+    const barcodeInput = screen.getByPlaceholderText(/Digite ou cole o código/i);
+    fireEvent.change(barcodeInput, { target: { value: 'prod_com_barcode' } });
+
+    const validateBtn = screen.getByRole('button', { name: /Validar Código/i });
+    fireEvent.click(validateBtn);
+
+    expect(await screen.findByText(/Alimento encontrado no banco local/i)).toBeInTheDocument();
+  });
 });
+
 

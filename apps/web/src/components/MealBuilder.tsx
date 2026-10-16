@@ -21,8 +21,10 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  ScanBarcode,
 } from 'lucide-react';
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
+import { BarcodeScannerModal } from './BarcodeScannerModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -96,6 +98,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     message: string;
   } | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [prefillBarcode, setPrefillBarcode] = useState<string>('');
 
   useEffect(() => {
     if (availableFoods && availableFoods.length > 0) {
@@ -116,6 +120,80 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       const firstCommon = commonForNewWindow[0]!;
       setSelectedFoodId(firstCommon.id);
       setServingGrams(firstCommon.servingSizeGrams || 100);
+    }
+  };
+
+  const handleBarcodeScanned = async (code: string) => {
+    setSearchQuery(code);
+    setSearchFeedback(null);
+
+    // 1. Consulta em primeiro lugar o nosso banco de dados local
+    const localMatches = searchFoodItems(internalFoods, code);
+    if (localMatches.length > 0) {
+      const found = localMatches[0]!;
+      setSelectedFoodId(found.id);
+      setServingGrams(found.servingSizeGrams || 100);
+      setSearchFeedback({
+        type: 'success',
+        message: `Alimento encontrado no banco local: ${found.name}`,
+      });
+      return;
+    }
+
+    // 2. Não encontrado localmente: consulta a API (cache do Firestore / Open Food Facts)
+    setIsSearching(true);
+    try {
+      let offFood: FoodItem | null = null;
+
+      // Consulta rota de código de barras
+      const barcodeRes = await fetch(`/api/v1/foods/barcode/${encodeURIComponent(code)}`);
+      if (barcodeRes.ok) {
+        const barcodeData = await barcodeRes.json();
+        if (barcodeData.food) {
+          offFood = barcodeData.food;
+        }
+      }
+
+      if (!offFood) {
+        const searchRes = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(code)}`);
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData.foods && searchData.foods.length > 0) {
+            offFood = searchData.foods[0];
+          }
+        }
+      }
+
+      if (offFood) {
+        setInternalFoods(prev => {
+          if (prev.some(f => f.id === offFood!.id)) return prev;
+          return [offFood!, ...prev];
+        });
+        onRegisterFood?.(offFood);
+        setSelectedFoodId(offFood.id);
+        setServingGrams(offFood.servingSizeGrams || 100);
+        setSearchFeedback({
+          type: 'success',
+          message: `Alimento encontrado e salvo no banco de dados: ${offFood.name}`,
+        });
+      } else {
+        // Código não encontrado: abre formulário rápido M3 com o código pré-preenchido
+        setPrefillBarcode(code);
+        setSearchFeedback({
+          type: 'error',
+          message: `Código ${code} não cadastrado. Preencha os macronutrientes para inclusão imediata.`,
+        });
+        setIsRegisterModalOpen(true);
+      }
+    } catch {
+      setPrefillBarcode(code);
+      setSearchFeedback({
+        type: 'error',
+        message: `Código ${code} não cadastrado. Preencha os macronutrientes para inclusão imediata.`,
+      });
+      setIsRegisterModalOpen(true);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -291,6 +369,16 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                 <Search className="w-3.5 h-3.5 text-m3-primary" />
               )}
               <span>Consultar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs font-medium text-m3-primary px-3 py-2 rounded-xl transition-colors shadow-sm"
+              aria-label="Escanear Código de Barras / QR Code"
+            >
+              <ScanBarcode className="w-3.5 h-3.5" />
+              <span>Escanear Código</span>
             </button>
           </div>
 
@@ -575,12 +663,23 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         </div>
       )}
 
+      {/* Modal de Scanner de Código de Barras / QR Code */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
+
       {/* Modal de Cadastro de Novo Alimento */}
       <FoodRegistrationModal
         isOpen={isRegisterModalOpen}
-        onClose={() => setIsRegisterModalOpen(false)}
+        onClose={() => {
+          setIsRegisterModalOpen(false);
+          setPrefillBarcode('');
+        }}
         onSave={handleSaveCustomFood}
         initialName={searchQuery}
+        initialBarcode={prefillBarcode}
       />
     </div>
   );
