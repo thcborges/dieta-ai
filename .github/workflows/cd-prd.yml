@@ -78,13 +78,13 @@ jobs:
           terraform -chdir=infra/terraform/environments/prd validate
 
       - name: Autenticação Google Cloud (Prd)
-        if: env.GCP_SA_KEY_PRD != ''
+        if: secrets.GCP_SA_KEY_PRD != ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_PRD }}
 
       - name: Terraform Apply Prd (GCP us-central1)
-        if: env.GCP_SA_KEY_PRD != ''
+        if: secrets.GCP_SA_KEY_PRD != ''
         run: |
           terraform -chdir=infra/terraform/environments/prd init
           terraform -chdir=infra/terraform/environments/prd apply -auto-approve -no-color
@@ -98,18 +98,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Autenticação Google Cloud (Prd)
-        if: env.GCP_SA_KEY_PRD != ''
+        if: secrets.GCP_SA_KEY_PRD != ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_PRD }}
 
       - name: Configurar Docker para Artifact Registry (us-central1)
-        if: env.GCP_SA_KEY_PRD != ''
+        if: secrets.GCP_SA_KEY_PRD != ''
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Build & Push da Imagem da API
-        if: env.GCP_SA_KEY_PRD != ''
+        if: secrets.GCP_SA_KEY_PRD != ''
         run: |
           IMAGE_TAG="us-central1-docker.pkg.dev/${PRD_PROJECT_ID}/dieta-ai-registry/api:${{ github.sha }}"
           docker build -f apps/api/Dockerfile -t "${IMAGE_TAG}" .

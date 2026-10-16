@@ -80,13 +80,13 @@ jobs:
           terraform -chdir=infra/terraform/environments/dev validate
 
       - name: Autenticação Google Cloud (Dev)
-        if: github.event_name == 'push' && env.GCP_SA_KEY != ''
+        if: github.event_name == 'push' && secrets.GCP_SA_KEY_DEV != ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
 
       - name: Terraform Plan Dev (GCP us-central1)
-        if: github.event_name == 'push' && env.GCP_SA_KEY != ''
+        if: github.event_name == 'push' && secrets.GCP_SA_KEY_DEV != ''
         run: |
           terraform -chdir=infra/terraform/environments/dev init
           terraform -chdir=infra/terraform/environments/dev plan -no-color
