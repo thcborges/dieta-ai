@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  background-color: #141218;
+  color: #E6E0E9;
+}
+
+/* Scrollbars analíticos escuros e discretos */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1D1B20;
+}
+::-webkit-scrollbar-thumb {
+  background: #49454F;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #938F99;
+}
