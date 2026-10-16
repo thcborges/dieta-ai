@@ -39,13 +39,8 @@ jobs:
       - name: Build dos Pacotes
         run: pnpm build
 
-      - name: Executar Suíte Completa de Testes BDD/TDD com Cobertura
+      - name: Executar Suíte Completa de Testes BDD/TDD com Cobertura (>= 90%)
         run: pnpm test:coverage
-
-      - name: Validar Cobertura Mínima Global de 90%
-        run: |
-          echo "Verificando se a cobertura atende ao limiar estrito de >= 90% definido no AGENTS.md..."
-          pnpm --filter @dieta-ai/core --filter @dieta-ai/api --filter @dieta-ai/web --filter @dieta-ai/error-healer exec vitest run --coverage --coverage.thresholds.lines=90
 
   security-scan:
     name: Análise de Segurança & Vulnerabilidades (Trivy & SAST)

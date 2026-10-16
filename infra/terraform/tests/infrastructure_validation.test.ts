@@ -17,9 +17,42 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     PATH: `${process.env.HOME || ''}/.local/bin:${process.env.PATH || ''}`,
   };
 
+  const findTerraformBinary = (): string => {
+    try {
+      execSync('which terraform', { stdio: 'pipe', env: testEnv });
+      return 'terraform';
+    } catch {
+      const candidates = [
+        `${process.env.HOME || ''}/.local/bin/terraform`,
+        '/usr/local/bin/terraform',
+        '/usr/bin/terraform',
+        '/bin/terraform',
+        '/opt/homebrew/bin/terraform',
+      ];
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          return candidate;
+        }
+      }
+      return 'terraform';
+    }
+  };
+
+  const terraformBin = findTerraformBinary();
+
+  it('deve resolver dinamicamente o binário do Terraform no ambiente', () => {
+    expect(terraformBin).toBeTruthy();
+    const versionOutput = execSync(`${terraformBin} version`, {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+      env: testEnv,
+    });
+    expect(versionOutput).toContain('Terraform');
+  });
+
   it('deve formatar perfeitamente todo o código HCL (terraform fmt -check)', () => {
     expect(() => {
-      execSync('terraform fmt -check -recursive', {
+      execSync(`${terraformBin} fmt -check -recursive`, {
         cwd: terraformRoot,
         stdio: 'pipe',
         env: testEnv,
@@ -70,13 +103,13 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
 
   it('deve validar sintaxe e inicialização dos ambientes dev e prd (terraform validate)', () => {
     // Inicializa dev localmente sem backend remoto
-    execSync('terraform init -backend=false', {
+    execSync(`${terraformBin} init -backend=false`, {
       cwd: devEnvPath,
       stdio: 'pipe',
       env: testEnv,
     });
 
-    const devValidate = execSync('terraform validate', {
+    const devValidate = execSync(`${terraformBin} validate`, {
       cwd: devEnvPath,
       stdio: 'pipe',
       encoding: 'utf-8',
@@ -85,13 +118,13 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(devValidate).toContain('The configuration is valid');
 
     // Inicializa prd localmente sem backend remoto
-    execSync('terraform init -backend=false', {
+    execSync(`${terraformBin} init -backend=false`, {
       cwd: prdEnvPath,
       stdio: 'pipe',
       env: testEnv,
     });
 
-    const prdValidate = execSync('terraform validate', {
+    const prdValidate = execSync(`${terraformBin} validate`, {
       cwd: prdEnvPath,
       stdio: 'pipe',
       encoding: 'utf-8',
