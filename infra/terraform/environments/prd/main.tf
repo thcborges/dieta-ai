@@ -49,6 +49,12 @@ variable "region" {
   default     = "us-central1"
 }
 
+variable "image_tag" {
+  type        = string
+  description = "Tag da imagem do container da API para o Cloud Run"
+  default     = "stable"
+}
+
 # 1. Repositório de Containers (Artifact Registry)
 module "artifact_registry" {
   source     = "../../modules/artifact_registry"
@@ -85,7 +91,7 @@ module "cloud_run" {
   project_id            = var.project_id
   region                = var.region
   service_name          = "dieta-ai-api-prd"
-  image_url             = "${module.artifact_registry.repository_url}/api:stable"
+  image_url             = "${module.artifact_registry.repository_url}/api:${var.image_tag}"
   node_env              = "production"
   allow_unauthenticated = true
 }

@@ -145,4 +145,17 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     });
     expect(prdValidate).toContain('The configuration is valid');
   }, 60000);
+
+  it('deve garantir suporte a Continuous Deployment no Cloud Run de produção com image_tag dinâmica', () => {
+    const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
+    const cdWorkflowPath = resolve(terraformRoot, '../../.github/workflows/cd-prd.yml');
+    const cdWorkflow = readFileSync(cdWorkflowPath, 'utf-8');
+
+    // Regra: prd/main.tf deve parametrizar image_tag para evitar Cloud Run congelado em :stable
+    expect(prdHcl).toContain('variable "image_tag"');
+    expect(prdHcl).toContain('api:${var.image_tag}');
+
+    // Regra: cd-prd.yml deve injetar a tag do commit (github.sha) no apply do Terraform
+    expect(cdWorkflow).toContain('-var="image_tag=${{ github.sha }}"');
+  });
 });

@@ -119,4 +119,4 @@ jobs:
         if: env.GCP_SA_KEY != ''
         run: |
           terraform -chdir=infra/terraform/environments/prd init
-          terraform -chdir=infra/terraform/environments/prd apply -auto-approve -no-color
+          terraform -chdir=infra/terraform/environments/prd apply -var="image_tag=${{ github.sha }}" -auto-approve -no-color
