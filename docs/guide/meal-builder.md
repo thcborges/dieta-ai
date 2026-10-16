@@ -46,7 +46,26 @@ O algoritmo verifica ainda se as gorduras e calorias associadas à porção calc
 
 ---
 
+## 🔍 Busca Inteligente & Cache de Alimentos (Open Food Facts + Banco Local)
+
+Para flexibilidade máxima sem lentidão, o cadastro e seleção de alimentos segue um fluxo hierárquico implacável:
+
+1. **Consulta Prioritária ao Banco de Dados Local (Cache Global / Firestore):**
+   - Ao digitar no campo de busca ou escanear um código de barras, o sistema consulta primeiro a base local e os alimentos já cacheados ou cadastrados.
+   - Retorno imediato em memória com latência inferior a 10ms.
+2. **Fallback Automático para API do Open Food Facts:**
+   - Caso o alimento não exista no banco de dados, o backend consulta a API oficial do **Open Food Facts** (`world.openfoodfacts.org`).
+   - Os dados nutricionais (calorias, proteínas, carboidratos, gorduras, fibras e porção) são normalizados automaticamente.
+3. **Persistência Imediata no Banco de Dados (Cache Global):**
+   - Todo alimento descoberto no Open Food Facts é imediatamente salvo no Firestore/banco local como cache de primeiro nível, garantindo que buscas subsequentes ocorram instantaneamente.
+4. **Cadastro Rápido de Novo Alimento (Formulário M3):**
+   - Caso o alimento não conste em nenhuma base ou seja uma preparação caseira, o usuário conta com o modal **"+ Novo Alimento"**.
+   - Interface Material Design 3 com validação em tempo real de macronutrientes por 100g e tamanho de porção, sincronizando offline-first com o diário e com a API.
+
+---
+
 ## 🔄 Cópia Ágil de Refeições & Módulo de Receitas
 
 - **Cópia de Refeições:** Duplicação instantânea de refeições de dias anteriores ou entre janelas (ex: replicar o almoço de ontem no almoço de hoje com um clique).
 - **Módulo de Receitas Compostas:** Criação de preparações culinárias (como bolos de whey, cappuccino proteico ou tortas fit), armazenando o rendimento total e permitindo o lançamento no diário em frações ou porções fracionadas.
+

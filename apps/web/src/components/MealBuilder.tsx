@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   type MealWindow,
   PREPOPULATED_FOODS,
+  type FoodItem,
+  getCommonFoodsForMeal,
+  searchFoodItems,
 } from '@dieta-ai/core';
 import {
   Plus,
@@ -13,7 +16,15 @@ import {
   Sunrise,
   Sunset,
   Moon,
+  Search,
+  PlusCircle,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  ScanBarcode,
 } from 'lucide-react';
+import { FoodRegistrationModal } from './FoodRegistrationModal.js';
+import { BarcodeScannerModal } from './BarcodeScannerModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -31,10 +42,12 @@ export type MealMap = Record<MealWindow, LoggedFood[]>;
 
 interface MealBuilderProps {
   meals: MealMap;
+  availableFoods?: FoodItem[];
   onAddFood: (window: MealWindow, item: LoggedFood) => void;
   onRemoveFood: (window: MealWindow, itemId: string) => void;
   onCopyMeal: (fromWindow: MealWindow, toWindow: MealWindow) => void;
   onAutoCompleteProtein: (source: 'sassami' | 'whey_growth') => void;
+  onRegisterFood?: (food: FoodItem) => void;
   missingProtein: number;
   remainingCalories: number;
 }
@@ -58,20 +71,199 @@ const FREQUENT_PRESETS_BY_WINDOW: Record<MealWindow, string[]> = {
 
 export const MealBuilder: React.FC<MealBuilderProps> = ({
   meals,
+  availableFoods,
   onAddFood,
   onRemoveFood,
   onCopyMeal,
   onAutoCompleteProtein,
+  onRegisterFood,
   missingProtein,
   remainingCalories,
 }) => {
+  const [internalFoods, setInternalFoods] = useState<FoodItem[]>(() => {
+    return availableFoods && availableFoods.length > 0 ? availableFoods : PREPOPULATED_FOODS;
+  });
+
   const [selectedFoodId, setSelectedFoodId] = useState<string>('sassami');
   const [servingGrams, setServingGrams] = useState<number>(100);
   const [activeWindow, setActiveWindow] = useState<MealWindow>('lunch');
   const [copyTargetWindow, setCopyTargetWindow] = useState<MealWindow>('dinner_event');
   const [showCopyModal, setShowCopyModal] = useState<MealWindow | null>(null);
 
-  const selectedFood = PREPOPULATED_FOODS.find(f => f.id === selectedFoodId) ?? PREPOPULATED_FOODS[0]!;
+  // Busca e Cadastro
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchFeedback, setSearchFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [prefillBarcode, setPrefillBarcode] = useState<string>('');
+
+  useEffect(() => {
+    if (availableFoods && availableFoods.length > 0) {
+      setInternalFoods(availableFoods);
+    }
+  }, [availableFoods]);
+
+  const selectedFood =
+    internalFoods.find(f => f.id === selectedFoodId) ??
+    internalFoods[0] ??
+    PREPOPULATED_FOODS[0]!;
+
+  const handleWindowChange = (newWindow: MealWindow) => {
+    setActiveWindow(newWindow);
+    const commonForNewWindow = getCommonFoodsForMeal(newWindow, internalFoods);
+    const isAlreadyCommon = commonForNewWindow.some(f => f.id === selectedFoodId);
+    if (!isAlreadyCommon && commonForNewWindow.length > 0) {
+      const firstCommon = commonForNewWindow[0]!;
+      setSelectedFoodId(firstCommon.id);
+      setServingGrams(firstCommon.servingSizeGrams || 100);
+    }
+  };
+
+  const handleBarcodeScanned = async (code: string) => {
+    setSearchQuery(code);
+    setSearchFeedback(null);
+
+    // 1. Consulta em primeiro lugar o nosso banco de dados local
+    const localMatches = searchFoodItems(internalFoods, code);
+    if (localMatches.length > 0) {
+      const found = localMatches[0]!;
+      setSelectedFoodId(found.id);
+      setServingGrams(found.servingSizeGrams || 100);
+      setSearchFeedback({
+        type: 'success',
+        message: `Alimento encontrado no banco local: ${found.name}`,
+      });
+      return;
+    }
+
+    // 2. Não encontrado localmente: consulta a API (cache do Firestore / Open Food Facts)
+    setIsSearching(true);
+    try {
+      let offFood: FoodItem | null = null;
+
+      // Consulta rota de código de barras
+      const barcodeRes = await fetch(`/api/v1/foods/barcode/${encodeURIComponent(code)}`);
+      if (barcodeRes.ok) {
+        const barcodeData = await barcodeRes.json();
+        if (barcodeData.food) {
+          offFood = barcodeData.food;
+        }
+      }
+
+      if (!offFood) {
+        const searchRes = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(code)}`);
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData.foods && searchData.foods.length > 0) {
+            offFood = searchData.foods[0];
+          }
+        }
+      }
+
+      if (offFood) {
+        setInternalFoods(prev => {
+          if (prev.some(f => f.id === offFood!.id)) return prev;
+          return [offFood!, ...prev];
+        });
+        onRegisterFood?.(offFood);
+        setSelectedFoodId(offFood.id);
+        setServingGrams(offFood.servingSizeGrams || 100);
+        setSearchFeedback({
+          type: 'success',
+          message: `Alimento encontrado e salvo no banco de dados: ${offFood.name}`,
+        });
+      } else {
+        // Código não encontrado: abre formulário rápido M3 com o código pré-preenchido
+        setPrefillBarcode(code);
+        setSearchFeedback({
+          type: 'error',
+          message: `Código ${code} não cadastrado. Preencha os macronutrientes para inclusão imediata.`,
+        });
+        setIsRegisterModalOpen(true);
+      }
+    } catch {
+      setPrefillBarcode(code);
+      setSearchFeedback({
+        type: 'error',
+        message: `Código ${code} não cadastrado. Preencha os macronutrientes para inclusão imediata.`,
+      });
+      setIsRegisterModalOpen(true);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setSearchFeedback(null);
+
+    // 1. Consulta em primeiro lugar o nosso banco de dados local
+    const localMatches = searchFoodItems(internalFoods, query);
+    if (localMatches.length > 0) {
+      const found = localMatches[0]!;
+      setSelectedFoodId(found.id);
+      setServingGrams(found.servingSizeGrams || 100);
+      setSearchFeedback({
+        type: 'success',
+        message: `Alimento encontrado no banco local: ${found.name}`,
+      });
+      return;
+    }
+
+    // 2. Não encontrado localmente: consulta a API (cache do Firestore / Open Food Facts)
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) {
+        throw new Error('Falha na requisição');
+      }
+      const data = await res.json();
+      if (data.foods && Array.isArray(data.foods) && data.foods.length > 0) {
+        const offFood: FoodItem = data.foods[0];
+        setInternalFoods(prev => {
+          if (prev.some(f => f.id === offFood.id)) return prev;
+          return [offFood, ...prev];
+        });
+        onRegisterFood?.(offFood);
+        setSelectedFoodId(offFood.id);
+        setServingGrams(offFood.servingSizeGrams || 100);
+        setSearchFeedback({
+          type: 'success',
+          message: `Alimento encontrado e salvo no banco de dados: ${offFood.name}`,
+        });
+      } else {
+        setSearchFeedback({
+          type: 'error',
+          message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
+        });
+      }
+    } catch {
+      setSearchFeedback({
+        type: 'error',
+        message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSaveCustomFood = (newFood: FoodItem) => {
+    setInternalFoods(prev => [newFood, ...prev]);
+    onRegisterFood?.(newFood);
+    setSelectedFoodId(newFood.id);
+    setServingGrams(newFood.servingSizeGrams || 100);
+    setSearchFeedback({
+      type: 'success',
+      message: `Alimento "${newFood.name}" cadastrado com sucesso!`,
+    });
+  };
 
   const handleAddFoodSubmit = (window: MealWindow) => {
     const factor = servingGrams / 100;
@@ -90,7 +282,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   };
 
   const handleAddFrequentChip = (window: MealWindow, foodId: string) => {
-    const food = PREPOPULATED_FOODS.find(f => f.id === foodId);
+    const food =
+      internalFoods.find(f => f.id === foodId) || PREPOPULATED_FOODS.find(f => f.id === foodId);
     if (!food) return;
 
     const grams = food.servingSizeGrams || 100;
@@ -109,6 +302,9 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     onAddFood(window, newFood);
   };
 
+  const commonFoods = getCommonFoodsForMeal(activeWindow, internalFoods);
+  const otherFoods = internalFoods.filter(f => !commonFoods.some(cf => cf.id === f.id));
+
   return (
     <div className="space-y-6">
       {/* Barra de Ação Rápida Cronometer-Style (Porção & Peso no Topo) */}
@@ -121,8 +317,18 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
             </h3>
           </div>
 
-          {/* Botão Auto-Completar Proteína */}
           <div className="flex items-center gap-2">
+            {/* Botão Cadastrar Novo Alimento */}
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs text-m3-primary font-medium px-3 py-1.5 rounded-xl transition-all shadow-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ Novo Alimento</span>
+            </button>
+
+            {/* Botão Auto-Completar Proteína */}
             <button
               type="button"
               onClick={() => onAutoCompleteProtein('sassami')}
@@ -131,41 +337,129 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
               Auto-Completar Proteína
               {missingProtein > 0 && (
-                <span className="font-mono text-[11px] opacity-90">({missingProtein}g / {remainingCalories} kcal)</span>
+                <span className="font-mono text-[11px] opacity-90">
+                  ({missingProtein}g / {remainingCalories} kcal)
+                </span>
               )}
             </button>
           </div>
         </div>
 
+        {/* Linha de Consulta / Busca no Banco e Open Food Facts */}
+        <form onSubmit={handleSearchSubmit} className="mb-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Consultar alimento ou código de barras no banco / Open Food Facts..."
+                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl pl-8 pr-3 py-2 text-xs text-m3-on-surface placeholder:text-m3-outline/60 focus:outline-none focus:border-m3-primary"
+              />
+              <Search className="w-3.5 h-3.5 text-m3-outline absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs font-medium text-m3-on-surface px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
+            >
+              {isSearching ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-m3-primary" />
+              )}
+              <span>Consultar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs font-medium text-m3-primary px-3 py-2 rounded-xl transition-colors shadow-sm"
+              aria-label="Escanear Código de Barras / QR Code"
+            >
+              <ScanBarcode className="w-3.5 h-3.5" />
+              <span>Escanear Código</span>
+            </button>
+          </div>
+
+          {searchFeedback && (
+            <div
+              className={`mt-2 p-2 rounded-xl text-xs flex items-center justify-between gap-2 ${
+                searchFeedback.type === 'success'
+                  ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/50'
+                  : 'bg-red-950/40 text-red-300 border border-red-800/50'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                {searchFeedback.type === 'success' ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                )}
+                <span>{searchFeedback.message}</span>
+              </div>
+              {searchFeedback.type === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterModalOpen(true)}
+                  className="underline font-medium hover:text-white shrink-0"
+                >
+                  Cadastrar agora
+                </button>
+              )}
+            </div>
+          )}
+        </form>
+
         {/* Linha de Inputs: Peso/Porção SEMPRE no Topo */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
           <div className="sm:col-span-5">
-            <label className="block text-[11px] font-mono text-m3-outline uppercase mb-1">
-              Alimento da Base Real
+            <label
+              htmlFor="food-select"
+              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
+            >
+              Alimento Selecionado
             </label>
             <select
+              id="food-select"
+              aria-label="Alimento Selecionado"
               value={selectedFoodId}
               onChange={e => {
                 const id = e.target.value;
                 setSelectedFoodId(id);
-                const found = PREPOPULATED_FOODS.find(f => f.id === id);
+                const found = internalFoods.find(f => f.id === id);
                 if (found) setServingGrams(found.servingSizeGrams || 100);
               }}
               className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs text-m3-on-surface font-medium focus:outline-none focus:border-m3-primary"
             >
-              {PREPOPULATED_FOODS.map(food => (
-                <option key={food.id} value={food.id}>
-                  {food.name} ({food.caloriesPer100g} kcal/100g)
-                </option>
-              ))}
+              <optgroup label={`Mais Comuns para ${WINDOW_META[activeWindow].label}`}>
+                {commonFoods.map(food => (
+                  <option key={`common_${food.id}`} value={food.id}>
+                    {food.name} ({food.caloriesPer100g} kcal/100g)
+                  </option>
+                ))}
+              </optgroup>
+              {otherFoods.length > 0 && (
+                <optgroup label="Todos os Alimentos Disponíveis">
+                  {otherFoods.map(food => (
+                    <option key={`all_${food.id}`} value={food.id}>
+                      {food.name} ({food.caloriesPer100g} kcal/100g)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-[11px] font-mono text-m3-outline uppercase mb-1">
+            <label
+              htmlFor="serving-input"
+              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
+            >
               Porção (Gramas)
             </label>
             <input
+              id="serving-input"
               type="number"
               min="1"
               max="2000"
@@ -176,12 +470,17 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           </div>
 
           <div className="sm:col-span-3">
-            <label className="block text-[11px] font-mono text-m3-outline uppercase mb-1">
+            <label
+              htmlFor="window-select"
+              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
+            >
               Janela de Refeição
             </label>
             <select
+              id="window-select"
+              aria-label="Janela de Refeição"
               value={activeWindow}
-              onChange={e => setActiveWindow(e.target.value as MealWindow)}
+              onChange={e => handleWindowChange(e.target.value as MealWindow)}
               className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs text-m3-on-surface font-medium focus:outline-none focus:border-m3-primary"
             >
               {Object.entries(WINDOW_META).map(([key, meta]) => (
@@ -252,9 +551,13 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
 
               {/* Sugestões Contextuais (Alimentos Frequentes da Janela) */}
               <div className="flex flex-wrap items-center gap-1.5 mt-3 mb-2">
-                <span className="text-[10px] text-m3-outline font-mono uppercase mr-1">Frequentes:</span>
+                <span className="text-[10px] text-m3-outline font-mono uppercase mr-1">
+                  Frequentes:
+                </span>
                 {frequentFoodIds.map(fId => {
-                  const food = PREPOPULATED_FOODS.find(f => f.id === fId);
+                  const food =
+                    internalFoods.find(f => f.id === fId) ||
+                    PREPOPULATED_FOODS.find(f => f.id === fId);
                   if (!food) return null;
                   return (
                     <button
@@ -264,7 +567,9 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                       className="text-[11px] bg-m3-surface-container-low hover:bg-m3-surface-container-high border border-m3-outline-variant/60 text-m3-on-surface px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
                     >
                       <span>+ {food.name.split(' ')[0]}</span>
-                      <span className="text-m3-outline text-[10px] font-mono">({food.proteinPer100g}g P)</span>
+                      <span className="text-m3-outline text-[10px] font-mono">
+                        ({food.proteinPer100g}g P)
+                      </span>
                     </button>
                   );
                 })}
@@ -290,7 +595,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                           </span>
                         </div>
                         <div className="font-mono text-[11px] text-m3-outline">
-                          {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G • {item.fiber ?? 0}g Fibra
+                          {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G
+                          • {item.fiber ?? 0}g Fibra
                         </div>
                       </div>
 
@@ -356,6 +662,25 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Scanner de Código de Barras / QR Code */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
+
+      {/* Modal de Cadastro de Novo Alimento */}
+      <FoodRegistrationModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => {
+          setIsRegisterModalOpen(false);
+          setPrefillBarcode('');
+        }}
+        onSave={handleSaveCustomFood}
+        initialName={searchQuery}
+        initialBarcode={prefillBarcode}
+      />
     </div>
   );
 };
