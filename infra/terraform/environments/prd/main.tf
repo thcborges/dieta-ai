@@ -27,6 +27,11 @@ import {
   id = "projects/thcborges-dieta-ai-prd/topics/dieta-ai-errors-prd"
 }
 
+import {
+  to = module.pubsub.google_pubsub_subscription.errors_sub
+  id = "projects/thcborges-dieta-ai-prd/subscriptions/dieta-ai-errors-prd-sub"
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -71,7 +76,7 @@ module "logging_sink" {
   source          = "../../modules/logging_sink"
   project_id      = var.project_id
   sink_name       = "dieta-ai-prd-error-sink"
-  pubsub_topic_id = module.pubsub.topic_name
+  pubsub_topic_id = module.pubsub.topic_id
 }
 
 # 5. Serviço Cloud Run (Fastify API, scale-to-zero, 256MB RAM)

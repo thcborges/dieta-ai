@@ -51,7 +51,7 @@ module "pubsub" {
 module "logging_sink" {
   source          = "../../modules/logging_sink"
   project_id      = var.project_id
-  pubsub_topic_id = module.pubsub.topic_name
+  pubsub_topic_id = module.pubsub.topic_id
 }
 
 # 5. Serviço Cloud Run (Fastify API, scale-to-zero, 256MB RAM)
