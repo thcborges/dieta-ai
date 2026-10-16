@@ -4,6 +4,9 @@
   "private": true,
   "description": "MacroMetrics Pro - Analytical diet planning & reverse engineering engine",
   "scripts": {
+    "dev": "pnpm --filter @dieta-ai/web dev",
+    "dev:api": "pnpm --filter @dieta-ai/api dev",
+    "preview": "pnpm --filter @dieta-ai/web preview",
     "test": "pnpm --workspace-concurrency=1 -r test",
     "test:coverage": "pnpm --workspace-concurrency=1 -r test:coverage",
     "build": "pnpm -r build",
