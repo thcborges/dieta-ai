@@ -204,5 +204,125 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     // Deve estar visível na lista de alimentos consumidos
     expect(screen.getAllByText(/Atum Ralado em Água/i).length).toBeGreaterThanOrEqual(1);
   });
+
+  it('deve sincronizar com Firestore via GET e persistir via PUT /api/v1/diaries/:date', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = url.toString();
+      const method = init?.method?.toUpperCase() || 'GET';
+      if (urlStr.includes('/api/v1/diaries') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({
+            date: '2026-10-16',
+            meals: {
+              breakfast: [],
+              lunch: [
+                {
+                  id: 'persisted_lunch_1',
+                  foodId: 'sassami',
+                  name: 'Sassami Persistido Firestore',
+                  grams: 180,
+                  calories: 297,
+                  protein: 55.8,
+                  carbs: 0,
+                  fat: 6.48,
+                  fiber: 0,
+                },
+              ],
+              afternoon_snack: [],
+              dinner_event: [],
+            },
+            totals: { calories: 297, protein: 55.8, carbs: 0, fat: 6.48, fiber: 0 },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response;
+    });
+
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges_firestore',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+
+    render(<App />);
+
+    // Verifica que o seletor de data está presente
+    const dateInput = screen.getByLabelText(/Data do Diário/i);
+    expect(dateInput).toBeInTheDocument();
+
+    // Aguarda sincronização do Firestore
+    const persistedFood = await screen.findByText(/Sassami Persistido Firestore/i);
+    expect(persistedFood).toBeInTheDocument();
+
+    // Dispara adição de outro alimento para verificar persistência PUT
+    const launchBtn = screen.getByRole('button', { name: /Lançar/i });
+    fireEvent.click(launchBtn);
+
+    // Verifica que PUT foi disparado
+    expect(
+      fetchSpy.mock.calls.some(
+        call =>
+          call[0].toString().includes('/api/v1/diaries') &&
+          call[1]?.method === 'PUT' &&
+          (call[1]?.headers as Record<string, string>)?.['x-user-id'] === 'usr_thcborges_firestore'
+      )
+    ).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
+
+  it('deve disparar rotas de exclusão de conta e expurgo admin no modal de LGPD', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
+
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+
+    render(<App />);
+
+    const accountBtn = screen.getByRole('button', { name: /Conta & LGPD/i });
+    fireEvent.click(accountBtn);
+
+    const deleteReqBtn = screen.getByRole('button', { name: /Solicitar Exclusão da Conta/i });
+    fireEvent.click(deleteReqBtn);
+
+    expect(
+      fetchSpy.mock.calls.some(call =>
+        call[0].toString().includes('/api/v1/users/usr_thcborges/deletion-request')
+      )
+    ).toBe(true);
+
+    // Admin purge
+    const adminInput = screen.getByPlaceholderText(/Google Subject ID ou User ID/i);
+    fireEvent.change(adminInput, { target: { value: 'usr_target_to_purge' } });
+
+    const purgeBtn = screen.getByRole('button', { name: /Exclusão Imediata e Irreversível/i });
+    fireEvent.click(purgeBtn);
+
+    expect(
+      fetchSpy.mock.calls.some(
+        call =>
+          call[0].toString().includes('/api/v1/admin/users/usr_target_to_purge') &&
+          call[1]?.method === 'DELETE'
+      )
+    ).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
 });
 

@@ -69,3 +69,18 @@ Para flexibilidade máxima sem lentidão, o cadastro e seleção de alimentos se
 - **Cópia de Refeições:** Duplicação instantânea de refeições de dias anteriores ou entre janelas (ex: replicar o almoço de ontem no almoço de hoje com um clique).
 - **Módulo de Receitas Compostas:** Criação de preparações culinárias (como bolos de whey, cappuccino proteico ou tortas fit), armazenando o rendimento total e permitindo o lançamento no diário em frações ou porções fracionadas.
 
+---
+
+## ☁️ Persistência Duradoura no Firestore (Offline-First & Blind Indexing)
+
+Os alimentos cadastrados e lançados no diário alimentar são persistidos no **Google Cloud Firestore (Native Mode)** com garantia de privacidade e conformidade estrita com a **LGPD**:
+
+- **Chave de Documento Pseudo-Anonimizada:** A chave do diário combina o identificador pseudo-anonimizado do usuário via **Blind Indexing (HMAC-SHA256 com pepper seguro)** e a data da refeição (`${blindUserId}_${date}`). O Google Subject ID ou e-mail nunca é exposto em texto plano.
+- **Auditoria Matemática Automática dos Totais:** A cada gravação (`PUT /api/v1/diaries/:date`), o serviço backend recalcula com precisão analítica os totais de calorias, proteínas, carboidratos, gorduras e fibras.
+- **Sincronização Bidirecional Offline-First:** O frontend mantém o cache local instantâneo via `localStorage` e sincroniza em segundo plano com as rotas REST do Cloud Run:
+  - `GET /api/v1/diaries/:date`: Consulta diário e restaura estado em caso de troca de dispositivo ou recarregamento.
+  - `PUT /api/v1/diaries/:date`: Persistência completa do mapa de refeições (`breakfast`, `lunch`, `afternoon_snack`, `dinner_event`).
+  - `POST /api/v1/diaries/:date/meals/:window`: Inclusão direta de alimento em uma refeição específica.
+  - `DELETE /api/v1/diaries/:date/meals/:window/:itemId`: Remoção granular de item do Firestore.
+- **Expurgo Total de Dados (Direito ao Esquecimento LGPD):** Quando o usuário ou o administrador aciona a exclusão da conta, todos os registros de diários associados àquele usuário no Firestore são permanentemente deletados.
+

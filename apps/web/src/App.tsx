@@ -14,7 +14,7 @@ import { MealBuilder, type LoggedFood, type MealMap } from './components/MealBui
 import { AccountManagementModal } from './components/AccountManagementModal.js';
 import { LoginPage, type AuthUser } from './components/LoginPage.js';
 import { MacroSettingsModal, type UserMacroSettings } from './components/MacroSettingsModal.js';
-import { User, Sliders, LogOut } from 'lucide-react';
+import { User, Sliders, LogOut, Calendar } from 'lucide-react';
 
 const EMPTY_MEALS: MealMap = {
   breakfast: [],
@@ -66,12 +66,20 @@ export default function App() {
     }
   });
 
+  // Data ativa do diário (padrão: hoje YYYY-MM-DD)
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
+
   // Refeições isoladas por usuário (inicia vazio para novos usuários ou carrega do storage da conta)
   const [meals, setMeals] = useState<MealMap>(() => {
     try {
       const savedUser = localStorage.getItem('macrometrics_auth_user');
       if (savedUser) {
         const userId = (JSON.parse(savedUser) as AuthUser).id;
+        const today = new Date().toISOString().slice(0, 10);
+        const savedByDate = localStorage.getItem(`macrometrics_meals_${userId}_${today}`);
+        if (savedByDate) return JSON.parse(savedByDate);
         const saved = localStorage.getItem(`macrometrics_meals_${userId}`);
         return saved ? JSON.parse(saved) : EMPTY_MEALS;
       }
@@ -108,7 +116,7 @@ export default function App() {
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
 
-  // Sincroniza persistência de perfil, refeições e alimentos ao trocar usuário
+  // Sincroniza persistência de perfil, refeições e alimentos ao trocar usuário ou data
   useEffect(() => {
     if (user) {
       activeUserRef.current = user.id;
@@ -116,8 +124,15 @@ export default function App() {
         const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
         setMacroSettings(savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS);
 
+        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${selectedDate}`);
         const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
-        setMeals(savedMeals ? JSON.parse(savedMeals) : EMPTY_MEALS);
+        if (savedMealsByDate) {
+          setMeals(JSON.parse(savedMealsByDate));
+        } else if (savedMeals) {
+          setMeals(JSON.parse(savedMeals));
+        } else {
+          setMeals(EMPTY_MEALS);
+        }
 
         const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${user.id}`);
         if (savedFoods) {
@@ -158,12 +173,52 @@ export default function App() {
       activeUserRef.current = null;
       setMeals(EMPTY_MEALS);
     }
-  }, [user]);
+  }, [user, selectedDate]);
 
-  // Persiste refeições do usuário logado exclusivamente para sua própria conta
+  // Consulta diário no Firestore (Sincronização em Nuvem resiliente / Offline-first)
+  useEffect(() => {
+    if (!user) return;
+    let isCancelled = false;
+
+    fetch(`/api/v1/diaries/${selectedDate}`, {
+      headers: {
+        'x-user-id': user.id,
+      },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Falha ao obter diário do Firestore');
+        return res.json();
+      })
+      .then(data => {
+        if (isCancelled || activeUserRef.current !== user.id) return;
+        if (data && data.meals) {
+          const hasLoggedMeals = Object.values(data.meals).some(
+            items => Array.isArray(items) && items.length > 0
+          );
+          if (hasLoggedMeals) {
+            setMeals(data.meals);
+            try {
+              localStorage.setItem(`macrometrics_meals_${user.id}_${selectedDate}`, JSON.stringify(data.meals));
+            } catch {
+              // Ignora erro de storage
+            }
+          }
+        }
+      })
+      .catch(() => {
+        // Offline-first: mantém dados locais
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, selectedDate]);
+
+  // Persiste refeições do usuário logado localmente e no Firestore
   useEffect(() => {
     if (user && activeUserRef.current === user.id) {
       try {
+        localStorage.setItem(`macrometrics_meals_${user.id}_${selectedDate}`, JSON.stringify(meals));
         localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(meals));
 
         fetch('/api/v1/diary', {
@@ -179,8 +234,19 @@ export default function App() {
       } catch {
         // Ignora erro de storage
       }
+
+      fetch(`/api/v1/diaries/${selectedDate}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ meals }),
+      }).catch(() => {
+        // Modo offline-first resiliente
+      });
     }
-  }, [meals, user]);
+  }, [meals, user, selectedDate]);
 
   // Persiste alimentos customizados do usuário logado
   useEffect(() => {
@@ -391,6 +457,25 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Seletor de Data do Diário (Sincronizado com Firestore) */}
+            <div className="flex items-center gap-1.5 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2.5 py-1 rounded-xl text-xs text-m3-on-surface">
+              <Calendar className="w-3.5 h-3.5 text-m3-primary" />
+              <label htmlFor="diary-date-picker" className="sr-only">
+                Data do Diário
+              </label>
+              <input
+                id="diary-date-picker"
+                type="date"
+                value={selectedDate}
+                onChange={e => {
+                  if (e.target.value) {
+                    setSelectedDate(e.target.value);
+                  }
+                }}
+                className="bg-transparent text-m3-on-surface text-xs focus:outline-none cursor-pointer font-mono"
+              />
+            </div>
+
             {/* Botão de Controle de Macros */}
             <button
               type="button"
@@ -471,11 +556,26 @@ export default function App() {
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
         isAdmin={isAdmin}
-        onRequestDeletion={() => {
-          console.log('Solicitação de exclusão de conta enviada.');
+        onRequestDeletion={async () => {
+          if (user) {
+            try {
+              await fetch(`/api/v1/users/${user.id}/deletion-request`, {
+                method: 'POST',
+              });
+            } catch {
+              // offline-first resiliente
+            }
+          }
         }}
-        onAdminPurge={id => {
-          console.log(`Admin expurgou usuário ${id}`);
+        onAdminPurge={async id => {
+          try {
+            await fetch(`/api/v1/admin/users/${id}`, {
+              method: 'DELETE',
+              headers: { 'x-admin-token': 'admin-secret-token-key-us-central1' },
+            });
+          } catch {
+            // offline-first resiliente
+          }
         }}
       />
     </div>
