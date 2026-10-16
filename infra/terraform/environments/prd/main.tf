@@ -6,6 +6,25 @@ terraform {
       version = ">= 5.0.0"
     }
   }
+  backend "gcs" {
+    bucket = "thcborges-dieta-ai-prd-terraform-state"
+    prefix = "terraform/state/prd"
+  }
+}
+
+import {
+  to = module.firestore.google_firestore_database.database
+  id = "projects/thcborges-dieta-ai-prd/databases/(default)"
+}
+
+import {
+  to = module.artifact_registry.google_artifact_registry_repository.repo
+  id = "projects/thcborges-dieta-ai-prd/locations/us-central1/repositories/dieta-ai"
+}
+
+import {
+  to = module.pubsub.google_pubsub_topic.errors
+  id = "projects/thcborges-dieta-ai-prd/topics/dieta-ai-errors-prd"
 }
 
 provider "google" {
