@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { X, Camera, Scan, AlertCircle, ArrowRight } from 'lucide-react';
+import { X, Scan, AlertCircle, ArrowRight } from 'lucide-react';
 
 export interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -219,6 +219,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <div className="absolute inset-8 border-2 border-dashed border-m3-primary/80 rounded-2xl pointer-events-none flex items-center justify-center">
                   <div className="w-full h-0.5 bg-m3-primary/70 animate-pulse" />
                 </div>
+
+                {isScanning && (
+                  <div className="absolute top-3 left-3 bg-black/60 px-2 py-0.5 rounded-full text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 pointer-events-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Câmera Ativa
+                  </div>
+                )}
               </>
             )}
           </div>
