@@ -208,7 +208,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-m3-surface-container rounded-3xl max-w-lg w-full border border-m3-outline-variant shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="bg-m3-surface-container rounded-3xl max-w-xl w-full border border-m3-outline-variant shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-m3-outline-variant/60">
           <div className="flex items-center gap-2.5">
@@ -285,9 +285,9 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           {/* Campos Biométricos & TMB */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             {bmrSource === 'manual_bioimpedance' ? (
-              <div className="col-span-2 sm:col-span-1">
-                <label htmlFor="manual-bmr-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                  TMB do Exame (kcal)
+              <div className="flex flex-col justify-between">
+                <label htmlFor="manual-bmr-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                  TMB do Exame <span className="text-[10px] text-m3-outline/80 font-normal">(kcal)</span>
                 </label>
                 <input
                   id="manual-bmr-input"
@@ -297,13 +297,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                   onChange={e =>
                     setForm(prev => ({ ...prev, manualBmr: Math.max(1, Number(e.target.value)) }))
                   }
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                  className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
                 />
               </div>
             ) : (
-              <div>
-                <label htmlFor="height-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                  Altura (cm)
+              <div className="flex flex-col justify-between">
+                <label htmlFor="height-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                  Altura <span className="text-[10px] text-m3-outline/80 font-normal">(cm)</span>
                 </label>
                 <input
                   id="height-input"
@@ -313,14 +313,14 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                   onChange={e =>
                     setForm(prev => ({ ...prev, heightCm: Math.max(1, Number(e.target.value)) }))
                   }
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                  className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
                 />
               </div>
             )}
 
-            <div>
-              <label htmlFor="age-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Idade (Anos)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="age-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Idade <span className="text-[10px] text-m3-outline/80 font-normal">(Anos)</span>
               </label>
               <input
                 id="age-input"
@@ -330,13 +330,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 onChange={e =>
                   setForm(prev => ({ ...prev, ageYears: Math.max(1, Number(e.target.value)) }))
                 }
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
 
-            <div>
-              <label htmlFor="weight-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Peso Corporal (kg)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="weight-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Peso Corporal <span className="text-[10px] text-m3-outline/80 font-normal">(kg)</span>
               </label>
               <input
                 id="weight-input"
@@ -346,12 +346,12 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 onChange={e =>
                   setForm(prev => ({ ...prev, weightKg: Math.max(1, Number(e.target.value)) }))
                 }
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
 
-            <div>
-              <label htmlFor="gender-select" className="block text-[11px] font-mono text-m3-outline mb-1">
+            <div className="flex flex-col justify-between">
+              <label htmlFor="gender-select" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
                 Sexo Biológico
               </label>
               <select
@@ -361,7 +361,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 onChange={e =>
                   setForm(prev => ({ ...prev, gender: e.target.value as Gender }))
                 }
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               >
                 <option value="male">Masculino</option>
                 <option value="female">Feminino</option>
@@ -388,8 +388,8 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="activity-select" className="block text-[11px] font-mono text-m3-outline mb-1">
+            <div className="flex flex-col justify-between">
+              <label htmlFor="activity-select" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
                 Nível de Atividade Física
               </label>
               <select
@@ -399,18 +399,18 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 onChange={e =>
                   setForm(prev => ({ ...prev, activityLevel: e.target.value as ActivityLevel }))
                 }
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               >
                 <option value="sedentary">Sedentário (fator 1.2 • pouco exercício)</option>
                 <option value="light">Leve (fator 1.375 • 1-3 dias/sem)</option>
-                <option value="moderate">Moderado (fator 1.55 • 3-5 dias/sem musculação+cardio)</option>
+                <option value="moderate">Moderado (fator 1.55 • 3-5 dias/sem)</option>
                 <option value="heavy">Intenso (fator 1.725 • 6-7 dias/sem)</option>
                 <option value="athlete">Atleta (fator 1.9 • 2 treinos ao dia)</option>
               </select>
             </div>
 
-            <div>
-              <label htmlFor="goal-select" className="block text-[11px] font-mono text-m3-outline mb-1">
+            <div className="flex flex-col justify-between">
+              <label htmlFor="goal-select" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
                 Objetivo Nutricional
               </label>
               <select
@@ -420,7 +420,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 onChange={e =>
                   setForm(prev => ({ ...prev, goal: e.target.value as DietGoal }))
                 }
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               >
                 <option value="weight_loss">Perda de Peso (Déficit / Blindagem)</option>
                 <option value="muscle_gain">Ganho de Peso (Superávit / Anabolismo)</option>
@@ -431,9 +431,9 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {form.goal === 'weight_gain' || form.goal === 'muscle_gain' ? (
-              <div>
-                <label className="block text-[11px] font-mono text-m3-outline mb-1">
-                  Superávit Diário Alvo (kcal)
+              <div className="flex flex-col justify-between">
+                <label className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                  Superávit Diário Alvo <span className="text-[10px] text-m3-outline/80 font-normal">(kcal)</span>
                 </label>
                 <input
                   aria-label="Superávit Diário Alvo"
@@ -445,13 +445,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                       dailySurplusKcal: Math.max(0, Number(e.target.value)),
                     }))
                   }
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                  className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
                 />
               </div>
             ) : form.goal === 'maintenance' ? (
-              <div>
-                <label className="block text-[11px] font-mono text-m3-outline mb-1">
-                  Tolerância de Nível (± %)
+              <div className="flex flex-col justify-between">
+                <label className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                  Tolerância de Nível <span className="text-[10px] text-m3-outline/80 font-normal">(± %)</span>
                 </label>
                 <input
                   aria-label="Tolerância de Nível"
@@ -463,13 +463,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                       tolerancePercent: Math.max(1, Number(e.target.value)),
                     }))
                   }
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                  className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
                 />
               </div>
             ) : (
-              <div>
-                <label className="block text-[11px] font-mono text-m3-outline mb-1">
-                  Déficit Diário Planejado (kcal)
+              <div className="flex flex-col justify-between">
+                <label className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                  Déficit Diário Planejado <span className="text-[10px] text-m3-outline/80 font-normal">(kcal)</span>
                 </label>
                 <input
                   aria-label="Déficit Diário Planejado"
@@ -481,28 +481,29 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                       dailyDeficitKcal: Math.max(0, Number(e.target.value)),
                     }))
                   }
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                  className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
                 />
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-m3-surface-container-low p-3 rounded-2xl border border-m3-outline-variant/60">
-              <div className="text-xs">
-                <span className="text-m3-outline font-mono">GET / TDEE: </span>
-                <strong className="text-cyan-400 font-mono text-sm">{currentTdee} kcal</strong>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-m3-surface-container-low p-3 rounded-2xl border border-m3-outline-variant/60">
+              <div className="text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <span className="text-m3-outline font-mono">GET / TDEE Projetado:</span>
+                <strong className="text-cyan-400 font-mono text-sm whitespace-nowrap">{currentTdee} kcal</strong>
               </div>
 
               <button
                 type="button"
                 onClick={handleCalculateForGoal}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 bg-m3-primary/15 hover:bg-m3-primary/25 border border-m3-primary/40 rounded-xl text-xs font-semibold text-m3-primary transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 bg-m3-primary/15 hover:bg-m3-primary/25 border border-m3-primary/40 rounded-xl text-xs font-semibold text-m3-primary transition-colors shrink-0"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Calcular Metas para este Objetivo</span>
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">Calcular Metas para este Objetivo</span>
               </button>
             </div>
           </div>
         </div>
+
 
         {/* 3. Metas de Macronutrientes & Fibra */}
         <div className="space-y-3 pt-1 border-t border-m3-outline-variant/60">
@@ -521,9 +522,9 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="calorias-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Calorias Alvo (kcal)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="calorias-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Calorias Alvo <span className="text-[10px] text-m3-outline/80 font-normal">(kcal)</span>
               </label>
               <input
                 id="calorias-input"
@@ -531,13 +532,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 type="number"
                 value={form.calories}
                 onChange={handleCaloriesChange}
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
 
-            <div>
-              <label htmlFor="proteinas-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Proteínas (g)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="proteinas-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Proteínas <span className="text-[10px] text-m3-outline/80 font-normal">(g)</span>
               </label>
               <input
                 id="proteinas-input"
@@ -545,13 +546,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 type="number"
                 value={form.proteinGrams}
                 onChange={handleProteinChange}
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
 
-            <div>
-              <label htmlFor="carbos-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Carboidratos (g)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="carbos-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Carboidratos <span className="text-[10px] text-m3-outline/80 font-normal">(g)</span>
               </label>
               <input
                 id="carbos-input"
@@ -559,13 +560,13 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 type="number"
                 value={form.carbGrams}
                 onChange={handleCarbChange}
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
 
-            <div>
-              <label htmlFor="gorduras-input" className="block text-[11px] font-mono text-m3-outline mb-1">
-                Gorduras (g)
+            <div className="flex flex-col justify-between">
+              <label htmlFor="gorduras-input" className="text-[11px] font-mono text-m3-outline mb-1 leading-tight">
+                Gorduras <span className="text-[10px] text-m3-outline/80 font-normal">(g)</span>
               </label>
               <input
                 id="gorduras-input"
@@ -573,12 +574,10 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 type="number"
                 value={form.fatGrams}
                 onChange={handleFatChange}
-                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
           </div>
-
-
 
           {/* Seção Exclusiva de Fibra como Macro */}
           <div className="bg-m3-surface-container-low p-3.5 rounded-2xl border border-m3-outline-variant/60 space-y-2">

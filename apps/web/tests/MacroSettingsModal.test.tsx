@@ -420,5 +420,42 @@ describe('MacroSettingsModal (Controle de Macros pelo Usuário)', () => {
       })
     );
   });
+
+  it('deve garantir alinhamento visual robusto dos campos biométricos e sem quebra indevida no GET/TDEE', () => {
+    render(
+      <MacroSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        currentSettings={initialSettings}
+        onSave={vi.fn()}
+      />
+    );
+
+    // Seleciona Bioimpedância para exibir os 4 campos na mesma linha
+    const bioRadio = screen.getByLabelText(/Fornecer TMB \(Bioimpedância\)/i);
+    fireEvent.click(bioRadio);
+
+    const bmrInput = screen.getByLabelText(/TMB do Exame/i);
+    const ageInput = screen.getByLabelText(/^Idade/i);
+    const weightInput = screen.getByLabelText(/Peso Corporal/i);
+    const genderSelect = screen.getByLabelText(/Sexo Biológico/i);
+
+    // O container de TMB manual não deve ter col-span-2 que desalinha a grade de 4 colunas
+    expect(bmrInput.parentElement?.className).not.toContain('col-span-2');
+
+    // Cada campo deve possuir flex-col justify-between para alinhar os inputs na mesma linha horizontal
+    expect(bmrInput.parentElement?.className).toContain('justify-between');
+    expect(ageInput.parentElement?.className).toContain('justify-between');
+    expect(weightInput.parentElement?.className).toContain('justify-between');
+    expect(genderSelect.parentElement?.className).toContain('justify-between');
+
+    // O indicador de GET / TDEE Projetado deve prevenir quebra feia da unidade kcal
+    const tdeeElement = screen.getByText(/GET \/ TDEE Projetado/i).closest('div');
+    expect(tdeeElement?.innerHTML).toContain('whitespace-nowrap');
+
+    // O modal deve utilizar max-w-xl para evitar compressão visual dos campos no desktop
+    const modalDialog = screen.getByText(/Controle de Macronutrientes/i).closest('.bg-m3-surface-container');
+    expect(modalDialog?.className).toContain('max-w-xl');
+  });
 });
 
