@@ -156,4 +156,106 @@ describe('MacroSettingsModal (Controle de Macros pelo Usuário)', () => {
       })
     );
   });
+
+  it('deve permitir fornecer TMB via exame de bioimpedância, selecionar objetivo e calcular macros recomendados', () => {
+    const onSave = vi.fn();
+    render(
+      <MacroSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        currentSettings={initialSettings}
+        onSave={onSave}
+      />
+    );
+
+    // Seleciona a opção de fornecer TMB manual (Bioimpedância)
+    const bioRadio = screen.getByLabelText(/Fornecer TMB \(Bioimpedância\)/i);
+    fireEvent.click(bioRadio);
+
+    // Deve exibir o campo de TMB manual
+    const bmrInput = screen.getByLabelText(/TMB do Exame/i);
+    fireEvent.change(bmrInput, { target: { value: '1850' } });
+
+    // Seleciona Nível de Atividade Física (Moderado)
+    const activitySelect = screen.getByLabelText(/Nível de Atividade Física/i);
+    fireEvent.change(activitySelect, { target: { value: 'moderate' } });
+
+    // Seleciona Objetivo (Emagrecer)
+    const goalSelect = screen.getByLabelText(/Objetivo Nutricional/i);
+    fireEvent.change(goalSelect, { target: { value: 'weight_loss' } });
+
+    // Clica no botão para calcular metas pelo objetivo
+    const calcGoalBtn = screen.getByRole('button', { name: /Calcular Metas para este Objetivo/i });
+    fireEvent.click(calcGoalBtn);
+
+    // TMB 1850 * 1.55 = 2868 TDEE. Emagrecer: -500 kcal = 2368 kcal
+    // Peso 95kg -> Proteína: 95 * 2.2 = 209g. Gordura: 95 * 0.8 = 76g.
+    // Carbo: (2368 - (209*4 + 76*9)) / 4 = (2368 - (836 + 684)) / 4 = 848 / 4 = 212g.
+    const calInput = screen.getByLabelText(/Calorias Alvo/i);
+    expect(calInput).toHaveValue(2368);
+
+    const protInput = screen.getByLabelText(/Proteínas/i);
+    expect(protInput).toHaveValue(209);
+
+    const fatInput = screen.getByLabelText(/Gorduras/i);
+    expect(fatInput).toHaveValue(76);
+
+    const carbInput = screen.getByLabelText(/Carboidratos/i);
+    expect(carbInput).toHaveValue(212);
+
+    // Salva as metas
+    const saveButton = screen.getByRole('button', { name: /Salvar Metas/i });
+    fireEvent.click(saveButton);
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bmrSource: 'manual_bioimpedance',
+        manualBmr: 1850,
+        activityLevel: 'moderate',
+        goal: 'weight_loss',
+        calories: 2368,
+        proteinGrams: 209,
+        fatGrams: 76,
+        carbGrams: 212,
+      })
+    );
+  });
+
+  it('deve calcular metas para Ganho de Peso e Manutenção com proporções recomendadas', () => {
+    const onSave = vi.fn();
+    render(
+      <MacroSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        currentSettings={initialSettings}
+        onSave={onSave}
+      />
+    );
+
+    // Seleciona Bioimpedância
+    const bioRadio = screen.getByLabelText(/Fornecer TMB \(Bioimpedância\)/i);
+    fireEvent.click(bioRadio);
+
+    const bmrInput = screen.getByLabelText(/TMB do Exame/i);
+    fireEvent.change(bmrInput, { target: { value: '2000' } });
+
+    // Seleciona Atividade Leve (1.375) -> TDEE = 2750
+    const activitySelect = screen.getByLabelText(/Nível de Atividade Física/i);
+    fireEvent.change(activitySelect, { target: { value: 'light' } });
+
+    // Seleciona Objetivo Ganho de Peso
+    const goalSelect = screen.getByLabelText(/Objetivo Nutricional/i);
+    fireEvent.change(goalSelect, { target: { value: 'muscle_gain' } });
+
+    const calcGoalBtn = screen.getByRole('button', { name: /Calcular Metas para este Objetivo/i });
+    fireEvent.click(calcGoalBtn);
+
+    // Superávit +350 -> 2750 + 350 = 3100 kcal
+    // Peso 95kg -> Proteína: 95 * 2.0 = 190g. Gordura: 95 * 0.9 = 86g (85.5 -> 86).
+    const calInput = screen.getByLabelText(/Calorias Alvo/i);
+    expect(calInput).toHaveValue(3100);
+
+    const protInput = screen.getByLabelText(/Proteínas/i);
+    expect(protInput).toHaveValue(190);
+  });
 });
