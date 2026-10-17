@@ -156,4 +156,32 @@ describe('MacroSettingsModal (Controle de Macros pelo Usuário)', () => {
       })
     );
   });
+
+  it('deve permitir alterar o objetivo nutricional e salvar o novo objetivo', () => {
+    const onSave = vi.fn();
+    render(
+      <MacroSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        currentSettings={initialSettings}
+        onSave={onSave}
+      />
+    );
+
+    const goalSelect = screen.getByLabelText(/Estratégia do Termômetro/i);
+    fireEvent.change(goalSelect, { target: { value: 'weight_gain' } });
+
+    const surplusInput = screen.getByLabelText(/Superávit Diário Alvo/i);
+    fireEvent.change(surplusInput, { target: { value: '450' } });
+
+    const saveButton = screen.getByRole('button', { name: /Salvar Metas/i });
+    fireEvent.click(saveButton);
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: 'weight_gain',
+        dailySurplusKcal: 450,
+      })
+    );
+  });
 });

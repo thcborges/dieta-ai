@@ -6,15 +6,19 @@ import {
   calculateRecommendedFiber,
   type Gender,
   type ActivityLevel,
+  type DietGoal,
 } from '@dieta-ai/core';
-import { Sliders, X, Sparkles, ShieldCheck } from 'lucide-react';
+import { Sliders, X, Sparkles, ShieldCheck, Target } from 'lucide-react';
 
 export interface UserMacroSettings {
   ageYears: number;
   gender: Gender;
   weightKg: number;
   activityLevel: ActivityLevel;
+  goal?: DietGoal;
   dailyDeficitKcal: number;
+  dailySurplusKcal?: number;
+  tolerancePercent?: number;
   calories: number;
   proteinGrams: number;
   carbGrams: number;
@@ -56,10 +60,21 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
       weightKg: form.weightKg,
     });
     const tdee = calculateTDEE(bmr, form.activityLevel);
+
+    const currentGoal = form.goal ?? 'weight_loss';
+    let effectiveDeficit = 0;
+    if (currentGoal === 'weight_loss') {
+      effectiveDeficit = form.dailyDeficitKcal || 500;
+    } else if (currentGoal === 'weight_gain') {
+      effectiveDeficit = -(form.dailySurplusKcal || 400);
+    } else {
+      effectiveDeficit = 0;
+    }
+
     const calculated = calculateMacroTargets({
       tdee,
       weightKg: form.weightKg,
-      deficitKcal: form.dailyDeficitKcal,
+      deficitKcal: effectiveDeficit,
       age: form.ageYears,
       gender: form.gender,
       proteinStrategy: { type: 'fixed', grams: form.proteinGrams || 220 },
@@ -162,11 +177,94 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           </div>
         </div>
 
+        {/* Objetivo Nutricional & Termômetro Semanal */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-m3-tertiary uppercase tracking-wider flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5" />
+            2. Objetivo da Dieta & Termômetro Semanal
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                Estratégia do Termômetro
+              </label>
+              <select
+                aria-label="Estratégia do Termômetro"
+                value={form.goal ?? 'weight_loss'}
+                onChange={e =>
+                  setForm(prev => ({ ...prev, goal: e.target.value as DietGoal }))
+                }
+                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
+              >
+                <option value="weight_loss">Perda de Peso (Déficit / Blindagem)</option>
+                <option value="weight_gain">Ganho de Peso (Superávit / Anabolismo)</option>
+                <option value="maintenance">Manutenção (Equilíbrio / Homeostase)</option>
+              </select>
+            </div>
+
+            {form.goal === 'weight_gain' ? (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Superávit Diário Alvo (kcal)
+                </label>
+                <input
+                  aria-label="Superávit Diário Alvo"
+                  type="number"
+                  value={form.dailySurplusKcal ?? 400}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      dailySurplusKcal: Math.max(0, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            ) : form.goal === 'maintenance' ? (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Tolerância de Nível (± %)
+                </label>
+                <input
+                  aria-label="Tolerância de Nível"
+                  type="number"
+                  value={form.tolerancePercent ?? 3}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      tolerancePercent: Math.max(1, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Déficit Diário Planejado (kcal)
+                </label>
+                <input
+                  aria-label="Déficit Diário Planejado"
+                  type="number"
+                  value={form.dailyDeficitKcal}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      dailyDeficitKcal: Math.max(0, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Metas de Macronutrientes & Fibra */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-m3-tertiary uppercase tracking-wider">
-              2. Metas de Macros Diárias
+              3. Metas de Macros Diárias
             </h3>
             <button
               type="button"

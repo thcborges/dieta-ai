@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import {
   auditDailyIntake,
   solveProteinDeficit,
+  calculateBMR,
+  calculateTDEE,
   PREPOPULATED_FOODS,
   type EventBufferInput,
   type MealWindow,
@@ -9,6 +11,7 @@ import {
 } from '@dieta-ai/core';
 import { MacroSummary } from './components/MacroSummary.js';
 import { AuditorBanner } from './components/AuditorBanner.js';
+import { WeeklyThermometerCard } from './components/WeeklyThermometerCard.js';
 import { ReverseBufferCard } from './components/ReverseBufferCard.js';
 import { MealBuilder, type LoggedFood, type MealMap } from './components/MealBuilder.js';
 import { AccountManagementModal } from './components/AccountManagementModal.js';
@@ -28,7 +31,10 @@ const DEFAULT_SETTINGS: UserMacroSettings = {
   gender: 'male',
   weightKg: 95,
   activityLevel: 'moderate',
+  goal: 'weight_loss',
   dailyDeficitKcal: 500,
+  dailySurplusKcal: 400,
+  tolerancePercent: 3,
   calories: 2400,
   proteinGrams: 220,
   carbGrams: 180,
@@ -381,6 +387,59 @@ export default function App() {
   const missingProtein = Math.max(0, targetMacros.proteinGrams - currentTotals.proteinGrams);
   const remainingCalories = targetMacros.calories - currentTotals.calories;
 
+  // Perfil e TDEE para o cálculo do termômetro
+  const userBmr = calculateBMR({
+    gender: macroSettings.gender,
+    age: macroSettings.ageYears,
+    heightCm: 190,
+    weightKg: macroSettings.weightKg,
+  });
+  const userTdee = calculateTDEE(userBmr, macroSettings.activityLevel);
+
+  // Janela móvel dos últimos 7 dias (terminando em selectedDate)
+  const rolling7Days = (() => {
+    const list: Array<{ date: string; calories: number; proteinGrams?: number }> = [];
+    const baseDate = new Date(selectedDate);
+    const validDate = isNaN(baseDate.getTime()) ? new Date() : baseDate;
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(validDate);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+
+      if (dateStr === selectedDate) {
+        list.push({
+          date: dateStr,
+          calories: currentTotals.calories,
+          proteinGrams: currentTotals.proteinGrams,
+        });
+      } else if (user) {
+        try {
+          const savedMealsStr = localStorage.getItem(`macrometrics_meals_${user.id}_${dateStr}`);
+          if (savedMealsStr) {
+            const savedMeals = JSON.parse(savedMealsStr) as MealMap;
+            const foods = Object.values(savedMeals).flat();
+            const cals = foods.reduce((acc, f) => acc + (f.calories || 0), 0);
+            const prot = foods.reduce((acc, f) => acc + (f.protein || 0), 0);
+            list.push({ date: dateStr, calories: cals, proteinGrams: prot });
+          } else {
+            list.push({ date: dateStr, calories: 0, proteinGrams: 0 });
+          }
+        } catch {
+          list.push({ date: dateStr, calories: 0, proteinGrams: 0 });
+        }
+      } else {
+        list.push({ date: dateStr, calories: 0, proteinGrams: 0 });
+      }
+    }
+    return list;
+  })();
+
+  const weeklySlipKcal =
+    rolling7Days.reduce((acc, d) => acc + d.calories, 0) -
+    rolling7Days.length * targetMacros.calories;
+  const weeklyBankDisplay = -weeklySlipKcal;
+
   // Handlers do MealBuilder
   const handleAddFood = (window: MealWindow, item: LoggedFood) => {
     setMeals(prev => ({
@@ -519,7 +578,19 @@ export default function App() {
         <MacroSummary
           target={targetMacros}
           current={currentTotals}
-          weeklyBankKcal={450}
+          weeklyBankKcal={weeklyBankDisplay}
+        />
+
+        {/* Termômetro do Banco Semanal com Janela Móvel */}
+        <WeeklyThermometerCard
+          goal={macroSettings.goal ?? 'weight_loss'}
+          dailyTargetCalories={targetMacros.calories}
+          tdee={userTdee}
+          weightKg={macroSettings.weightKg}
+          dailyDeficitKcal={macroSettings.dailyDeficitKcal}
+          dailySurplusKcal={macroSettings.dailySurplusKcal}
+          tolerancePercent={macroSettings.tolerancePercent ?? 3}
+          days={rolling7Days}
         />
 
         {/* Simulador de Buffer de Evento Social (Engenharia Reversa) */}

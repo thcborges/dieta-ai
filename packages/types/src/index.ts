@@ -114,3 +114,55 @@ export interface LgpdDeletionRequestDto {
   status: 'PENDING_15_DAYS' | 'COMPLETED' | 'CANCELLED';
 }
 
+export type DietGoal = 'weight_loss' | 'weight_gain' | 'maintenance';
+
+export type WeeklyThermometerStatus =
+  | 'optimal'
+  | 'warning'
+  | 'blown'
+  | 'critical_deficit'
+  | 'surplus_drift';
+
+export interface RollingDayLog {
+  date: string;
+  calories: number;
+  proteinGrams?: number;
+}
+
+export interface WeeklyThermometerInput {
+  goal: DietGoal;
+  dailyTargetCalories: number;
+  tdee: number;
+  weightKg: number;
+  dailyDeficitKcal?: number;
+  dailySurplusKcal?: number;
+  tolerancePercent?: number; // default: 3 (%)
+  days: RollingDayLog[]; // Up to 7 days
+}
+
+export interface WeeklyThermometerAlert {
+  code:
+    | 'BLOWN_BUDGET'
+    | 'WARNING_BUDGET'
+    | 'CRITICAL_WEIGHT_LOSS'
+    | 'WARNING_LOW_CALORIES'
+    | 'MAINTENANCE_DRIFT_HIGH'
+    | 'MAINTENANCE_DRIFT_LOW';
+  severity: 'INFO' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  message: string;
+}
+
+export interface WeeklyThermometerReport {
+  goal: DietGoal;
+  daysCount: number;
+  totalTargetCalories: number;
+  totalActualCalories: number;
+  weeklySlipKcal: number;
+  thermalRatioPercent: number;
+  adherenceScorePercent: number;
+  status: WeeklyThermometerStatus;
+  projectedWeightDeltaKg: number;
+  neutralizedDeficitDays?: number;
+  alerts: WeeklyThermometerAlert[];
+}
+
