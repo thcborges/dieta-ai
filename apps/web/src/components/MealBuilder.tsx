@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
+import { ProteinAutocompleteModal } from './ProteinAutocompleteModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -101,6 +102,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   } | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [isProteinModalOpen, setIsProteinModalOpen] = useState<boolean>(false);
   const [prefillBarcode, setPrefillBarcode] = useState<string>('');
 
   useEffect(() => {
@@ -348,7 +350,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
             {/* Botão Auto-Completar Proteína */}
             <button
               type="button"
-              onClick={() => onAutoCompleteProtein('sassami')}
+              onClick={() => setIsProteinModalOpen(true)}
               className="flex items-center gap-1.5 bg-m3-primary text-m3-on-primary font-medium text-xs px-3 py-1.5 rounded-xl hover:bg-m3-primary/90 shadow transition-all"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -706,6 +708,32 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         onSave={handleSaveCustomFood}
         initialName={searchQuery}
         initialBarcode={prefillBarcode}
+      />
+
+      {/* Modal de Auto-Completar Proteína Interativo */}
+      <ProteinAutocompleteModal
+        isOpen={isProteinModalOpen}
+        onClose={() => setIsProteinModalOpen(false)}
+        missingProtein={missingProtein}
+        remainingCalories={remainingCalories}
+        activeWindow={activeWindow}
+        availableFoods={internalFoods}
+        onConfirm={(items, targetWindow) => {
+          items.forEach(item => {
+            onAddFood(targetWindow, {
+              id: `autocomplete_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              foodId: item.sourceId,
+              name: item.name,
+              grams: item.grams,
+              calories: item.calories,
+              protein: item.protein,
+              carbs: item.carbs,
+              fat: item.fat,
+              fiber: item.fiber,
+            });
+          });
+          onAutoCompleteProtein?.('sassami');
+        }}
       />
     </div>
   );
