@@ -26,8 +26,12 @@ const EMPTY_MEALS: MealMap = {
 const DEFAULT_SETTINGS: UserMacroSettings = {
   ageYears: 40,
   gender: 'male',
+  heightCm: 190,
   weightKg: 95,
   activityLevel: 'moderate',
+  bmrSource: 'mifflin_st_jeor',
+  manualBmr: 1943,
+  goal: 'weight_loss',
   dailyDeficitKcal: 500,
   calories: 2400,
   proteinGrams: 220,
