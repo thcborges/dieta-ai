@@ -5,6 +5,8 @@ import {
   calculateBMR,
   calculateTDEE,
   PREPOPULATED_FOODS,
+  getLocalDateString,
+  getRollingDays,
   type EventBufferInput,
   type MealWindow,
   type FoodItem,
@@ -93,9 +95,9 @@ export default function App() {
     }
   });
 
-  // Data ativa do diário (padrão: hoje YYYY-MM-DD)
+  // Data ativa do diário (padrão: hoje no fuso local do usuário YYYY-MM-DD)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateString();
   });
   const selectedDateRef = useRef<string>(selectedDate);
   selectedDateRef.current = selectedDate;
@@ -106,7 +108,7 @@ export default function App() {
       const savedUser = localStorage.getItem('macrometrics_auth_user');
       if (savedUser) {
         const userId = (JSON.parse(savedUser) as AuthUser).id;
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateString();
         const savedByDate = localStorage.getItem(`macrometrics_meals_${userId}_${today}`);
         if (savedByDate) return normalizeMeals(JSON.parse(savedByDate));
         const saved = localStorage.getItem(`macrometrics_meals_${userId}`);
@@ -219,7 +221,7 @@ export default function App() {
         }
 
         // Sincroniza com /api/v1/diary na autenticação inicial da sessão
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateString();
         const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${today}`);
         const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
 
@@ -306,6 +308,41 @@ export default function App() {
       isCancelled = true;
     };
   }, [user, selectedDate]);
+
+  // Monitora a virada do dia (meia-noite 00:00:00) no fuso local do usuário
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const scheduleMidnightCheck = () => {
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0,
+        0,
+        0,
+        50
+      );
+      const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime());
+
+      timeoutId = setTimeout(() => {
+        const newToday = getLocalDateString();
+        const currentActive = selectedDateRef.current;
+        const previousToday = getLocalDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+        if (currentActive === previousToday) {
+          handleDateChange(newToday);
+        }
+        scheduleMidnightCheck();
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnightCheck();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Persiste alimentos customizados do usuário logado
   useEffect(() => {
@@ -467,17 +504,12 @@ export default function App() {
   });
   const userTdee = calculateTDEE(userBmr, macroSettings.activityLevel);
 
-  // Janela móvel dos últimos 7 dias (terminando em selectedDate)
+  // Janela móvel dos últimos 7 dias (terminando em selectedDate) no fuso local
   const rolling7Days = (() => {
+    const daysList = getRollingDays(selectedDate, 7);
     const list: Array<{ date: string; calories: number; proteinGrams?: number }> = [];
-    const baseDate = new Date(selectedDate);
-    const validDate = isNaN(baseDate.getTime()) ? new Date() : baseDate;
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(validDate);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-
+    for (const dateStr of daysList) {
       if (dateStr === selectedDate) {
         list.push({
           date: dateStr,
