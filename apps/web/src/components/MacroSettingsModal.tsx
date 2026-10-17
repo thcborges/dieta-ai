@@ -4,6 +4,8 @@ import {
   calculateTDEE,
   calculateMacroTargets,
   calculateRecommendedFiber,
+  calculateCaloriesFromMacros,
+  calculateCarbsFromCalories,
   calculateMacrosForGoal,
   type Gender,
   type ActivityLevel,
@@ -140,6 +142,62 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
       fatGrams: calculated.fatGrams,
       fiberGrams: calculated.fiberGrams,
       dailyDeficitKcal: -calculated.calorieDelta,
+    }));
+  };
+
+  const handleProteinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newProtein = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: newProtein,
+      carbGrams: form.carbGrams,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      proteinGrams: newProtein,
+      calories: newCalories,
+    }));
+  };
+
+  const handleCarbChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCarb = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: form.proteinGrams,
+      carbGrams: newCarb,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      carbGrams: newCarb,
+      calories: newCalories,
+    }));
+  };
+
+  const handleFatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFat = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: form.proteinGrams,
+      carbGrams: form.carbGrams,
+      fatGrams: newFat,
+    });
+    setForm(prev => ({
+      ...prev,
+      fatGrams: newFat,
+      calories: newCalories,
+    }));
+  };
+
+  const handleCaloriesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCalories = Math.max(0, Number(e.target.value));
+    const newCarb = calculateCarbsFromCalories({
+      calories: newCalories,
+      proteinGrams: form.proteinGrams,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      calories: newCalories,
+      carbGrams: newCarb,
     }));
   };
 
@@ -336,7 +394,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
               </label>
               <select
                 id="activity-select"
-                aria-label="Nível de Atividade Física"
+                aria-label="Nível de Atividade"
                 value={form.activityLevel}
                 onChange={e =>
                   setForm(prev => ({ ...prev, activityLevel: e.target.value as ActivityLevel }))
@@ -473,9 +531,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 aria-label="Calorias Alvo"
                 type="number"
                 value={form.calories}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, calories: Number(e.target.value) }))
-                }
+                onChange={handleCaloriesChange}
                 className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
@@ -489,9 +545,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 aria-label="Proteínas"
                 type="number"
                 value={form.proteinGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, proteinGrams: Number(e.target.value) }))
-                }
+                onChange={handleProteinChange}
                 className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
@@ -505,9 +559,7 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 aria-label="Carboidratos"
                 type="number"
                 value={form.carbGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, carbGrams: Number(e.target.value) }))
-                }
+                onChange={handleCarbChange}
                 className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
@@ -521,14 +573,11 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 aria-label="Gorduras"
                 type="number"
                 value={form.fatGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, fatGrams: Number(e.target.value) }))
-                }
+                onChange={handleFatChange}
                 className="h-9 w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary box-border"
               />
             </div>
           </div>
-
 
           {/* Seção Exclusiva de Fibra como Macro */}
           <div className="bg-m3-surface-container-low p-3.5 rounded-2xl border border-m3-outline-variant/60 space-y-2">
