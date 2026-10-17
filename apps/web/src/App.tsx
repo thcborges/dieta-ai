@@ -278,25 +278,35 @@ export default function App() {
   }, [macroSettings, user]);
 
   const handleRegisterFood = async (newFood: FoodItem) => {
+    const foodWithUser: FoodItem = {
+      ...newFood,
+      userId: newFood.userId || user?.id,
+      isValidated: newFood.isValidated ?? false,
+    };
+
     setAvailableFoods(prev => {
-      if (prev.some(f => f.id === newFood.id)) return prev;
-      return [newFood, ...prev];
+      if (prev.some(f => f.id === foodWithUser.id)) return prev;
+      return [foodWithUser, ...prev];
     });
 
-    if (newFood.isCustom) {
+    if (foodWithUser.isCustom) {
       try {
         await fetch('/api/v1/foods/custom', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(user?.id ? { 'x-user-id': user.id } : {}),
+          },
           body: JSON.stringify({
-            name: newFood.name,
-            servingSizeGrams: newFood.servingSizeGrams,
-            caloriesPer100g: newFood.caloriesPer100g,
-            proteinPer100g: newFood.proteinPer100g,
-            carbsPer100g: newFood.carbsPer100g,
-            fatPer100g: newFood.fatPer100g,
-            fiberPer100g: newFood.fiberPer100g,
-            barcode: (newFood as { barcode?: string }).barcode,
+            name: foodWithUser.name,
+            servingSizeGrams: foodWithUser.servingSizeGrams,
+            caloriesPer100g: foodWithUser.caloriesPer100g,
+            proteinPer100g: foodWithUser.proteinPer100g,
+            carbsPer100g: foodWithUser.carbsPer100g,
+            fatPer100g: foodWithUser.fatPer100g,
+            fiberPer100g: foodWithUser.fiberPer100g,
+            barcode: (foodWithUser as { barcode?: string }).barcode,
+            userId: user?.id,
           }),
         });
       } catch {
@@ -556,6 +566,7 @@ export default function App() {
           onRegisterFood={handleRegisterFood}
           missingProtein={missingProtein}
           remainingCalories={remainingCalories}
+          currentUser={user}
         />
       </main>
 

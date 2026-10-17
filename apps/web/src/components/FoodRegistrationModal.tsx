@@ -18,12 +18,12 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
   initialBarcode = '',
 }) => {
   const [name, setName] = useState(initialName);
-  const [servingSizeGrams, setServingSizeGrams] = useState<number>(100);
-  const [caloriesPer100g, setCaloriesPer100g] = useState<number>(0);
-  const [proteinPer100g, setProteinPer100g] = useState<number>(0);
-  const [carbsPer100g, setCarbsPer100g] = useState<number>(0);
-  const [fatPer100g, setFatPer100g] = useState<number>(0);
-  const [fiberPer100g, setFiberPer100g] = useState<number>(0);
+  const [servingSizeGrams, setServingSizeGrams] = useState<number | ''>(100);
+  const [caloriesPer100g, setCaloriesPer100g] = useState<string>('');
+  const [proteinPer100g, setProteinPer100g] = useState<string>('');
+  const [carbsPer100g, setCarbsPer100g] = useState<string>('');
+  const [fatPer100g, setFatPer100g] = useState<string>('');
+  const [fiberPer100g, setFiberPer100g] = useState<string>('');
   const [barcode, setBarcode] = useState<string>(initialBarcode);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,11 +31,40 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
     if (isOpen) {
       setName(initialName);
       setBarcode(initialBarcode);
+      setServingSizeGrams(100);
+      setCaloriesPer100g('');
+      setProteinPer100g('');
+      setCarbsPer100g('');
+      setFatPer100g('');
+      setFiberPer100g('');
       setError(null);
     }
   }, [isOpen, initialName, initialBarcode]);
 
   if (!isOpen) return null;
+
+  const updateCalories = (pStr: string, cStr: string, fStr: string) => {
+    const p = pStr === '' ? 0 : Number(pStr) || 0;
+    const c = cStr === '' ? 0 : Number(cStr) || 0;
+    const f = fStr === '' ? 0 : Number(fStr) || 0;
+    const totalCal = Math.round(p * 4 + c * 4 + f * 9);
+    setCaloriesPer100g(totalCal > 0 ? String(totalCal) : '');
+  };
+
+  const handleProteinChange = (val: string) => {
+    setProteinPer100g(val);
+    updateCalories(val, carbsPer100g, fatPer100g);
+  };
+
+  const handleCarbsChange = (val: string) => {
+    setCarbsPer100g(val);
+    updateCalories(proteinPer100g, val, fatPer100g);
+  };
+
+  const handleFatChange = (val: string) => {
+    setFatPer100g(val);
+    updateCalories(proteinPer100g, carbsPer100g, val);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +74,13 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
       return;
     }
 
+    const p = Number(proteinPer100g) || 0;
+    const c = Number(carbsPer100g) || 0;
+    const f = Number(fatPer100g) || 0;
+    const fib = Number(fiberPer100g) || 0;
+    const calculatedCalories = Math.round(p * 4 + c * 4 + f * 9);
+    const finalCalories = caloriesPer100g !== '' ? Number(caloriesPer100g) || 0 : calculatedCalories;
+
     const newFood: FoodItem = {
       id: barcode.trim()
         ? `custom_${barcode.trim()}`
@@ -52,12 +88,13 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
       name: trimmedName,
       servingDescription: `${servingSizeGrams || 100}g`,
       servingSizeGrams: Number(servingSizeGrams) || 100,
-      caloriesPer100g: Math.max(0, Math.round(Number(caloriesPer100g) || 0)),
-      proteinPer100g: Math.max(0, Math.round((Number(proteinPer100g) || 0) * 10) / 10),
-      carbsPer100g: Math.max(0, Math.round((Number(carbsPer100g) || 0) * 10) / 10),
-      fatPer100g: Math.max(0, Math.round((Number(fatPer100g) || 0) * 10) / 10),
-      fiberPer100g: Math.max(0, Math.round((Number(fiberPer100g) || 0) * 10) / 10),
+      caloriesPer100g: Math.max(0, Math.round(finalCalories)),
+      proteinPer100g: Math.max(0, Math.round(p * 10) / 10),
+      carbsPer100g: Math.max(0, Math.round(c * 10) / 10),
+      fatPer100g: Math.max(0, Math.round(f * 10) / 10),
+      fiberPer100g: Math.max(0, Math.round(fib * 10) / 10),
       isCustom: true,
+      isValidated: false,
     };
 
     onSave(newFood);
@@ -124,7 +161,11 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
                 min="1"
                 max="2000"
                 value={servingSizeGrams}
-                onChange={e => setServingSizeGrams(Number(e.target.value) || 0)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setServingSizeGrams(val === '' ? '' : Number(val) || 0);
+                }}
+                placeholder="100"
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
               />
             </div>
@@ -149,21 +190,6 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="food-calories" className="block text-[11px] text-m3-outline mb-1">
-                  Calorias (100g)
-                </label>
-                <input
-                  id="food-calories"
-                  type="number"
-                  min="0"
-                  max="1000"
-                  value={caloriesPer100g}
-                  onChange={e => setCaloriesPer100g(Number(e.target.value) || 0)}
-                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
-                />
-              </div>
-
-              <div>
                 <label htmlFor="food-protein" className="block text-[11px] text-m3-metric-protein mb-1 font-medium">
                   Proteínas (100g)
                 </label>
@@ -174,7 +200,8 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
                   min="0"
                   max="100"
                   value={proteinPer100g}
-                  onChange={e => setProteinPer100g(Number(e.target.value) || 0)}
+                  onChange={e => handleProteinChange(e.target.value)}
+                  placeholder="0"
                   className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-metric-protein"
                 />
               </div>
@@ -190,7 +217,8 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
                   min="0"
                   max="100"
                   value={carbsPer100g}
-                  onChange={e => setCarbsPer100g(Number(e.target.value) || 0)}
+                  onChange={e => handleCarbsChange(e.target.value)}
+                  placeholder="0"
                   className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-metric-carbs"
                 />
               </div>
@@ -206,7 +234,8 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
                   min="0"
                   max="100"
                   value={fatPer100g}
-                  onChange={e => setFatPer100g(Number(e.target.value) || 0)}
+                  onChange={e => handleFatChange(e.target.value)}
+                  placeholder="0"
                   className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-metric-fat"
                 />
               </div>
@@ -222,8 +251,25 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
                   min="0"
                   max="100"
                   value={fiberPer100g}
-                  onChange={e => setFiberPer100g(Number(e.target.value) || 0)}
+                  onChange={e => setFiberPer100g(e.target.value)}
+                  placeholder="0"
                   className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-metric-fiber"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="food-calories" className="block text-[11px] text-m3-outline mb-1 font-medium">
+                  Calorias (100g)
+                </label>
+                <input
+                  id="food-calories"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  value={caloriesPer100g}
+                  onChange={e => setCaloriesPer100g(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
                 />
               </div>
             </div>
