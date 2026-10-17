@@ -85,3 +85,26 @@ export function calculateRecommendedFiber(age: number, gender: Gender): number {
 ## 🥩 Tetos Proteicos e Travas de Segurança
 
 O sistema suporta travas de proteína customizáveis entre **2.0g/kg e 2.5g/kg**, ou trava máxima fixa de até **240g de proteína/dia**, essenciais para preservar a massa magra durante déficits calóricos acentuados em praticantes de musculação de grande porte.
+
+---
+
+## 🎯 Item 3: Metas de Macros Diárias & Recálculo Bidirecional
+
+No modal de **Controle de Macronutrientes**, a seção **3. Metas de Macros Diárias** conta com um motor matemático bidirecional e reativo:
+
+### 1. Cálculo Automático de Calorias Alvo a partir dos Macros
+Sempre que o usuário altera a gramatura de **Proteína**, **Carboidrato** ou **Gordura**, a quantidade de **Calorias Alvo** é recalculada instantaneamente:
+
+$$\text{Calorias Alvo (kcal)} = (P \times 4) + (C \times 4) + (G \times 9)$$
+
+- $P$: Gramas de proteína (4 kcal/g)
+- $C$: Gramas de carboidrato (4 kcal/g)
+- $G$: Gramas de gordura (9 kcal/g)
+
+### 2. Ajuste Exclusivo de Carboidratos ao Alterar Calorias Alvo
+Se o usuário alterar diretamente o campo **Calorias Alvo**, o sistema preserva integralmente as quantidades de proteína (para proteção da massa magra) e gordura (para suporte hormonal), aumentando ou reduzindo **apenas a quantidade de carboidrato**:
+
+$$C_{\text{novo}} = \max\left(0, \text{round}\left(\frac{\text{Calorias Alvo} - (P \times 4 + G \times 9)}{4}\right)\right)$$
+
+Caso a caloria alvo informada seja inferior à soma de calorias fornecidas por proteína e gordura, o carboidrato é delimitado pelo piso de segurança de **0g**, impedindo valores negativos no plano alimentar.
+
