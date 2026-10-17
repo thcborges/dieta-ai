@@ -1,6 +1,6 @@
 export type Gender = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'heavy' | 'athlete';
-export type DietGoal = 'weight_loss' | 'maintenance' | 'muscle_gain';
+export type DietGoal = 'weight_loss' | 'maintenance' | 'muscle_gain' | 'weight_gain';
 export type BmrSource = 'mifflin_st_jeor' | 'manual_bioimpedance';
 
 export interface BiometricProfile {
@@ -223,6 +223,7 @@ export function calculateMacrosForGoal(input: GoalBasedMacroCalculationInput): G
     weight_loss: -500,
     maintenance: 0,
     muscle_gain: 350,
+    weight_gain: 350,
   };
 
   const calorieDelta = input.customDeltaKcal ?? defaultDeltas[input.goal] ?? 0;
@@ -233,6 +234,7 @@ export function calculateMacrosForGoal(input: GoalBasedMacroCalculationInput): G
     weight_loss: 2.2, // Proteção de massa magra em restrição
     maintenance: 2.0, // Alta densidade e homeostase
     muscle_gain: 2.0, // Síntese proteica hipertrófica ideal
+    weight_gain: 2.0,
   };
 
   const proteinPerKg = input.customProteinPerKg ?? defaultProteinPerKg[input.goal] ?? 2.0;
@@ -247,6 +249,7 @@ export function calculateMacrosForGoal(input: GoalBasedMacroCalculationInput): G
     weight_loss: 0.8,
     maintenance: 0.9,
     muscle_gain: 0.9,
+    weight_gain: 0.9,
   };
 
   const fatPerKg = input.customFatPerKg ?? defaultFatPerKg[input.goal] ?? 0.8;

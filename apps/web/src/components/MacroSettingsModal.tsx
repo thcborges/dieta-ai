@@ -22,6 +22,8 @@ export interface UserMacroSettings {
   manualBmr?: number;
   goal?: DietGoal;
   dailyDeficitKcal: number;
+  dailySurplusKcal?: number;
+  tolerancePercent?: number;
   calories: number;
   proteinGrams: number;
   carbGrams: number;
@@ -88,10 +90,19 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
   // Recalcular via Mifflin-St Jeor (atalho direto mantendo compatibilidade)
   const handleRecalculateMifflin = () => {
     const tdee = calculateTDEE(mifflinBmr, activityLevel);
+    let effectiveDeficit = 0;
+    if (goal === 'weight_loss') {
+      effectiveDeficit = form.dailyDeficitKcal || 500;
+    } else if (goal === 'weight_gain') {
+      effectiveDeficit = -(form.dailySurplusKcal || 400);
+    } else {
+      effectiveDeficit = 0;
+    }
+
     const calculated = calculateMacroTargets({
       tdee,
       weightKg: weight,
-      deficitKcal: form.dailyDeficitKcal || 500,
+      deficitKcal: effectiveDeficit,
       age,
       gender: form.gender,
       proteinStrategy: { type: 'fixed', grams: form.proteinGrams || 220 },
@@ -353,27 +364,85 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
                 }
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
               >
-                <option value="weight_loss">Emagrecer (Déficit Calórico ~500 kcal)</option>
-                <option value="maintenance">Manutenção (Equilíbrio Calórico)</option>
-                <option value="muscle_gain">Ganho de Peso (Superávit Calórico +350 kcal)</option>
+                <option value="weight_loss">Perda de Peso (Déficit / Blindagem)</option>
+                <option value="muscle_gain">Ganho de Peso (Superávit / Anabolismo)</option>
+                <option value="maintenance">Manutenção (Equilíbrio / Homeostase)</option>
               </select>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-m3-surface-container-low p-3 rounded-2xl border border-m3-outline-variant/60">
-            <div className="text-xs">
-              <span className="text-m3-outline font-mono">GET / TDEE Projetado: </span>
-              <strong className="text-cyan-400 font-mono text-sm">{currentTdee} kcal</strong>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {form.goal === 'weight_gain' || form.goal === 'muscle_gain' ? (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Superávit Diário Alvo (kcal)
+                </label>
+                <input
+                  aria-label="Superávit Diário Alvo"
+                  type="number"
+                  value={form.dailySurplusKcal ?? 400}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      dailySurplusKcal: Math.max(0, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            ) : form.goal === 'maintenance' ? (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Tolerância de Nível (± %)
+                </label>
+                <input
+                  aria-label="Tolerância de Nível"
+                  type="number"
+                  value={form.tolerancePercent ?? 3}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      tolerancePercent: Math.max(1, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[11px] font-mono text-m3-outline mb-1">
+                  Déficit Diário Planejado (kcal)
+                </label>
+                <input
+                  aria-label="Déficit Diário Planejado"
+                  type="number"
+                  value={form.dailyDeficitKcal}
+                  onChange={e =>
+                    setForm(prev => ({
+                      ...prev,
+                      dailyDeficitKcal: Math.max(0, Number(e.target.value)),
+                    }))
+                  }
+                  className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+                />
+              </div>
+            )}
 
-            <button
-              type="button"
-              onClick={handleCalculateForGoal}
-              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-m3-primary/15 hover:bg-m3-primary/25 border border-m3-primary/40 rounded-xl text-xs font-semibold text-m3-primary transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Calcular Metas para este Objetivo</span>
-            </button>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-m3-surface-container-low p-3 rounded-2xl border border-m3-outline-variant/60">
+              <div className="text-xs">
+                <span className="text-m3-outline font-mono">GET / TDEE: </span>
+                <strong className="text-cyan-400 font-mono text-sm">{currentTdee} kcal</strong>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCalculateForGoal}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 bg-m3-primary/15 hover:bg-m3-primary/25 border border-m3-primary/40 rounded-xl text-xs font-semibold text-m3-primary transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Calcular Metas para este Objetivo</span>
+              </button>
+            </div>
           </div>
         </div>
 

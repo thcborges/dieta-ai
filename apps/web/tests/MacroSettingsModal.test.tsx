@@ -188,9 +188,6 @@ describe('MacroSettingsModal (Controle de Macros pelo Usuário)', () => {
     const calcGoalBtn = screen.getByRole('button', { name: /Calcular Metas para este Objetivo/i });
     fireEvent.click(calcGoalBtn);
 
-    // TMB 1850 * 1.55 = 2868 TDEE. Emagrecer: -500 kcal = 2368 kcal
-    // Peso 95kg -> Proteína: 95 * 2.2 = 209g. Gordura: 95 * 0.8 = 76g.
-    // Carbo: (2368 - (209*4 + 76*9)) / 4 = (2368 - (836 + 684)) / 4 = 848 / 4 = 212g.
     const calInput = screen.getByLabelText(/Calorias Alvo/i);
     expect(calInput).toHaveValue(2368);
 
@@ -250,12 +247,38 @@ describe('MacroSettingsModal (Controle de Macros pelo Usuário)', () => {
     const calcGoalBtn = screen.getByRole('button', { name: /Calcular Metas para este Objetivo/i });
     fireEvent.click(calcGoalBtn);
 
-    // Superávit +350 -> 2750 + 350 = 3100 kcal
-    // Peso 95kg -> Proteína: 95 * 2.0 = 190g. Gordura: 95 * 0.9 = 86g (85.5 -> 86).
     const calInput = screen.getByLabelText(/Calorias Alvo/i);
     expect(calInput).toHaveValue(3100);
 
     const protInput = screen.getByLabelText(/Proteínas/i);
     expect(protInput).toHaveValue(190);
+  });
+
+  it('deve permitir alterar o objetivo nutricional e customizar superávit/déficit', () => {
+    const onSave = vi.fn();
+    render(
+      <MacroSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        currentSettings={initialSettings}
+        onSave={onSave}
+      />
+    );
+
+    const goalSelect = screen.getByLabelText(/Objetivo Nutricional/i);
+    fireEvent.change(goalSelect, { target: { value: 'muscle_gain' } });
+
+    const surplusInput = screen.getByLabelText(/Superávit Diário Alvo/i);
+    fireEvent.change(surplusInput, { target: { value: '450' } });
+
+    const saveButton = screen.getByRole('button', { name: /Salvar Metas/i });
+    fireEvent.click(saveButton);
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: 'muscle_gain',
+        dailySurplusKcal: 450,
+      })
+    );
   });
 });
