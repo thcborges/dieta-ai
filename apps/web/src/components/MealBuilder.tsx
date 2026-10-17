@@ -50,6 +50,7 @@ interface MealBuilderProps {
   onRegisterFood?: (food: FoodItem) => void;
   missingProtein: number;
   remainingCalories: number;
+  currentUser?: { id: string } | null;
 }
 
 const WINDOW_META: Record<
@@ -79,13 +80,14 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   onRegisterFood,
   missingProtein,
   remainingCalories,
+  currentUser,
 }) => {
   const [internalFoods, setInternalFoods] = useState<FoodItem[]>(() => {
     return availableFoods && availableFoods.length > 0 ? availableFoods : PREPOPULATED_FOODS;
   });
 
   const [selectedFoodId, setSelectedFoodId] = useState<string>('sassami');
-  const [servingGrams, setServingGrams] = useState<number>(100);
+  const [servingGrams, setServingGrams] = useState<number | ''>(100);
   const [activeWindow, setActiveWindow] = useState<MealWindow>('lunch');
   const [copyTargetWindow, setCopyTargetWindow] = useState<MealWindow>('dinner_event');
   const [showCopyModal, setShowCopyModal] = useState<MealWindow | null>(null);
@@ -128,7 +130,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     setSearchFeedback(null);
 
     // 1. Consulta em primeiro lugar o nosso banco de dados local
-    const localMatches = searchFoodItems(internalFoods, code);
+    const localMatches = searchFoodItems(internalFoods, code, currentUser?.id);
     if (localMatches.length > 0) {
       const found = localMatches[0]!;
       setSelectedFoodId(found.id);
@@ -144,9 +146,11 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     setIsSearching(true);
     try {
       let offFood: FoodItem | null = null;
+      const headers: Record<string, string> = {};
+      if (currentUser?.id) headers['x-user-id'] = currentUser.id;
 
       // Consulta rota de código de barras
-      const barcodeRes = await fetch(`/api/v1/foods/barcode/${encodeURIComponent(code)}`);
+      const barcodeRes = await fetch(`/api/v1/foods/barcode/${encodeURIComponent(code)}`, { headers });
       if (barcodeRes.ok) {
         const barcodeData = await barcodeRes.json();
         if (barcodeData.food) {
@@ -155,7 +159,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       }
 
       if (!offFood) {
-        const searchRes = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(code)}`);
+        const searchRes = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(code)}`, { headers });
         if (searchRes.ok) {
           const searchData = await searchRes.json();
           if (searchData.foods && searchData.foods.length > 0) {
@@ -205,7 +209,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     setSearchFeedback(null);
 
     // 1. Consulta em primeiro lugar o nosso banco de dados local
-    const localMatches = searchFoodItems(internalFoods, query);
+    const localMatches = searchFoodItems(internalFoods, query, currentUser?.id);
     if (localMatches.length > 0) {
       const found = localMatches[0]!;
       setSelectedFoodId(found.id);
@@ -220,7 +224,10 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     // 2. Não encontrado localmente: consulta a API (cache do Firestore / Open Food Facts)
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}`);
+      const headers: Record<string, string> = {};
+      if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+
+      const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}`, { headers });
       if (!res.ok) {
         throw new Error('Falha na requisição');
       }
@@ -255,23 +262,32 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   };
 
   const handleSaveCustomFood = (newFood: FoodItem) => {
-    setInternalFoods(prev => [newFood, ...prev]);
-    onRegisterFood?.(newFood);
-    setSelectedFoodId(newFood.id);
-    setServingGrams(newFood.servingSizeGrams || 100);
+    const foodWithUser: FoodItem = {
+      ...newFood,
+      userId: newFood.userId || currentUser?.id,
+      isValidated: newFood.isValidated ?? false,
+    };
+    setInternalFoods(prev => [foodWithUser, ...prev]);
+    onRegisterFood?.(foodWithUser);
+    setSelectedFoodId(foodWithUser.id);
+    setServingGrams(foodWithUser.servingSizeGrams || 100);
     setSearchFeedback({
       type: 'success',
-      message: `Alimento "${newFood.name}" cadastrado com sucesso!`,
+      message: `Alimento "${foodWithUser.name}" cadastrado com sucesso!`,
     });
   };
 
   const handleAddFoodSubmit = (window: MealWindow) => {
-    const factor = servingGrams / 100;
+    const parsedGrams = typeof servingGrams === 'number' ? servingGrams : Number(servingGrams);
+    if (!parsedGrams || parsedGrams <= 0) {
+      return;
+    }
+    const factor = parsedGrams / 100;
     const newFood: LoggedFood = {
       id: `${selectedFood.id}_${Date.now()}`,
       foodId: selectedFood.id,
       name: selectedFood.name,
-      grams: servingGrams,
+      grams: parsedGrams,
       calories: Math.round(selectedFood.caloriesPer100g * factor),
       protein: Math.round(selectedFood.proteinPer100g * factor * 10) / 10,
       carbs: Math.round(selectedFood.carbsPer100g * factor * 10) / 10,
@@ -279,6 +295,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       fiber: Math.round((selectedFood.fiberPer100g ?? 0) * factor * 10) / 10,
     };
     onAddFood(window, newFood);
+    setServingGrams('');
   };
 
   const handleAddFrequentChip = (window: MealWindow, foodId: string) => {
@@ -464,7 +481,16 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               min="1"
               max="2000"
               value={servingGrams}
-              onChange={e => setServingGrams(Math.max(1, Number(e.target.value) || 0))}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === '') {
+                  setServingGrams('');
+                } else {
+                  const num = Number(val);
+                  setServingGrams(isNaN(num) ? '' : num);
+                }
+              }}
+              placeholder="Ex: 100"
               className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
             />
           </div>

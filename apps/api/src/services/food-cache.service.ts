@@ -1,4 +1,4 @@
-import { PREPOPULATED_FOODS, type FoodItem } from '@dieta-ai/core';
+import { PREPOPULATED_FOODS, filterVisibleFoods, type FoodItem } from '@dieta-ai/core';
 
 export interface CachedFood extends FoodItem {
   barcode?: string;
@@ -25,18 +25,23 @@ export class FoodCacheService {
     }
   }
 
-  getAllFoods(): CachedFood[] {
+  getAllFoods(userId?: string, isAdmin: boolean = false): CachedFood[] {
     const map = new Map<string, CachedFood>();
     for (const food of this.inMemoryCache.values()) {
       map.set(food.id, food);
     }
-    return Array.from(map.values());
+    const all = Array.from(map.values());
+    return filterVisibleFoods(all, userId, isAdmin) as CachedFood[];
   }
 
-  async searchFoods(query: string): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' }> {
+  async searchFoods(
+    query: string,
+    userId?: string,
+    isAdmin: boolean = false
+  ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' }> {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return { foods: this.getAllFoods(), source: 'cache' };
+      return { foods: this.getAllFoods(userId, isAdmin), source: 'cache' };
     }
 
     // 1. Consulta em primeiro lugar o nosso banco de dados (cache / prepopulated / custom)
@@ -51,7 +56,12 @@ export class FoodCacheService {
       }
     }
 
-    const cachedResults = Array.from(cachedFoodsMap.values());
+    const cachedResults = filterVisibleFoods(
+      Array.from(cachedFoodsMap.values()),
+      userId,
+      isAdmin
+    ) as CachedFood[];
+
     if (cachedResults.length > 0) {
       return { foods: cachedResults, source: 'cache' };
     }
@@ -118,10 +128,18 @@ export class FoodCacheService {
     return { foods: [], source: 'cache' };
   }
 
-  async getByBarcode(barcode: string): Promise<CachedFood | null> {
+  async getByBarcode(
+    barcode: string,
+    userId?: string,
+    isAdmin: boolean = false
+  ): Promise<CachedFood | null> {
     // 1. Consulta cache em memória / Firestore
     const cached = this.inMemoryCache.get(barcode);
     if (cached) {
+      const visible = filterVisibleFoods([cached], userId, isAdmin);
+      if (visible.length === 0) {
+        return null; // Não validado e pertence a outro usuário
+      }
       return { ...cached, source: 'cache' };
     }
 
@@ -187,6 +205,7 @@ export class FoodCacheService {
     fatPer100g: number;
     fiberPer100g?: number;
     barcode?: string;
+    userId?: string;
   }): Promise<CachedFood> {
     const id = foodData.barcode ? `custom_${foodData.barcode}` : `custom_${Date.now()}`;
     const cachedFood: CachedFood = {
@@ -201,6 +220,8 @@ export class FoodCacheService {
       fiberPer100g: foodData.fiberPer100g ?? 0,
       barcode: foodData.barcode,
       isCustom: true,
+      userId: foodData.userId,
+      isValidated: false,
       source: 'manual',
       updatedAt: new Date().toISOString(),
     };
@@ -211,6 +232,23 @@ export class FoodCacheService {
     this.inMemoryCache.set(id, cachedFood);
 
     return cachedFood;
+  }
+
+  validateFood(foodId: string): CachedFood | null {
+    const food = this.inMemoryCache.get(foodId);
+    if (!food) {
+      return null;
+    }
+    food.isValidated = true;
+    food.updatedAt = new Date().toISOString();
+    if (food.barcode && this.inMemoryCache.has(food.barcode)) {
+      const barcodeFood = this.inMemoryCache.get(food.barcode);
+      if (barcodeFood) {
+        barcodeFood.isValidated = true;
+        barcodeFood.updatedAt = food.updatedAt;
+      }
+    }
+    return food;
   }
 }
 
