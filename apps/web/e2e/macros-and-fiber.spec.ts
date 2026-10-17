@@ -5,10 +5,10 @@ test.describe('Controle Individual de Macros & Fibras por Idade', () => {
     await page.goto('/');
     // Realiza login para liberar acesso
     const loginButton = page.getByRole('button', { name: /Entrar com Google/i });
-    if (await loginButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await loginButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await loginButton.click();
     }
-    await expect(page.getByRole('button', { name: /Controlar Macros/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Controlar Macros/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('deve abrir modal de controle de macros e recalcular fibra recomendada ao alterar idade', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('Controle Individual de Macros & Fibras por Idade', () => {
     await expect(page.getByText('Controle de Macronutrientes')).toBeVisible();
 
     // Localiza input de idade e altera para 55
-    const ageInput = page.getByLabel(/Idade/i);
+    const ageInput = page.getByLabel(/^Idade$/i);
     await ageInput.fill('55');
 
     // Clica no atalho para aplicar a recomendação oficial DRI

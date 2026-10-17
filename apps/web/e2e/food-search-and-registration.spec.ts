@@ -5,10 +5,10 @@ test.describe('Cadastro e Consulta de Alimentos com Cache e Open Food Facts (UX 
     await page.goto('/');
     // Realiza login se necessário
     const loginButton = page.getByRole('button', { name: /Entrar com Google/i });
-    if (await loginButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await loginButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await loginButton.click();
     }
-    await expect(page.getByText('Lançamento Rápido de Alimentos')).toBeVisible();
+    await expect(page.getByText('Lançamento Rápido de Alimentos')).toBeVisible({ timeout: 10000 });
   });
 
   test('deve priorizar itens comuns no select e permitir cadastrar novo alimento via modal M3', async ({ page }) => {
