@@ -34,15 +34,21 @@ O sistema é pré-populado com os alimentos essenciais consumidos na rotina de p
 
 ---
 
-## ⚡ Botão "Auto-Completar Proteína" (Solver Matemático)
+## ⚡ Botão "Auto-Completar Proteína" (Modal & Solver Interativo)
 
-Quando restam proteínas para atingir a meta diária e há margem calórica suficiente, o usuário não precisa fazer contas de cabeça. 
+Quando restam proteínas para atingir a meta diária e há margem calórica suficiente, o usuário conta com um **Modal Interativo de Planejamento de Proteínas**:
 
-O solver calcula a gramatura exata necessária de uma fonte pura de proteína (como Sassami ou Whey Protein) para zerar o déficit proteico:
+1. **Lista de Fontes Proteicas:** Exibe as opções mais eficientes da dieta (Filé de Sassami Desfiado, Whey Protein Growth, Claras de Ovo Pasteurizadas, etc.) e alimentos proteicos cadastrados.
+2. **Entrada Personalizada de Gramas:** O usuário informa a quantidade exata que planeja ingerir de cada alimento.
+3. **Cálculo Reativo em Tempo Real:** Conforme as gramaturas são digitadas, o modal calcula instantaneamente:
+   - **Proteína Planejada vs. Meta:** Quanto já foi suprido e quanto ainda falta ($P_{restante} = P_{meta} - \sum P_{selecionado}$).
+   - **Feedback Visual de Status:** Alerta se faltam gramas, se a meta foi atingida com perfeição ($0.0\text{g}$) ou se foi superada.
+   - **Auditoria de Orçamento Calórico:** Valida se as calorias associadas cabem no teto calórico diário restante, sinalizando sobrecargas ($Kcal_{adicionadas} > Kcal_{restantes}$).
+4. **Botão de Atalho "Completar restante":** Calcula automaticamente a porção precisa de qualquer alimento para zerar o déficit residual:
 
-$$\text{Gramas Necessárias} = \frac{P_{faltante}}{\text{Proteína por grama do alimento}}$$
+$$\text{Gramas Necessárias} = \frac{P_{residual}}{\text{Proteína por grama do alimento}}$$
 
-O algoritmo verifica ainda se as gorduras e calorias associadas à porção calculada respeitam o teto calórico restante.
+5. **Lançamento Direto no Diário:** Permite escolher a janela de refeição de destino e adiciona os alimentos selecionados em uma única confirmação.
 
 ---
 

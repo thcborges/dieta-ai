@@ -31,13 +31,14 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     expect(screen.getAllByText(/Jantar \/ Evento/i).length).toBeGreaterThan(0);
   });
 
-  it('deve acionar o Auto-Completar Proteína quando clicado', () => {
+  it('deve abrir o modal de Auto-Completar Proteína quando clicado e permitir lançar alimentos no diário', () => {
     const onAutoComplete = vi.fn();
+    const onAddFood = vi.fn();
 
     render(
       <MealBuilder
         meals={mockMeals}
-        onAddFood={vi.fn()}
+        onAddFood={onAddFood}
         onRemoveFood={vi.fn()}
         onCopyMeal={vi.fn()}
         onAutoCompleteProtein={onAutoComplete}
@@ -50,6 +51,23 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     expect(autoBtn).toBeInTheDocument();
 
     fireEvent.click(autoBtn);
+
+    // O modal deve ser aberto exibindo o diálogo, lista de proteínas e quanto falta
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Faltam 48(\.0)?g/i)).toBeInTheDocument();
+
+    // Usuário informa quanto vai consumir de Sassami
+    const sassamiInput = screen.getByLabelText(/Gramas de Filé de Sassami Desfiado/i);
+    fireEvent.change(sassamiInput, { target: { value: '150' } });
+
+    // Clica em lançar no diário
+    const confirmBtn = screen.getByRole('button', { name: /Lançar no Diário/i });
+    fireEvent.click(confirmBtn);
+
+    expect(onAddFood).toHaveBeenCalled();
+    const [, addedFood] = onAddFood.mock.calls[0];
+    expect(addedFood.name).toContain('Filé de Sassami Desfiado');
+    expect(addedFood.grams).toBe(150);
     expect(onAutoComplete).toHaveBeenCalled();
   });
 

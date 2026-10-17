@@ -108,7 +108,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     expect(screen.queryByText(/Densidade Proteica Exigida/i)).not.toBeInTheDocument();
   });
 
-  it('deve executar o auto-completar proteína e adicionar novo alimento no jantar', () => {
+  it('deve executar o auto-completar proteína via modal e adicionar novo alimento no jantar', () => {
     localStorage.setItem(
       'macrometrics_auth_user',
       JSON.stringify({
@@ -123,7 +123,20 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     const autoBtn = screen.getByRole('button', { name: /Auto-Completar Proteína/i });
     fireEvent.click(autoBtn);
 
-    expect(screen.getAllByText(/Auto-Completar/i).length).toBeGreaterThan(0);
+    // Modal abre e exibe quanto falta para atingir a meta
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Simule e distribua as gramas de cada fonte proteica/i)).toBeInTheDocument();
+
+    // Informa gramas de Sassami
+    const sassamiInput = screen.getByLabelText(/Gramas de Filé de Sassami Desfiado/i);
+    fireEvent.change(sassamiInput, { target: { value: '120' } });
+
+    // Clica em Lançar no Diário
+    const confirmBtn = screen.getByRole('button', { name: /Lançar no Diário/i });
+    fireEvent.click(confirmBtn);
+
+    // Alimento adicionado no jantar do diário
+    expect(screen.getAllByText(/Filé de Sassami Desfiado \(Auto-Completar\)/i).length).toBeGreaterThan(0);
   });
 
   it('deve permitir deslogar (logout) e retornar à página principal de login bloqueando novas inserções', () => {
