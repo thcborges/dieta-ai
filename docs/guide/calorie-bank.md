@@ -1,27 +1,52 @@
-# Módulo 5: Banco de Calorias e Macros Semanal
+# Módulo 5: Banco de Calorias e Macros Semanal & Termômetro Móvel
 
-A fisiologia humana e a perda de gordura respondem ao **balanço energético semanal consolidado**, e não a cortes artificiais a cada 24 horas.
+A fisiologia humana e a recomposição corporal respondem ao **balanço energético semanal consolidado em janela móvel**, e não a cortes artificiais a cada 24 horas.
 
-O Banco de Calorias e Macros Semanal permite transferir e poupar calorias estrategicamente ao longo da semana para acomodar ocasiões especiais.
-
----
-
-## 📈 Balanço Energético Semanal Consolidado
-
-O orçamento semanal é a soma dos 7 dias da semana:
-
-$$\text{Orçamento Semanal} = \sum_{i=1}^{7} \text{Meta Diária}_i$$
-
-$$\text{Consumo Acumulado} = \sum_{i=1}^{d} \text{Consumo Real}_i$$
-
-$$\text{Saldo Restante} = \text{Orçamento Semanal} - \text{Consumo Acumulado}$$
+O Banco de Calorias funciona como um **Termômetro Analítico de Janela Móvel (últimos 7 dias)**, auditando o esforço contínuo ao longo do tempo, quantificando deslizes semanais e alertando riscos com base no objetivo configurado.
 
 ---
 
-## 🏦 Estratégia de "Poupança Calórica"
+## 📈 Janela Móvel de 7 Dias & Adesão à Dieta
 
-Em vez de consumir 2.200 kcal uniformemente todos os dias:
-- **Segunda a Sexta (5 dias):** O usuário consome 1.900 kcal/dia (economizando $300 \times 5 = 1.500 \text{ kcal}$).
-- **Sábado (Evento Social):** O usuário dispõe de $2.200 + 1.500 = 3.700 \text{ kcal}$ livres para pizza ou churrasco, **mantendo rigorosamente a mesma média semanal de 2.200 kcal/dia e o déficit acumulado intacto**.
+Em vez de zerar arbitrariamente a cada segunda-feira, o termômetro avalia continuamente os **últimos 7 dias** ($d \in \{1, \dots, 7\}$):
 
-O dashboard analítico apresenta gráficos diários e o balanço em tempo real, alertando se o saldo semanal estiver em risco de déficit negativo.
+$$\text{Orçamento Alvo da Janela} = \sum_{i=1}^{N} \text{Meta Diária}_i = N \times C_{\text{alvo}}$$
+
+$$\text{Consumo Acumulado} = \sum_{i=1}^{N} C_i^{\text{real}}$$
+
+$$\text{Deslize Semanal } (\text{kcal}) = \text{Consumo Acumulado} - \text{Orçamento Alvo}$$
+
+$$\text{Índice Térmico } (\theta) = \frac{\text{Consumo Acumulado}}{\text{Orçamento Alvo}} \times 100\%$$
+
+### Pontuação de Adesão ($\text{Adesão \%}$)
+Mede a consistência e dispersão diária em relação à meta planejada:
+$$\text{Desvio Médio Diário} = \frac{1}{N} \sum_{i=1}^{N} \frac{|C_i^{\text{real}} - C_{\text{alvo}}|}{C_{\text{alvo}}}$$
+$$\text{Adesão} = \max(0, \min(100, \text{round}((1 - \text{Desvio Médio Diário}) \times 100)))$$
+
+---
+
+## 🌡️ Comportamento do Termômetro por Objetivo (`DietGoal`)
+
+### 1. Perda de Peso (`weight_loss` / Cutting)
+* **Objetivo:** Blindar o déficit calórico semanal e preservar massa magra.
+* **Estados do Termômetro:**
+  * $\theta \le 100\%$: **Zona Ótima (Verde/Ciano Analítico)** — Déficit cumprido com poupança calórica disponível.
+  * $100\% < \theta \le 105\%$: **Atenção / Margem Estreita (Âmbar)** — Alerta `WARNING_BUDGET`. Deslize leve absorvível na janela.
+  * $\theta > 105\%$: **Termômetro Estourado (Vermelho Crítico / Alerta `BLOWN_BUDGET`)** — O superávit acumulado neutralizou dias de déficit:
+    $$\text{Dias Neutralizados} = \frac{\text{Deslize Semanal}}{\text{Déficit Diário Planejado}}$$
+
+### 2. Ganho de Peso (`weight_gain` / Bulking)
+* **Objetivo:** Manter ambiente anabólico hipertrófico contínuo. O risco crítico é o **subconsumo calórico involuntário**.
+* **Estados do Termômetro:**
+  * $\theta \ge 98\%$: **Zona Anabólica Ótima (Verde/Azul Analítico)** — Superávit sustentado.
+  * $90\% \le \theta < 98\%$: **Atenção (Âmbar / `WARNING_LOW_CALORIES`)** — Superávit abaixo do planejado.
+  * $\text{Consumo Acumulado} < (N \times TDEE)$: **Termômetro Congelado (Azul Gélido / Alerta Crítico `CRITICAL_WEIGHT_LOSS`)** — O usuário entrou em déficit involuntário:
+    $$\Delta \text{Peso Projetado (kg)} = \frac{\text{Consumo Acumulado} - (N \times TDEE)}{7.700}$$
+    Alerta matemático de risco iminente de catabolismo proteico e perda ponderal de peso corporal.
+
+### 3. Manutenção (`maintenance` / Homeostase)
+* **Objetivo:** Manter peso estável com flutuações calóricas controladas em torno do GET/TDEE.
+* **Estados do Termômetro (Nível Central / Calibrador):**
+  * $| \theta - 100\% | \le \text{Tolerância \%}$ (padrão: $\pm 3\%$): **Homeostase / Nível Equilibrado (Esmeralda)**.
+  * $\theta > 100\% + \text{Tolerância \%}$: **Desvio de Manutenção para Cima (Âmbar / `MAINTENANCE_DRIFT_HIGH`)** — Risco de ganho indesejado.
+  * $\theta < 100\% - \text{Tolerância \%}$: **Desvio de Manutenção para Baixo (Âmbar / `MAINTENANCE_DRIFT_LOW`)** — Risco de perda indesejada.
