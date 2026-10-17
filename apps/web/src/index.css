@@ -6,11 +6,13 @@
   color-scheme: dark;
 }
 
-body {
+html, body {
   margin: 0;
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   background-color: #141218;
   color: #E6E0E9;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 /* Scrollbars analíticos escuros e discretos */

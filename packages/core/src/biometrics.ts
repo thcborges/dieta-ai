@@ -1,5 +1,7 @@
 export type Gender = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'heavy' | 'athlete';
+export type DietGoal = 'weight_loss' | 'maintenance' | 'muscle_gain';
+export type BmrSource = 'mifflin_st_jeor' | 'manual_bioimpedance';
 
 export interface BiometricProfile {
   gender: Gender;
@@ -29,6 +31,34 @@ export interface MacroTargets {
   carbGrams: number;
   fatGrams: number;
   fiberGrams: number;
+}
+
+export interface ResolveBmrInput {
+  source: BmrSource;
+  manualBmr?: number;
+  profile?: BiometricProfile;
+}
+
+export interface GoalBasedMacroCalculationInput {
+  bmr: number;
+  activityLevel: ActivityLevel;
+  goal: DietGoal;
+  weightKg: number;
+  age?: number;
+  gender?: Gender;
+  heightCm?: number;
+  customDeltaKcal?: number;
+  customProteinPerKg?: number;
+  customFatPerKg?: number;
+  customFiberGrams?: number;
+  maxProteinCapGrams?: number;
+}
+
+export interface GoalBasedMacroTargets extends MacroTargets {
+  bmr: number;
+  tdee: number;
+  goal: DietGoal;
+  calorieDelta: number;
 }
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
@@ -142,6 +172,105 @@ export function calculateMacroTargets(input: TargetCalculationInput): MacroTarge
   }
 
   return {
+    calories: targetCalories,
+    proteinGrams,
+    carbGrams,
+    fatGrams,
+    fiberGrams,
+  };
+}
+
+/**
+ * Resolve a Taxa Metabólica Basal (TMB):
+ * - Vinda diretamente de exame de bioimpedância (`manual_bioimpedance`)
+ * - Recalculada através da equação Mifflin-St Jeor (`mifflin_st_jeor`)
+ */
+export function resolveBMR(input: ResolveBmrInput): number {
+  if (input.source === 'manual_bioimpedance') {
+    if (input.manualBmr === undefined || input.manualBmr <= 0) {
+      throw new Error('Taxa metabólica basal informada deve ser maior que zero');
+    }
+    return input.manualBmr;
+  }
+
+  if (input.source === 'mifflin_st_jeor') {
+    if (!input.profile) {
+      throw new Error('Perfil biométrico é obrigatório para cálculo via Mifflin-St Jeor');
+    }
+    return calculateBMR(input.profile);
+  }
+
+  throw new Error(`Fonte de TMB desconhecida: ${input.source}`);
+}
+
+/**
+ * Calcula a meta de calorias alvo por dia e proporções recomendadas para proteína,
+ * carboidrato, gordura e fibras de acordo com o nível de atividade e objetivo
+ * ('weight_loss', 'maintenance', 'muscle_gain').
+ */
+export function calculateMacrosForGoal(input: GoalBasedMacroCalculationInput): GoalBasedMacroTargets {
+  if (input.bmr <= 0) {
+    throw new Error('Taxa metabólica basal deve ser maior que zero');
+  }
+  if (input.weightKg <= 0) {
+    throw new Error('Peso deve ser maior que zero');
+  }
+
+  const tdee = calculateTDEE(input.bmr, input.activityLevel);
+
+  // Déficit ou Superávit por padrão segundo objetivo
+  const defaultDeltas: Record<DietGoal, number> = {
+    weight_loss: -500,
+    maintenance: 0,
+    muscle_gain: 350,
+  };
+
+  const calorieDelta = input.customDeltaKcal ?? defaultDeltas[input.goal] ?? 0;
+  const targetCalories = Math.max(1200, tdee + calorieDelta);
+
+  // Proporção recomendada de proteína por kg por objetivo
+  const defaultProteinPerKg: Record<DietGoal, number> = {
+    weight_loss: 2.2, // Proteção de massa magra em restrição
+    maintenance: 2.0, // Alta densidade e homeostase
+    muscle_gain: 2.0, // Síntese proteica hipertrófica ideal
+  };
+
+  const proteinPerKg = input.customProteinPerKg ?? defaultProteinPerKg[input.goal] ?? 2.0;
+  let proteinGrams = Math.round(input.weightKg * proteinPerKg);
+  const maxCap = input.maxProteinCapGrams ?? 240;
+  if (maxCap && proteinGrams > maxCap) {
+    proteinGrams = maxCap;
+  }
+
+  // Proporção recomendada de gordura por kg por objetivo
+  const defaultFatPerKg: Record<DietGoal, number> = {
+    weight_loss: 0.8,
+    maintenance: 0.9,
+    muscle_gain: 0.9,
+  };
+
+  const fatPerKg = input.customFatPerKg ?? defaultFatPerKg[input.goal] ?? 0.8;
+  const fatGrams = Math.round(input.weightKg * fatPerKg);
+
+  // Carboidratos completam o saldo calórico restante
+  const caloriesFromProtein = proteinGrams * 4;
+  const caloriesFromFat = fatGrams * 9;
+  const remainingCalories = Math.max(0, targetCalories - (caloriesFromProtein + caloriesFromFat));
+  const carbGrams = Math.round(remainingCalories / 4);
+
+  // Meta de fibras: Diretriz DRI oficial por idade/gênero ou customizada
+  let fiberGrams = 38;
+  if (input.customFiberGrams !== undefined) {
+    fiberGrams = input.customFiberGrams;
+  } else if (input.age !== undefined) {
+    fiberGrams = calculateRecommendedFiber(input.age, input.gender ?? 'male');
+  }
+
+  return {
+    bmr: input.bmr,
+    tdee,
+    goal: input.goal,
+    calorieDelta,
     calories: targetCalories,
     proteinGrams,
     carbGrams,

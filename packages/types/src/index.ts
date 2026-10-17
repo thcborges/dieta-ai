@@ -45,6 +45,9 @@ export interface HealerJobResult {
   message: string;
 }
 
+export type DietGoal = 'weight_loss' | 'maintenance' | 'muscle_gain';
+export type BmrSource = 'mifflin_st_jeor' | 'manual_bioimpedance';
+
 export interface UserBiometrics {
   weightKg: number;
   heightCm: number;
@@ -53,6 +56,9 @@ export interface UserBiometrics {
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'very_active' | 'extra_active';
   proteinTargetGPerKg?: number;
   fixedProteinTargetG?: number;
+  bmrSource?: BmrSource;
+  manualBmr?: number;
+  goal?: DietGoal;
 }
 
 export interface MacroBreakdown {
@@ -114,7 +120,7 @@ export interface LgpdDeletionRequestDto {
   status: 'PENDING_15_DAYS' | 'COMPLETED' | 'CANCELLED';
 }
 
-export type DietGoal = 'weight_loss' | 'weight_gain' | 'maintenance';
+export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
 
 export type WeeklyThermometerStatus =
   | 'optimal'

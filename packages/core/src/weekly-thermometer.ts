@@ -1,4 +1,4 @@
-export type DietGoal = 'weight_loss' | 'weight_gain' | 'maintenance';
+export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
 
 export type WeeklyThermometerStatus =
   | 'optimal'
@@ -127,7 +127,8 @@ export function evaluateWeeklyThermometer(
       break;
     }
 
-    case 'weight_gain': {
+    case 'weight_gain':
+    case 'muscle_gain': {
       if (totalActualCalories < totalTdee) {
         status = 'critical_deficit';
         alerts.push({

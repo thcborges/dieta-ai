@@ -4,8 +4,12 @@ import {
   calculateTDEE,
   calculateMacroTargets,
   calculateRecommendedFiber,
+  resolveBMR,
+  calculateMacrosForGoal,
   type BiometricProfile,
   type ActivityLevel,
+  type DietGoal,
+  type BmrSource,
 } from '../src/biometrics.js';
 
 describe('Biometrics & Dynamic Targets (Módulo 1)', () => {
@@ -171,6 +175,201 @@ describe('Biometrics & Dynamic Targets (Módulo 1)', () => {
     it('deve lançar erro se a idade for zero ou negativa', () => {
       expect(() => calculateRecommendedFiber(0, 'male')).toThrow('Idade deve ser maior que zero');
       expect(() => calculateRecommendedFiber(-5, 'female')).toThrow('Idade deve ser maior que zero');
+    });
+  });
+
+  describe('resolveBMR (Mifflin-St Jeor vs Bioimpedância Manual)', () => {
+    it('deve retornar a TMB informada manualmente (ex: exame de bioimpedância)', () => {
+      const bmr = resolveBMR({
+        source: 'manual_bioimpedance',
+        manualBmr: 1850,
+      });
+      expect(bmr).toBe(1850);
+    });
+
+    it('deve calcular a TMB usando Mifflin-St Jeor quando a fonte for mifflin_st_jeor', () => {
+      const bmr = resolveBMR({
+        source: 'mifflin_st_jeor',
+        profile: {
+          gender: 'male',
+          age: 40,
+          heightCm: 190,
+          weightKg: 95,
+        },
+      });
+      expect(bmr).toBe(1942.5);
+    });
+
+    it('deve lançar erro se a TMB manual for menor ou igual a zero ou indefinida', () => {
+      expect(() =>
+        resolveBMR({
+          source: 'manual_bioimpedance',
+          manualBmr: 0,
+        })
+      ).toThrow('Taxa metabólica basal informada deve ser maior que zero');
+
+      expect(() =>
+        resolveBMR({
+          source: 'manual_bioimpedance',
+          manualBmr: undefined,
+        })
+      ).toThrow('Taxa metabólica basal informada deve ser maior que zero');
+    });
+
+    it('deve lançar erro se o perfil biométrico não for fornecido para Mifflin-St Jeor', () => {
+      expect(() =>
+        resolveBMR({
+          source: 'mifflin_st_jeor',
+          profile: undefined,
+        })
+      ).toThrow('Perfil biométrico é obrigatório para cálculo via Mifflin-St Jeor');
+    });
+  });
+
+  describe('calculateMacrosForGoal (Cálculo por Nível de Atividade & Objetivo: Emagrecer, Manutenção, Ganho de Peso)', () => {
+    it('deve calcular meta calórica e macros para emagrecimento com TMB de bioimpedância', () => {
+      // TMB 1850, Atividade moderada (1.55) -> GET / TDEE = 1850 * 1.55 = 2867.5 -> 2868 kcal
+      // Emagrecimento: Déficit padrão de -500 kcal -> 2368 kcal
+      // Peso 90kg, 40 anos, homem
+      // Proteína: 2.2 g/kg = 198g (792 kcal)
+      // Gordura: 0.8 g/kg = 72g (648 kcal)
+      // Carbo: (2368 - (792 + 648)) / 4 = (2368 - 1440) / 4 = 928 / 4 = 232g
+      // Fibras: DRI homem 40 anos = 38g
+      const result = calculateMacrosForGoal({
+        bmr: 1850,
+        activityLevel: 'moderate',
+        goal: 'weight_loss',
+        weightKg: 90,
+        age: 40,
+        gender: 'male',
+      });
+
+      expect(result.bmr).toBe(1850);
+      expect(result.tdee).toBe(2868);
+      expect(result.goal).toBe('weight_loss');
+      expect(result.calorieDelta).toBe(-500);
+      expect(result.calories).toBe(2368);
+      expect(result.proteinGrams).toBe(198);
+      expect(result.fatGrams).toBe(72);
+      expect(result.carbGrams).toBe(232);
+      expect(result.fiberGrams).toBe(38);
+    });
+
+    it('deve calcular meta calórica e macros para manutenção de peso', () => {
+      // TMB 1850, Atividade moderada (1.55) -> TDEE = 2868 kcal
+      // Manutenção: Delta 0 -> 2868 kcal
+      // Proteína: 2.0 g/kg = 180g (720 kcal)
+      // Gordura: 0.9 g/kg = 81g (729 kcal)
+      // Carbo: (2868 - (720 + 729)) / 4 = 1419 / 4 = 354.75 -> 355g
+      const result = calculateMacrosForGoal({
+        bmr: 1850,
+        activityLevel: 'moderate',
+        goal: 'maintenance',
+        weightKg: 90,
+        age: 40,
+        gender: 'male',
+      });
+
+      expect(result.tdee).toBe(2868);
+      expect(result.calorieDelta).toBe(0);
+      expect(result.calories).toBe(2868);
+      expect(result.proteinGrams).toBe(180);
+      expect(result.fatGrams).toBe(81);
+      expect(result.carbGrams).toBe(355);
+      expect(result.fiberGrams).toBe(38);
+    });
+
+    it('deve calcular meta calórica e macros para ganho de peso (superávit controlado)', () => {
+      // TMB 1850, Atividade moderada (1.55) -> TDEE = 2868 kcal
+      // Ganho de peso: Superávit de +350 kcal -> 3218 kcal
+      // Proteína: 2.0 g/kg = 180g (720 kcal)
+      // Gordura: 0.9 g/kg = 81g (729 kcal)
+      // Carbo: (3218 - (720 + 729)) / 4 = 1769 / 4 = 442.25 -> 442g
+      const result = calculateMacrosForGoal({
+        bmr: 1850,
+        activityLevel: 'moderate',
+        goal: 'muscle_gain',
+        weightKg: 90,
+        age: 40,
+        gender: 'male',
+      });
+
+      expect(result.calorieDelta).toBe(350);
+      expect(result.calories).toBe(3218);
+      expect(result.proteinGrams).toBe(180);
+      expect(result.fatGrams).toBe(81);
+      expect(result.carbGrams).toBe(442);
+      expect(result.fiberGrams).toBe(38);
+    });
+
+    it('deve respeitar customizações de déficit/superávit e teto proteico de 240g', () => {
+      const result = calculateMacrosForGoal({
+        bmr: 2000,
+        activityLevel: 'heavy', // 1.725 -> TDEE 3450
+        goal: 'weight_loss',
+        weightKg: 115,
+        age: 35,
+        gender: 'male',
+        customDeltaKcal: -600, // calorias = 3450 - 600 = 2850 kcal
+        maxProteinCapGrams: 240, // 115 * 2.2 = 253g -> limitado a 240g
+      });
+
+      expect(result.tdee).toBe(3450);
+      expect(result.calorieDelta).toBe(-600);
+      expect(result.calories).toBe(2850);
+      expect(result.proteinGrams).toBe(240);
+    });
+
+    it('deve permitir customizar proporções de proteína por kg e gordura por kg', () => {
+      const result = calculateMacrosForGoal({
+        bmr: 1800,
+        activityLevel: 'sedentary', // 1.2 -> 2160
+        goal: 'weight_loss',
+        weightKg: 80,
+        customDeltaKcal: -400, // 1760 kcal
+        customProteinPerKg: 2.4, // 80 * 2.4 = 192g (768 kcal)
+        customFatPerKg: 0.7, // 80 * 0.7 = 56g (504 kcal)
+        customFiberGrams: 42,
+      });
+
+      expect(result.calories).toBe(1760);
+      expect(result.proteinGrams).toBe(192);
+      expect(result.fatGrams).toBe(56);
+      // Carbo = (1760 - (768 + 504)) / 4 = 488 / 4 = 122g
+      expect(result.carbGrams).toBe(122);
+      expect(result.fiberGrams).toBe(42);
+    });
+
+    it('deve respeitar piso mínimo de 1200 kcal mesmo em déficit acentuado', () => {
+      const result = calculateMacrosForGoal({
+        bmr: 1100,
+        activityLevel: 'sedentary', // 1.2 -> 1320
+        goal: 'weight_loss',
+        weightKg: 50,
+        customDeltaKcal: -500, // 1320 - 500 = 820 -> travado em 1200 kcal
+      });
+
+      expect(result.calories).toBe(1200);
+    });
+
+    it('deve lançar erro se a TMB ou o peso forem inválidos', () => {
+      expect(() =>
+        calculateMacrosForGoal({
+          bmr: 0,
+          activityLevel: 'moderate',
+          goal: 'weight_loss',
+          weightKg: 80,
+        })
+      ).toThrow('Taxa metabólica basal deve ser maior que zero');
+
+      expect(() =>
+        calculateMacrosForGoal({
+          bmr: 1600,
+          activityLevel: 'moderate',
+          goal: 'weight_loss',
+          weightKg: 0,
+        })
+      ).toThrow('Peso deve ser maior que zero');
     });
   });
 });
