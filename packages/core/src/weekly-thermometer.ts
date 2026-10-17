@@ -1,4 +1,4 @@
-export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
+import type { DietGoal } from './biometrics.js';
 
 export type WeeklyThermometerStatus =
   | 'optimal'

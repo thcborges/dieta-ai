@@ -45,7 +45,7 @@ export interface HealerJobResult {
   message: string;
 }
 
-export type DietGoal = 'weight_loss' | 'maintenance' | 'muscle_gain';
+export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
 export type BmrSource = 'mifflin_st_jeor' | 'manual_bioimpedance';
 
 export interface UserBiometrics {
@@ -119,8 +119,6 @@ export interface LgpdDeletionRequestDto {
   scheduledPurgeAt: string;
   status: 'PENDING_15_DAYS' | 'COMPLETED' | 'CANCELLED';
 }
-
-export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
 
 export type WeeklyThermometerStatus =
   | 'optimal'

@@ -10,7 +10,7 @@ import {
   type DietGoal,
   type BmrSource,
 } from '@dieta-ai/core';
-import { Sliders, X, Sparkles, ShieldCheck, Target, Flame, Activity } from 'lucide-react';
+import { Sliders, X, Sparkles, ShieldCheck, Flame, Activity } from 'lucide-react';
 
 export interface UserMacroSettings {
   ageYears: number;
