@@ -209,5 +209,109 @@ describe('Foods & Open Food Facts Cache API', () => {
     expect(Array.isArray(body.foods)).toBe(true);
     expect(body.foods.length).toBeGreaterThan(0);
   });
+
+  describe('Visibilidade Restrita e Moderação de Alimentos Cadastrados', () => {
+    it('deve permitir que o autor visualize seu alimento customizado, mas não outro usuário, até aprovação do admin', async () => {
+      // 1. Usuário A cadastra um alimento customizado
+      const payloadA = {
+        name: 'Muffin de Banana do Usuário A',
+        servingSizeGrams: 80,
+        caloriesPer100g: 220,
+        proteinPer100g: 15,
+        carbsPer100g: 30,
+        fatPer100g: 4,
+        barcode: '7899999990001',
+      };
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/foods/custom',
+        headers: { 'x-user-id': 'usr_user_A' },
+        payload: payloadA,
+      });
+
+      expect(createRes.statusCode).toBe(201);
+      const foodA = createRes.json();
+      expect(foodA.id).toBeDefined();
+      expect(foodA.isValidated).toBe(false);
+      expect(foodA.userId).toBe('usr_user_A');
+
+      // 2. Usuário A busca alimentos -> deve ver o seu Muffin
+      const searchResA = await app.inject({
+        method: 'GET',
+        url: '/api/v1/foods/search?q=Muffin',
+        headers: { 'x-user-id': 'usr_user_A' },
+      });
+      expect(searchResA.statusCode).toBe(200);
+      const searchDataA = searchResA.json();
+      expect(searchDataA.foods.some((f: { id: string }) => f.id === foodA.id)).toBe(true);
+
+      // 3. Usuário B busca alimentos -> NÃO deve ver o Muffin do Usuário A (pois não foi validado)
+      const searchResB = await app.inject({
+        method: 'GET',
+        url: '/api/v1/foods/search?q=Muffin',
+        headers: { 'x-user-id': 'usr_user_B' },
+      });
+      expect(searchResB.statusCode).toBe(200);
+      const searchDataB = searchResB.json();
+      expect(searchDataB.foods.some((f: { id: string }) => f.id === foodA.id)).toBe(false);
+
+      // 4. Usuário B tenta consultar por código de barras -> 404 (invisível para outros usuários)
+      const barcodeResB = await app.inject({
+        method: 'GET',
+        url: `/api/v1/foods/barcode/${payloadA.barcode}`,
+        headers: { 'x-user-id': 'usr_user_B' },
+      });
+      expect(barcodeResB.statusCode).toBe(404);
+
+      // 5. Administrador valida as informações nutricionais do alimento
+      const validateRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/foods/${foodA.id}/validate`,
+        headers: { 'x-admin-token': 'admin-secret-token-key-us-central1' },
+      });
+      expect(validateRes.statusCode).toBe(200);
+      expect(validateRes.json().food.isValidated).toBe(true);
+
+      // 6. Agora o Usuário B deve conseguir ver o alimento validado
+      const searchResBAfter = await app.inject({
+        method: 'GET',
+        url: '/api/v1/foods/search?q=Muffin',
+        headers: { 'x-user-id': 'usr_user_B' },
+      });
+      expect(searchResBAfter.statusCode).toBe(200);
+      const searchDataBAfter = searchResBAfter.json();
+      expect(searchDataBAfter.foods.some((f: { id: string }) => f.id === foodA.id)).toBe(true);
+
+      // E também pelo código de barras
+      const barcodeResBAfter = await app.inject({
+        method: 'GET',
+        url: `/api/v1/foods/barcode/${payloadA.barcode}`,
+        headers: { 'x-user-id': 'usr_user_B' },
+      });
+      expect(barcodeResBAfter.statusCode).toBe(200);
+      expect(barcodeResBAfter.json().food.name).toBe(payloadA.name);
+    });
+
+    it('deve retornar 403 se o token de admin não for informado ou for inválido', async () => {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/v1/foods/food_123/validate',
+        headers: { 'x-admin-token': 'wrong-token' },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe('UNAUTHORIZED_ADMIN');
+    });
+
+    it('deve retornar 404 ao tentar validar alimento inexistente', async () => {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/v1/foods/non_existent_food/validate',
+        headers: { 'x-admin-token': 'admin-secret-token-key-us-central1' },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.json().error).toBe('FOOD_NOT_FOUND');
+    });
+  });
 });
 

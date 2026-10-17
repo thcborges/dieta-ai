@@ -45,6 +45,9 @@ export interface HealerJobResult {
   message: string;
 }
 
+export type DietGoal = 'weight_loss' | 'weight_gain' | 'muscle_gain' | 'maintenance';
+export type BmrSource = 'mifflin_st_jeor' | 'manual_bioimpedance';
+
 export interface UserBiometrics {
   weightKg: number;
   heightCm: number;
@@ -53,6 +56,9 @@ export interface UserBiometrics {
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'very_active' | 'extra_active';
   proteinTargetGPerKg?: number;
   fixedProteinTargetG?: number;
+  bmrSource?: BmrSource;
+  manualBmr?: number;
+  goal?: DietGoal;
 }
 
 export interface MacroBreakdown {
@@ -112,5 +118,55 @@ export interface LgpdDeletionRequestDto {
   requestedAt: string;
   scheduledPurgeAt: string;
   status: 'PENDING_15_DAYS' | 'COMPLETED' | 'CANCELLED';
+}
+
+export type WeeklyThermometerStatus =
+  | 'optimal'
+  | 'warning'
+  | 'blown'
+  | 'critical_deficit'
+  | 'surplus_drift';
+
+export interface RollingDayLog {
+  date: string;
+  calories: number;
+  proteinGrams?: number;
+}
+
+export interface WeeklyThermometerInput {
+  goal: DietGoal;
+  dailyTargetCalories: number;
+  tdee: number;
+  weightKg: number;
+  dailyDeficitKcal?: number;
+  dailySurplusKcal?: number;
+  tolerancePercent?: number; // default: 3 (%)
+  days: RollingDayLog[]; // Up to 7 days
+}
+
+export interface WeeklyThermometerAlert {
+  code:
+    | 'BLOWN_BUDGET'
+    | 'WARNING_BUDGET'
+    | 'CRITICAL_WEIGHT_LOSS'
+    | 'WARNING_LOW_CALORIES'
+    | 'MAINTENANCE_DRIFT_HIGH'
+    | 'MAINTENANCE_DRIFT_LOW';
+  severity: 'INFO' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  message: string;
+}
+
+export interface WeeklyThermometerReport {
+  goal: DietGoal;
+  daysCount: number;
+  totalTargetCalories: number;
+  totalActualCalories: number;
+  weeklySlipKcal: number;
+  thermalRatioPercent: number;
+  adherenceScorePercent: number;
+  status: WeeklyThermometerStatus;
+  projectedWeightDeltaKg: number;
+  neutralizedDeficitDays?: number;
+  alerts: WeeklyThermometerAlert[];
 }
 

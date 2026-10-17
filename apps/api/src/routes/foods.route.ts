@@ -2,6 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { foodCacheService } from '../services/food-cache.service.js';
 
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-secret-token-key-us-central1';
+
 const customFoodSchema = z.object({
   name: z.string().min(1),
   servingSizeGrams: z.number().positive(),
@@ -11,13 +13,17 @@ const customFoodSchema = z.object({
   fatPer100g: z.number().nonnegative(),
   fiberPer100g: z.number().nonnegative().optional(),
   barcode: z.string().optional(),
+  userId: z.string().optional(),
 });
 
 export const foodRoutes: FastifyPluginAsync = async (app) => {
   // Consulta alimento por código de barras
   app.get<{ Params: { barcode: string } }>('/api/v1/foods/barcode/:barcode', async (req, reply) => {
     const { barcode } = req.params;
-    const food = await foodCacheService.getByBarcode(barcode);
+    const userId = req.headers['x-user-id'] as string | undefined;
+    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+
+    const food = await foodCacheService.getByBarcode(barcode, userId, isAdmin);
 
     if (!food) {
       return reply.status(404).send({
@@ -33,19 +39,25 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  // Listagem de alimentos no banco de dados / cache
-  app.get('/api/v1/foods', async () => {
-    const foods = foodCacheService.getAllFoods();
+  // Listagem de alimentos no banco de dados / cache (respeita isolamento de alimentos não-validados)
+  app.get('/api/v1/foods', async (req) => {
+    const userId = req.headers['x-user-id'] as string | undefined;
+    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+
+    const foods = foodCacheService.getAllFoods(userId, isAdmin);
     return {
       foods,
       total: foods.length,
     };
   });
 
-  // Busca de alimentos (Cache/Banco de dados primeiro -> Open Food Facts API -> Salva no banco de dados)
+  // Busca de alimentos (respeita isolamento de alimentos não-validados por usuário)
   app.get<{ Querystring: { q?: string } }>('/api/v1/foods/search', async (req) => {
     const query = req.query.q || '';
-    const result = await foodCacheService.searchFoods(query);
+    const userId = req.headers['x-user-id'] as string | undefined;
+    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+
+    const result = await foodCacheService.searchFoods(query, userId, isAdmin);
     return {
       source: result.source,
       query,
@@ -64,8 +76,39 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const saved = await foodCacheService.saveCustomFood(parseResult.data);
+    const userId = (req.headers['x-user-id'] as string | undefined) || parseResult.data.userId;
+    const saved = await foodCacheService.saveCustomFood({
+      ...parseResult.data,
+      userId,
+    });
     return reply.status(201).send(saved);
   });
+
+  // Validação de alimento por administrador do sistema (torna disponível globalmente)
+  app.patch<{ Params: { id: string } }>('/api/v1/foods/:id/validate', async (req, reply) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (adminToken !== ADMIN_TOKEN) {
+      return reply.status(403).send({
+        error: 'UNAUTHORIZED_ADMIN',
+        message: 'Apenas administradores podem validar informações nutricionais de alimentos.',
+      });
+    }
+
+    const { id } = req.params;
+    const food = foodCacheService.validateFood(id);
+    if (!food) {
+      return reply.status(404).send({
+        error: 'FOOD_NOT_FOUND',
+        message: `Alimento com ID ${id} não encontrado.`,
+      });
+    }
+
+    return reply.status(200).send({
+      success: true,
+      food,
+      message: 'Alimento validado com sucesso e disponibilizado publicamente.',
+    });
+  });
 };
+
 

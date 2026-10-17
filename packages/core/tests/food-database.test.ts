@@ -122,5 +122,60 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     const notFound = searchFoodItems(PREPOPULATED_FOODS, 'alimento_inexistente_xyz');
     expect(notFound.length).toBe(0);
   });
+
+  describe('Visibilidade e Moderação de Alimentos Cadastrados', () => {
+    const customFoodUserA = {
+      id: 'custom_panqueca_user_a',
+      name: 'Panqueca do Usuário A',
+      servingDescription: '100g',
+      servingSizeGrams: 100,
+      caloriesPer100g: 200,
+      proteinPer100g: 20,
+      carbsPer100g: 15,
+      fatPer100g: 5,
+      fiberPer100g: 2,
+      isCustom: true,
+      userId: 'user_A',
+      isValidated: false,
+    };
+
+    const validatedCustomFood = {
+      id: 'custom_whey_blend_validado',
+      name: 'Whey Blend Validado',
+      servingDescription: '30g',
+      servingSizeGrams: 30,
+      caloriesPer100g: 380,
+      proteinPer100g: 75,
+      carbsPer100g: 5,
+      fatPer100g: 3,
+      fiberPer100g: 0,
+      isCustom: true,
+      userId: 'user_A',
+      isValidated: true,
+    };
+
+    const allFoods = [...PREPOPULATED_FOODS, customFoodUserA, validatedCustomFood];
+
+    it('deve permitir que o autor veja seu próprio alimento cadastrado mesmo sem validação', () => {
+      const visible = searchFoodItems(allFoods, 'Panqueca', 'user_A', false);
+      expect(visible.some(f => f.id === 'custom_panqueca_user_a')).toBe(true);
+    });
+
+    it('não deve permitir que outro usuário veja alimento cadastrado não-validado', () => {
+      const visible = searchFoodItems(allFoods, 'Panqueca', 'user_B', false);
+      expect(visible.some(f => f.id === 'custom_panqueca_user_a')).toBe(false);
+    });
+
+    it('deve permitir que qualquer usuário veja alimento cadastrado após validação do administrador', () => {
+      const visible = searchFoodItems(allFoods, 'Whey Blend', 'user_B', false);
+      expect(visible.some(f => f.id === 'custom_whey_blend_validado')).toBe(true);
+    });
+
+    it('deve permitir que um administrador veja todos os alimentos não-validados', () => {
+      const visible = searchFoodItems(allFoods, 'Panqueca', 'user_B', true);
+      expect(visible.some(f => f.id === 'custom_panqueca_user_a')).toBe(true);
+    });
+  });
 });
+
 
