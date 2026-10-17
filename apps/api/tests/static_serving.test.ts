@@ -64,6 +64,55 @@ describe('Frontend SPA Static Hosting & Routing in Fastify', () => {
     expect(response.body).toContain('<title>MacroMetrics Pro</title>');
   });
 
+  it('NÃO deve fazer SPA fallback para arquivos sob /assets/ inexistentes (deve retornar 404 e NÃO index.html/text/html)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/assets/index-DSIqM_b5.css',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type'] || '').not.toContain('text/html');
+    expect(response.body).not.toContain('<title>MacroMetrics Pro</title>');
+  });
+
+  it('NÃO deve fazer SPA fallback para imagens/recursos inexistentes com extensão (ex: /pwa-192x192.png)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/pwa-192x192.png',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type'] || '').not.toContain('text/html');
+    expect(response.body).not.toContain('<title>MacroMetrics Pro</title>');
+  });
+
+  it('deve enviar cabeçalho no-cache para index.html e navegações SPA para evitar cache de hashes desatualizados', async () => {
+    const navResponse = await app.inject({
+      method: 'GET',
+      url: '/dashboard',
+    });
+
+    expect(navResponse.statusCode).toBe(200);
+    expect(navResponse.headers['cache-control']).toContain('no-cache');
+
+    const rootResponse = await app.inject({
+      method: 'GET',
+      url: '/',
+    });
+    expect(rootResponse.statusCode).toBe(200);
+    expect(rootResponse.headers['cache-control']).toContain('no-cache');
+  });
+
+  it('deve configurar Cache-Control com max-age longo para assets imutáveis sob /assets/', async () => {
+    const assetResponse = await app.inject({
+      method: 'GET',
+      url: '/assets/app.js',
+    });
+
+    expect(assetResponse.statusCode).toBe(200);
+    expect(assetResponse.headers['cache-control']).toContain('max-age');
+  });
+
   it('deve preservar respostas da API sem interferência do SPA (ex: GET /health)', async () => {
     const response = await app.inject({
       method: 'GET',
