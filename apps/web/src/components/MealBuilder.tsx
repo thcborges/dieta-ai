@@ -537,7 +537,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         {(Object.keys(WINDOW_META) as MealWindow[]).map(windowKey => {
           const meta = WINDOW_META[windowKey];
           const Icon = meta.icon;
-          const items = meals[windowKey];
+          const items = meals[windowKey] || [];
 
           const totalCalories = items.reduce((acc, i) => acc + i.calories, 0);
           const totalProtein = Math.round(items.reduce((acc, i) => acc + i.protein, 0) * 10) / 10;
