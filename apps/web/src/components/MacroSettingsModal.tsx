@@ -4,6 +4,8 @@ import {
   calculateTDEE,
   calculateMacroTargets,
   calculateRecommendedFiber,
+  calculateCaloriesFromMacros,
+  calculateCarbsFromCalories,
   type Gender,
   type ActivityLevel,
 } from '@dieta-ai/core';
@@ -76,6 +78,62 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
     }));
   };
 
+  const handleProteinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newProtein = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: newProtein,
+      carbGrams: form.carbGrams,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      proteinGrams: newProtein,
+      calories: newCalories,
+    }));
+  };
+
+  const handleCarbChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCarb = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: form.proteinGrams,
+      carbGrams: newCarb,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      carbGrams: newCarb,
+      calories: newCalories,
+    }));
+  };
+
+  const handleFatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFat = Math.max(0, Number(e.target.value));
+    const newCalories = calculateCaloriesFromMacros({
+      proteinGrams: form.proteinGrams,
+      carbGrams: form.carbGrams,
+      fatGrams: newFat,
+    });
+    setForm(prev => ({
+      ...prev,
+      fatGrams: newFat,
+      calories: newCalories,
+    }));
+  };
+
+  const handleCaloriesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCalories = Math.max(0, Number(e.target.value));
+    const newCarb = calculateCarbsFromCalories({
+      calories: newCalories,
+      proteinGrams: form.proteinGrams,
+      fatGrams: form.fatGrams,
+    });
+    setForm(prev => ({
+      ...prev,
+      calories: newCalories,
+      carbGrams: newCarb,
+    }));
+  };
+
   const handleSave = () => {
     onSave(form);
     onClose();
@@ -131,10 +189,12 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="weight-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Peso Corporal (kg)
               </label>
               <input
+                id="weight-input"
+                aria-label="Peso Corporal"
                 type="number"
                 value={form.weightKg}
                 onChange={e =>
@@ -145,10 +205,12 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="gender-select" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Sexo Biológico
               </label>
               <select
+                id="gender-select"
+                aria-label="Sexo Biológico"
                 value={form.gender}
                 onChange={e =>
                   setForm(prev => ({ ...prev, gender: e.target.value as Gender }))
@@ -162,11 +224,56 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
           </div>
         </div>
 
+        {/* Parâmetros de Gasto & Déficit */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-m3-tertiary uppercase tracking-wider">
+            2. Gasto Energético & Déficit
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="activity-level-select" className="block text-[11px] font-mono text-m3-outline mb-1">
+                Nível de Atividade
+              </label>
+              <select
+                id="activity-level-select"
+                aria-label="Nível de Atividade"
+                value={form.activityLevel}
+                onChange={e =>
+                  setForm(prev => ({ ...prev, activityLevel: e.target.value as ActivityLevel }))
+                }
+                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-medium text-m3-on-surface focus:outline-none focus:border-m3-primary"
+              >
+                <option value="sedentary">Sedentário (1.2x)</option>
+                <option value="light">Leve (1.375x)</option>
+                <option value="moderate">Moderado (1.55x)</option>
+                <option value="heavy">Muito Ativo (1.725x)</option>
+                <option value="athlete">Atleta (1.9x)</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="deficit-input" className="block text-[11px] font-mono text-m3-outline mb-1">
+                Déficit Diário (kcal)
+              </label>
+              <input
+                id="deficit-input"
+                aria-label="Déficit Diário"
+                type="number"
+                value={form.dailyDeficitKcal}
+                onChange={e =>
+                  setForm(prev => ({ ...prev, dailyDeficitKcal: Math.max(0, Number(e.target.value)) }))
+                }
+                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Metas de Macronutrientes & Fibra */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-m3-tertiary uppercase tracking-wider">
-              2. Metas de Macros Diárias
+              3. Metas de Macros Diárias
             </h3>
             <button
               type="button"
@@ -180,61 +287,62 @@ export const MacroSettingsModal: React.FC<MacroSettingsModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="calorias-alvo-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Calorias Alvo (kcal)
               </label>
               <input
+                id="calorias-alvo-input"
+                aria-label="Calorias Alvo"
                 type="number"
                 value={form.calories}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, calories: Number(e.target.value) }))
-                }
+                onChange={handleCaloriesChange}
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="proteinas-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Proteínas (g)
               </label>
               <input
+                id="proteinas-input"
+                aria-label="Proteínas"
                 type="number"
                 value={form.proteinGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, proteinGrams: Number(e.target.value) }))
-                }
+                onChange={handleProteinChange}
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="carboidratos-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Carboidratos (g)
               </label>
               <input
+                id="carboidratos-input"
+                aria-label="Carboidratos"
                 type="number"
                 value={form.carbGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, carbGrams: Number(e.target.value) }))
-                }
+                onChange={handleCarbChange}
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono text-m3-outline mb-1">
+              <label htmlFor="gorduras-input" className="block text-[11px] font-mono text-m3-outline mb-1">
                 Gorduras (g)
               </label>
               <input
+                id="gorduras-input"
+                aria-label="Gorduras"
                 type="number"
                 value={form.fatGrams}
-                onChange={e =>
-                  setForm(prev => ({ ...prev, fatGrams: Number(e.target.value) }))
-                }
+                onChange={handleFatChange}
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
               />
             </div>
           </div>
+
 
           {/* Seção Exclusiva de Fibra como Macro */}
           <div className="bg-m3-surface-container-low p-3.5 rounded-2xl border border-m3-outline-variant/60 space-y-2">

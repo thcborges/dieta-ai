@@ -149,3 +149,37 @@ export function calculateMacroTargets(input: TargetCalculationInput): MacroTarge
     fiberGrams,
   };
 }
+
+/**
+ * Calcula automaticamente a quantidade de calorias alvo a partir das quantidades
+ * de proteína, carboidrato e gordura (4 kcal/g para proteína, 4 kcal/g para carboidrato e 9 kcal/g para gordura).
+ */
+export function calculateCaloriesFromMacros(macros: {
+  proteinGrams: number;
+  carbGrams: number;
+  fatGrams: number;
+}): number {
+  const p = Math.max(0, macros.proteinGrams || 0);
+  const c = Math.max(0, macros.carbGrams || 0);
+  const f = Math.max(0, macros.fatGrams || 0);
+  return Math.round(p * 4 + c * 4 + f * 9);
+}
+
+/**
+ * Recalcula apenas a quantidade de carboidratos quando as calorias alvo forem alteradas,
+ * mantendo as quantidades de proteína e gordura inalteradas.
+ * Se as calorias forem inferiores à soma de proteína e gordura, o piso é 0g.
+ */
+export function calculateCarbsFromCalories(input: {
+  calories: number;
+  proteinGrams: number;
+  fatGrams: number;
+}): number {
+  const targetCalories = Math.max(0, input.calories || 0);
+  const p = Math.max(0, input.proteinGrams || 0);
+  const f = Math.max(0, input.fatGrams || 0);
+  const fixedCalories = p * 4 + f * 9;
+  const remainingForCarbs = Math.max(0, targetCalories - fixedCalories);
+  return Math.round(remainingForCarbs / 4);
+}
+

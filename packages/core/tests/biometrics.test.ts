@@ -4,6 +4,8 @@ import {
   calculateTDEE,
   calculateMacroTargets,
   calculateRecommendedFiber,
+  calculateCaloriesFromMacros,
+  calculateCarbsFromCalories,
   type BiometricProfile,
   type ActivityLevel,
 } from '../src/biometrics.js';
@@ -173,5 +175,90 @@ describe('Biometrics & Dynamic Targets (Módulo 1)', () => {
       expect(() => calculateRecommendedFiber(-5, 'female')).toThrow('Idade deve ser maior que zero');
     });
   });
+
+  describe('calculateCaloriesFromMacros & calculateCarbsFromCalories (Item 3: Metas de Macros Diárias)', () => {
+    it('deve calcular calorias alvo automaticamente quando proteína, carboidrato ou gordura forem alterados', () => {
+      // 200g P (800 kcal) + 180g C (720 kcal) + 75g F (675 kcal) = 2195 kcal
+      const calories = calculateCaloriesFromMacros({
+        proteinGrams: 200,
+        carbGrams: 180,
+        fatGrams: 75,
+      });
+      expect(calories).toBe(2195);
+    });
+
+    it('deve recalcular calorias corretamente quando apenas proteína for alterada', () => {
+      // Aumenta proteína de 200g para 220g (+20g * 4 = +80 kcal): 2195 + 80 = 2275 kcal
+      const calories = calculateCaloriesFromMacros({
+        proteinGrams: 220,
+        carbGrams: 180,
+        fatGrams: 75,
+      });
+      expect(calories).toBe(2275);
+    });
+
+    it('deve recalcular calorias corretamente quando apenas carboidrato for alterado', () => {
+      // Aumenta carboidrato de 180g para 210g (+30g * 4 = +120 kcal): 2195 + 120 = 2315 kcal
+      const calories = calculateCaloriesFromMacros({
+        proteinGrams: 200,
+        carbGrams: 210,
+        fatGrams: 75,
+      });
+      expect(calories).toBe(2315);
+    });
+
+    it('deve recalcular calorias corretamente quando apenas gordura for alterada', () => {
+      // Reduz gordura de 75g para 65g (-10g * 9 = -90 kcal): 2195 - 90 = 2105 kcal
+      const calories = calculateCaloriesFromMacros({
+        proteinGrams: 200,
+        carbGrams: 180,
+        fatGrams: 65,
+      });
+      expect(calories).toBe(2105);
+    });
+
+    it('deve tratar valores zerados ou negativos gracefully', () => {
+      const calories = calculateCaloriesFromMacros({
+        proteinGrams: 0,
+        carbGrams: 100,
+        fatGrams: 0,
+      });
+      expect(calories).toBe(400);
+    });
+
+    it('deve aumentar apenas carboidratos quando calorias alvo forem aumentadas', () => {
+      // Base: 2195 kcal com 200g P e 75g F (P*4 + F*9 = 800 + 675 = 1475 kcal)
+      // Aumenta calorias para 2395 kcal (+200 kcal) -> +50g carbs -> 230g carbs
+      const carbs = calculateCarbsFromCalories({
+        calories: 2395,
+        proteinGrams: 200,
+        fatGrams: 75,
+      });
+      expect(carbs).toBe(230);
+    });
+
+    it('deve reduzir apenas carboidratos quando calorias alvo forem reduzidas', () => {
+      // Base: 2195 kcal com 200g P e 75g F (1475 kcal fixas)
+      // Reduz calorias para 1995 kcal (-200 kcal) -> -50g carbs -> 130g carbs
+      const carbs = calculateCarbsFromCalories({
+        calories: 1995,
+        proteinGrams: 200,
+        fatGrams: 75,
+      });
+      expect(carbs).toBe(130);
+    });
+
+    it('deve garantir piso de zero gramas de carboidrato se calorias alvo forem inferiores à soma de proteína e gordura', () => {
+      // P*4 + F*9 = 200*4 + 75*9 = 1475 kcal.
+      // Se calorias forem 1200 kcal, não deve gerar carboidrato negativo.
+      const carbs = calculateCarbsFromCalories({
+        calories: 1200,
+        proteinGrams: 200,
+        fatGrams: 75,
+      });
+      expect(carbs).toBe(0);
+    });
+  });
 });
+
 
