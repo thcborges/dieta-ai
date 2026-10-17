@@ -26,6 +26,24 @@ const EMPTY_MEALS: MealMap = {
   dinner_event: [],
 };
 
+function normalizeMeals(raw: unknown): MealMap {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      breakfast: [],
+      lunch: [],
+      afternoon_snack: [],
+      dinner_event: [],
+    };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    breakfast: Array.isArray(r.breakfast) ? (r.breakfast as LoggedFood[]) : [],
+    lunch: Array.isArray(r.lunch) ? (r.lunch as LoggedFood[]) : [],
+    afternoon_snack: Array.isArray(r.afternoon_snack) ? (r.afternoon_snack as LoggedFood[]) : [],
+    dinner_event: Array.isArray(r.dinner_event) ? (r.dinner_event as LoggedFood[]) : [],
+  };
+}
+
 const DEFAULT_SETTINGS: UserMacroSettings = {
   ageYears: 40,
   gender: 'male',
@@ -79,6 +97,8 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().slice(0, 10);
   });
+  const selectedDateRef = useRef<string>(selectedDate);
+  selectedDateRef.current = selectedDate;
 
   // Refeições isoladas por usuário (inicia vazio para novos usuários ou carrega do storage da conta)
   const [meals, setMeals] = useState<MealMap>(() => {
@@ -88,9 +108,9 @@ export default function App() {
         const userId = (JSON.parse(savedUser) as AuthUser).id;
         const today = new Date().toISOString().slice(0, 10);
         const savedByDate = localStorage.getItem(`macrometrics_meals_${userId}_${today}`);
-        if (savedByDate) return JSON.parse(savedByDate);
+        if (savedByDate) return normalizeMeals(JSON.parse(savedByDate));
         const saved = localStorage.getItem(`macrometrics_meals_${userId}`);
-        return saved ? JSON.parse(saved) : EMPTY_MEALS;
+        return saved ? normalizeMeals(JSON.parse(saved)) : EMPTY_MEALS;
       }
       return EMPTY_MEALS;
     } catch {
@@ -125,23 +145,67 @@ export default function App() {
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
 
-  // Sincroniza persistência de perfil, refeições e alimentos ao trocar usuário ou data
+  // Função para persistir refeições de uma data específica sem poluir outras datas
+  const persistMeals = (mealsToSave: MealMap, date: string) => {
+    if (!user || activeUserRef.current !== user.id) return;
+    try {
+      localStorage.setItem(`macrometrics_meals_${user.id}_${date}`, JSON.stringify(mealsToSave));
+      localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(mealsToSave));
+
+      fetch('/api/v1/diary', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ meals: mealsToSave }),
+      }).catch(() => {
+        // Ignora erro em modo offline-first
+      });
+    } catch {
+      // Ignora erro de storage
+    }
+
+    fetch(`/api/v1/diaries/${date}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': user.id,
+      },
+      body: JSON.stringify({ meals: mealsToSave }),
+    }).catch(() => {
+      // Modo offline-first resiliente
+    });
+  };
+
+  // Troca de data segura e atômica: atualiza a data e carrega as refeições do dia sem copiar
+  const handleDateChange = (newDate: string) => {
+    if (!newDate || newDate === selectedDate) return;
+    selectedDateRef.current = newDate;
+    setSelectedDate(newDate);
+
+    // Carrega imediatamente do localStorage da data selecionada
+    let nextMeals: MealMap = EMPTY_MEALS;
+    if (user) {
+      try {
+        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${newDate}`);
+        if (savedMealsByDate) {
+          nextMeals = normalizeMeals(JSON.parse(savedMealsByDate));
+        }
+      } catch {
+        nextMeals = EMPTY_MEALS;
+      }
+    }
+    setMeals(nextMeals);
+  };
+
+  // Sincroniza persistência de perfil e alimentos customizados ao trocar usuário
   useEffect(() => {
     if (user) {
       activeUserRef.current = user.id;
       try {
         const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
         setMacroSettings(savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS);
-
-        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${selectedDate}`);
-        const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
-        if (savedMealsByDate) {
-          setMeals(JSON.parse(savedMealsByDate));
-        } else if (savedMeals) {
-          setMeals(JSON.parse(savedMeals));
-        } else {
-          setMeals(EMPTY_MEALS);
-        }
 
         const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${user.id}`);
         if (savedFoods) {
@@ -154,7 +218,11 @@ export default function App() {
           setAvailableFoods(PREPOPULATED_FOODS);
         }
 
-        // Sincroniza refeições com a API de diário da conta
+        // Sincroniza com /api/v1/diary na autenticação inicial da sessão
+        const today = new Date().toISOString().slice(0, 10);
+        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${today}`);
+        const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
+
         fetch('/api/v1/diary', {
           headers: {
             'x-user-id': user.id,
@@ -166,9 +234,12 @@ export default function App() {
               const hasRemoteMeals = Object.values(data.meals).some(
                 (arr: unknown) => Array.isArray(arr) && arr.length > 0
               );
-              if (hasRemoteMeals || !savedMeals) {
-                setMeals(data.meals);
-                localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(data.meals));
+              // Apenas aplica na data de hoje se ainda não houver dados locais conflitantes
+              if (selectedDateRef.current === today && (hasRemoteMeals || (!savedMealsByDate && !savedMeals))) {
+                const normalized = normalizeMeals(data.meals);
+                setMeals(normalized);
+                localStorage.setItem(`macrometrics_meals_${user.id}_${today}`, JSON.stringify(normalized));
+                localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(normalized));
               }
             }
           })
@@ -182,12 +253,24 @@ export default function App() {
       activeUserRef.current = null;
       setMeals(EMPTY_MEALS);
     }
-  }, [user, selectedDate]);
+  }, [user]);
 
-  // Consulta diário no Firestore (Sincronização em Nuvem resiliente / Offline-first)
+  // Consulta diário no Firestore para a data selecionada (Offline-first & Nuvem)
   useEffect(() => {
     if (!user) return;
     let isCancelled = false;
+
+    // Carrega do localStorage para a data ativa (garante que dias vazios fiquem vazios)
+    try {
+      const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${selectedDate}`);
+      if (savedMealsByDate) {
+        setMeals(normalizeMeals(JSON.parse(savedMealsByDate)));
+      } else {
+        setMeals(EMPTY_MEALS);
+      }
+    } catch {
+      setMeals(EMPTY_MEALS);
+    }
 
     fetch(`/api/v1/diaries/${selectedDate}`, {
       headers: {
@@ -205,9 +288,10 @@ export default function App() {
             items => Array.isArray(items) && items.length > 0
           );
           if (hasLoggedMeals) {
-            setMeals(data.meals);
+            const normalized = normalizeMeals(data.meals);
+            setMeals(normalized);
             try {
-              localStorage.setItem(`macrometrics_meals_${user.id}_${selectedDate}`, JSON.stringify(data.meals));
+              localStorage.setItem(`macrometrics_meals_${user.id}_${selectedDate}`, JSON.stringify(normalized));
             } catch {
               // Ignora erro de storage
             }
@@ -222,40 +306,6 @@ export default function App() {
       isCancelled = true;
     };
   }, [user, selectedDate]);
-
-  // Persiste refeições do usuário logado localmente e no Firestore
-  useEffect(() => {
-    if (user && activeUserRef.current === user.id) {
-      try {
-        localStorage.setItem(`macrometrics_meals_${user.id}_${selectedDate}`, JSON.stringify(meals));
-        localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(meals));
-
-        fetch('/api/v1/diary', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': user.id,
-          },
-          body: JSON.stringify({ meals }),
-        }).catch(() => {
-          // Ignora erro em modo offline-first
-        });
-      } catch {
-        // Ignora erro de storage
-      }
-
-      fetch(`/api/v1/diaries/${selectedDate}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({ meals }),
-      }).catch(() => {
-        // Modo offline-first resiliente
-      });
-    }
-  }, [meals, user, selectedDate]);
 
   // Persiste alimentos customizados do usuário logado
   useEffect(() => {
@@ -325,8 +375,16 @@ export default function App() {
     setUser(loggedUser);
     try {
       localStorage.setItem('macrometrics_auth_user', JSON.stringify(loggedUser));
+      const today = selectedDateRef.current;
+      const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${loggedUser.id}_${today}`);
       const savedMeals = localStorage.getItem(`macrometrics_meals_${loggedUser.id}`);
-      setMeals(savedMeals ? JSON.parse(savedMeals) : EMPTY_MEALS);
+      if (savedMealsByDate) {
+        setMeals(normalizeMeals(JSON.parse(savedMealsByDate)));
+      } else if (savedMeals) {
+        setMeals(normalizeMeals(JSON.parse(savedMeals)));
+      } else {
+        setMeals(EMPTY_MEALS);
+      }
     } catch {
       setMeals(EMPTY_MEALS);
     }
@@ -455,28 +513,44 @@ export default function App() {
 
   // Handlers do MealBuilder
   const handleAddFood = (window: MealWindow, item: LoggedFood) => {
-    setMeals(prev => ({
-      ...prev,
-      [window]: [...prev[window], item],
-    }));
+    setMeals(prev => {
+      const current = prev[window] || [];
+      const updated: MealMap = {
+        ...prev,
+        [window]: [...current, item],
+      };
+      persistMeals(updated, selectedDateRef.current);
+      return updated;
+    });
   };
 
   const handleRemoveFood = (window: MealWindow, itemId: string) => {
-    setMeals(prev => ({
-      ...prev,
-      [window]: prev[window].filter(item => item.id !== itemId),
-    }));
+    setMeals(prev => {
+      const current = prev[window] || [];
+      const updated: MealMap = {
+        ...prev,
+        [window]: current.filter(item => item.id !== itemId),
+      };
+      persistMeals(updated, selectedDateRef.current);
+      return updated;
+    });
   };
 
   const handleCopyMeal = (fromWindow: MealWindow, toWindow: MealWindow) => {
-    const cloned = meals[fromWindow].map(item => ({
-      ...item,
-      id: `${item.foodId}_copy_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    }));
-    setMeals(prev => ({
-      ...prev,
-      [toWindow]: [...prev[toWindow], ...cloned],
-    }));
+    setMeals(prev => {
+      const fromList = prev[fromWindow] || [];
+      const toList = prev[toWindow] || [];
+      const cloned = fromList.map(item => ({
+        ...item,
+        id: `${item.foodId}_copy_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      }));
+      const updated: MealMap = {
+        ...prev,
+        [toWindow]: [...toList, ...cloned],
+      };
+      persistMeals(updated, selectedDateRef.current);
+      return updated;
+    });
   };
 
   const handleAutoCompleteProtein = (source: 'sassami' | 'whey_growth') => {
@@ -584,7 +658,7 @@ export default function App() {
                 value={selectedDate}
                 onChange={e => {
                   if (e.target.value) {
-                    setSelectedDate(e.target.value);
+                    handleDateChange(e.target.value);
                   }
                 }}
                 className="bg-transparent text-m3-on-surface text-xs focus:outline-none cursor-pointer font-mono"
