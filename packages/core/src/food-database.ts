@@ -9,6 +9,8 @@ export interface FoodItem {
   fatPer100g: number;
   fiberPer100g: number;
   isCustom?: boolean;
+  userId?: string;
+  isValidated?: boolean;
 }
 
 export interface RecipeIngredient {
@@ -290,12 +292,38 @@ export function getCommonFoodsForMeal(
 }
 
 /**
- * Busca alimentos por nome (case-insensitive) ou código de barras na lista fornecida.
+ * Filtra a lista de alimentos respeitando o isolamento por usuário.
+ * Alimentos sem usuário/prepopulados ou validados por administrador são públicos.
+ * Alimentos customizados pendentes de validação só são visíveis para seu criador ou administradores.
  */
-export function searchFoodItems(items: FoodItem[], query: string): FoodItem[] {
+export function filterVisibleFoods(
+  foods: FoodItem[],
+  userId?: string,
+  isAdmin: boolean = false
+): FoodItem[] {
+  if (isAdmin) return foods;
+  return foods.filter(food => {
+    if (!food.isCustom || food.isValidated || !food.userId) {
+      return true;
+    }
+    return Boolean(userId && food.userId === userId);
+  });
+}
+
+/**
+ * Busca alimentos por nome (case-insensitive) ou código de barras na lista fornecida,
+ * respeitando as regras de visibilidade e moderação de alimentos customizados.
+ */
+export function searchFoodItems(
+  items: FoodItem[],
+  query: string,
+  userId?: string,
+  isAdmin: boolean = false
+): FoodItem[] {
+  const visibleItems = filterVisibleFoods(items, userId, isAdmin);
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return items;
-  return items.filter(item => {
+  if (!normalized) return visibleItems;
+  return visibleItems.filter(item => {
     return (
       item.name.toLowerCase().includes(normalized) ||
       item.id.toLowerCase().includes(normalized) ||
@@ -303,4 +331,5 @@ export function searchFoodItems(items: FoodItem[], query: string): FoodItem[] {
     );
   });
 }
+
 

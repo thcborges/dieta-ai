@@ -151,4 +151,50 @@ describe('Isolamento de Diário de Refeições por Conta de Usuário (Regressão
 
     fetchSpy.mockRestore();
   });
+
+  it('deve isolar alimentos customizados cadastrados pelo Usuário A para que o Usuário B não tenha acesso', async () => {
+    // 1. Usuário A logado
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_user_A',
+        email: 'userA@example.com',
+        name: 'Usuário A',
+      })
+    );
+
+    const { unmount } = render(<App />);
+
+    // Abre modal de cadastro de novo alimento
+    const registerBtn = screen.getByRole('button', { name: /\+ Novo Alimento/i });
+    fireEvent.click(registerBtn);
+
+    // Preenche e salva alimento customizado do Usuário A
+    fireEvent.change(screen.getByLabelText(/Nome do Alimento/i), { target: { value: 'Panqueca Secreta User A' } });
+    fireEvent.change(screen.getByLabelText(/Proteínas \(100g\)/i), { target: { value: '25' } });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alimento/i }));
+
+    // Verifica que está disponível no select do Usuário A
+    expect(screen.getByRole('option', { name: /Panqueca Secreta User A/i })).toBeInTheDocument();
+
+    // Logout Usuário A
+    fireEvent.click(screen.getByRole('button', { name: /Sair/i }));
+    unmount();
+
+    // 2. Usuário B faz login
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_user_B',
+        email: 'userB@example.com',
+        name: 'Usuário B',
+      })
+    );
+
+    render(<App />);
+
+    // Usuário B NÃO deve ter acesso nem ver o alimento customizado não-validado do Usuário A
+    expect(screen.queryByRole('option', { name: /Panqueca Secreta User A/i })).not.toBeInTheDocument();
+  });
 });
+

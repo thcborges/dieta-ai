@@ -253,6 +253,39 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     fetchSpy.mockRestore();
   });
 
+  it('deve exibir mensagem de erro quando busca remota retornar lista vazia de alimentos', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ foods: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={vi.fn()}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+    fireEvent.change(searchInput, { target: { value: 'Comida Inexistente' } });
+
+    const searchBtn = screen.getByRole('button', { name: /Consultar/i });
+    fireEvent.click(searchBtn);
+
+    expect(
+      await screen.findByText(/Alimento não encontrado no banco de dados nem no Open Food Facts/i)
+    ).toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
   it('deve abrir o modal de cadastro de novo alimento e adicionar à lista de opções', () => {
     const onRegisterFood = vi.fn();
     const onAddFood = vi.fn();
@@ -363,6 +396,128 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
 
     expect(await screen.findByText(/Alimento encontrado no banco local/i)).toBeInTheDocument();
   });
+
+  describe('Comportamento de Input Numérico de Porção (Regressão & UX Cronometer)', () => {
+    it('deve permitir limpar completamente o input de porção sem forçar automaticamente o valor 1', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const servingInput = screen.getByLabelText(/Porção \(Gramas\)/i) as HTMLInputElement;
+      expect(servingInput.value).not.toBe('');
+
+      // Limpa todo o input
+      fireEvent.change(servingInput, { target: { value: '' } });
+
+      // O input deve ficar em branco e NÃO colocar 1 automaticamente
+      expect(servingInput.value).toBe('');
+    });
+
+    it('deve deixar o campo de porção em branco imediatamente após lançar um alimento', () => {
+      const onAddFood = vi.fn();
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={onAddFood}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const servingInput = screen.getByLabelText(/Porção \(Gramas\)/i) as HTMLInputElement;
+      fireEvent.change(servingInput, { target: { value: '150' } });
+      expect(servingInput.value).toBe('150');
+
+      const launchBtn = screen.getByRole('button', { name: /Lançar/i });
+      fireEvent.click(launchBtn);
+
+      expect(onAddFood).toHaveBeenCalled();
+      // Conforme requisito: por padrão esse campo deveria ficar em branco assim que eu lançar o alimento
+      expect(servingInput.value).toBe('');
+    });
+
+    it('não deve lançar alimento se a porção estiver em branco ou zerada', () => {
+      const onAddFood = vi.fn();
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={onAddFood}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const servingInput = screen.getByLabelText(/Porção \(Gramas\)/i) as HTMLInputElement;
+      fireEvent.change(servingInput, { target: { value: '' } });
+
+      const launchBtn = screen.getByRole('button', { name: /Lançar/i });
+      fireEvent.click(launchBtn);
+
+      expect(onAddFood).not.toHaveBeenCalled();
+    });
+
+    it('deve atualizar o alimento selecionado e a porção padrão ao alterar o select', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const select = screen.getByLabelText(/Alimento Selecionado/i) as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: 'whey_growth_30g' } });
+
+      expect(select.value).toBe('whey_growth_30g');
+      const servingInput = screen.getByLabelText(/Porção \(Gramas\)/i) as HTMLInputElement;
+      expect(servingInput.value).toBe('30');
+    });
+
+    it('deve abrir o modal de cadastro ao clicar em Cadastrar agora no erro de busca', async () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+      fireEvent.change(searchInput, { target: { value: 'InexistenteXYZ123' } });
+
+      const searchBtn = screen.getByRole('button', { name: /Consultar/i });
+      fireEvent.click(searchBtn);
+
+      const registerLink = await screen.findByRole('button', { name: /Cadastrar agora/i });
+      expect(registerLink).toBeInTheDocument();
+      fireEvent.click(registerLink);
+
+      expect(screen.getByText(/Cadastrar Novo Alimento/i)).toBeInTheDocument();
+    });
+  });
 });
+
 
 

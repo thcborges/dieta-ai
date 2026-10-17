@@ -1,14 +1,17 @@
-# Módulo 1: Motor Biométrico & Fibras por Idade
+# Módulo 1: Motor Biométrico & Metas por Objetivo
 
-O Motor Biométrico calcula a Taxa Metabólica Basal (TMB), o Gasto Energético Total (GET / TDEE) e as metas dinâmicas de macronutrientes, tratando as fibras como macro oficial de primeira classe.
+O Motor Biométrico calcula a Taxa Metabólica Basal (TMB), o Gasto Energético Total (GET / TDEE) e as metas dinâmicas de macronutrientes, permitindo ao usuário escolher entre fornecer a TMB diretamente (ex: exame de bioimpedância) ou recalcular via equação clínica Mifflin-St Jeor, além de definir metas otimizadas por objetivo nutricional.
 
 ---
 
-## 🧮 Fórmulas e Algoritmos
+## 🧮 Fontes de Taxa Metabólica Basal (TMB)
 
-### 1. Taxa Metabólica Basal (Mifflin-St Jeor)
+O usuário pode definir sua TMB de duas formas complementares:
 
-A fórmula de Mifflin-St Jeor é considerada o padrão-ouro clínico para estimativa de gasto energético:
+1. **Exame de Bioimpedância Clínico (`manual_bioimpedance`):**
+   - Fornecimento direto do valor exato de TMB medido por bioimpedância médica (ex: InBody, BodPod), eliminando desvios estatísticos de equações populacionais.
+2. **Equação Clínica de Mifflin-St Jeor (`mifflin_st_jeor`):**
+   - Padrão-ouro clínico calculado a partir do perfil antropométrico:
 
 Para homens:
 $$TMB = 10 \times \text{peso (kg)} + 6.25 \times \text{altura (cm)} - 5 \times \text{idade (anos)} + 5$$
@@ -16,16 +19,45 @@ $$TMB = 10 \times \text{peso (kg)} + 6.25 \times \text{altura (cm)} - 5 \times \
 Para mulheres:
 $$TMB = 10 \times \text{peso (kg)} + 6.25 \times \text{altura (cm)} - 5 \times \text{idade (anos)} - 161$$
 
-### 2. Gasto Energético Total (GET / TDEE)
-O TDEE é determinado pela multiplicação da TMB pelo fator de atividade física:
+---
+
+## ⚡ Gasto Energético Total (GET / TDEE)
+
+O TDEE é determinado pela multiplicação da TMB efetiva pelo fator de atividade física:
+
+$$GET = TMB \times \text{Fator de Atividade}$$
 
 | Nível de Atividade | Fator Multiplicador | Descrição |
 | :--- | :--- | :--- |
 | **Sedentário** | `1.200` | Pouco ou nenhum exercício diário |
 | **Leve** | `1.375` | Exercício leve 1 a 3 dias/semana |
 | **Moderado** | `1.550` | Musculação 4x/semana + cardio moderado |
-| **Muito Ativo** | `1.725` | Exercício intenso 6 a 7 dias/semana |
-| **Extremamente Ativo**| `1.900` | Atletas profissionais ou trabalho braçal intenso |
+| **Intenso** | `1.725` | Exercício pesado 6 a 7 dias/semana |
+| **Atleta** | `1.900` | Treinos 2x ao dia ou atletas de alta performance |
+
+---
+
+## 🎯 Metas e Proporções Recomendadas por Objetivo Nutricional
+
+O motor analítico ajusta a meta calórica e a distribuição matemática dos macronutrientes conforme o objetivo selecionado:
+
+### 1. Emagrecer (`weight_loss` / Cutting)
+- **Balanço Energético:** Déficit calórico controlado de **-500 kcal** (respeitando piso de segurança de 1.200 kcal).
+- **Proteína:** **2.2 g/kg** (alta proteção da massa magra durante restrição energética).
+- **Gorduras:** **0.8 g/kg** (suporte hormonal essencial e saciedade).
+- **Carboidratos:** Saldo calórico restante ($(\text{Calorias Alvo} - (\text{Proteína}\times 4 + \text{Gordura}\times 9)) / 4$).
+
+### 2. Manutenção (`maintenance` / Homeostase)
+- **Balanço Energético:** Equilíbrio calórico rigoroso ($\Delta = 0$, Calorias = GET).
+- **Proteína:** **2.0 g/kg** (homeostase de massa muscular e síntese proteica).
+- **Gorduras:** **0.9 g/kg** (lipídios funcionais para perfil lipídico ótimo).
+- **Carboidratos:** Saldo calórico restante para energia constante.
+
+### 3. Ganho de Peso (`muscle_gain` / Bulking Limpo)
+- **Balanço Energético:** Superávit calórico controlado de **+350 kcal** para maximizar anabolismo minimizando acúmulo de tecido adiposo.
+- **Proteína:** **2.0 g/kg** (teto ótimo para saturação da síntese proteica miofibrilar).
+- **Gorduras:** **0.9 g/kg**.
+- **Carboidratos:** Elevados para máxima reposição de glicogênio muscular e rendimento em treinos de alta sobrecarga.
 
 ---
 
@@ -50,9 +82,9 @@ export function calculateRecommendedFiber(age: number, gender: Gender): number {
 
 ---
 
-## 🥩 Tetos Proteicos Agressivos
+## 🥩 Tetos Proteicos e Travas de Segurança
 
-O sistema suporta travas de proteína customizáveis entre **2.0g/kg e 2.5g/kg**, ou valores fixos de até **240g de proteína/dia**, essenciais para preservar a massa muscular durante déficits calóricos acentuados em praticantes de musculação.
+O sistema suporta travas de proteína customizáveis entre **2.0g/kg e 2.5g/kg**, ou trava máxima fixa de até **240g de proteína/dia**, essenciais para preservar a massa magra durante déficits calóricos acentuados em praticantes de musculação de grande porte.
 
 ---
 

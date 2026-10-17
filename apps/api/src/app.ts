@@ -16,7 +16,7 @@ import { diaryRoutes as dateDiaryRoutes } from './routes/diaries.route.js';
 
 export function resolveStaticPath(): string | null {
   if (process.env.STATIC_PATH && fs.existsSync(process.env.STATIC_PATH)) {
-    return process.env.STATIC_PATH;
+    return path.resolve(process.env.STATIC_PATH);
   }
   const candidates = [
     path.resolve(process.cwd(), 'apps/web/dist'),
@@ -64,11 +64,27 @@ export async function buildApp(): Promise<FastifyInstance> {
       root: staticPath,
       prefix: '/',
       wildcard: false,
+      setHeaders: (reply, pathName) => {
+        const normalized = pathName.replace(/\\/g, '/');
+        if (normalized.includes('/assets/')) {
+          reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        } else if (
+          normalized.endsWith('.html') ||
+          normalized.endsWith('sw.js') ||
+          normalized.endsWith('manifest.webmanifest')
+        ) {
+          reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+          reply.header('Pragma', 'no-cache');
+          reply.header('Expires', '0');
+        }
+      },
     });
 
     app.setNotFoundHandler(async (request, reply) => {
-      // Rotas de API e healthcheck mantêm 404 JSON estrito
-      if (request.url.startsWith('/api') || request.url.startsWith('/health')) {
+      const urlPath = request.url.split('?')[0];
+
+      // 1. Rotas de API e healthcheck mantêm 404 JSON estrito
+      if (urlPath.startsWith('/api') || urlPath.startsWith('/health')) {
         return reply.status(404).send({
           error: 'Not Found',
           message: `Route ${request.method}:${request.url} not found`,
@@ -76,9 +92,24 @@ export async function buildApp(): Promise<FastifyInstance> {
         });
       }
 
-      // Rotas de navegação do cliente fazem fallback para index.html
+      // 2. Requisições de assets ou recursos com extensão não devem sofrer fallback para index.html.
+      // Isso previne que arquivos CSS, JS ou imagens inexistentes sejam servidos como text/html (strict MIME error / broken image).
+      const hasExtension = path.extname(urlPath) !== '';
+      const isAssetPath = urlPath.startsWith('/assets/');
+      if (hasExtension || isAssetPath) {
+        return reply.status(404).send({
+          error: 'Not Found',
+          message: `Asset ${request.url} not found`,
+          statusCode: 404,
+        });
+      }
+
+      // 3. Rotas de navegação do cliente SPA fazem fallback para index.html com cabeçalhos anti-cache
       const indexPath = path.join(staticPath, 'index.html');
       if (fs.existsSync(indexPath)) {
+        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
         return reply.sendFile('index.html');
       }
 
