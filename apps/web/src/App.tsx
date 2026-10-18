@@ -457,26 +457,77 @@ export default function App() {
   const handleAddFood = (window: MealWindow, item: LoggedFood) => {
     setMeals(prev => ({
       ...prev,
-      [window]: [...prev[window], item],
+      [window]: [...(prev[window] || []), item],
     }));
   };
 
   const handleRemoveFood = (window: MealWindow, itemId: string) => {
     setMeals(prev => ({
       ...prev,
-      [window]: prev[window].filter(item => item.id !== itemId),
+      [window]: (prev[window] || []).filter(item => item.id !== itemId),
     }));
   };
 
-  const handleCopyMeal = (fromWindow: MealWindow, toWindow: MealWindow) => {
-    const cloned = meals[fromWindow].map(item => ({
+  const handleCopyMeal = (
+    fromWindow: MealWindow,
+    toWindow: MealWindow,
+    copiedItems?: LoggedFood[]
+  ) => {
+    const itemsToDuplicate =
+      copiedItems && copiedItems.length > 0
+        ? copiedItems
+        : meals[fromWindow] || [];
+
+    const cloned = itemsToDuplicate.map((item, index) => ({
       ...item,
-      id: `${item.foodId}_copy_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `${item.foodId}_copy_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 7)}`,
     }));
+
     setMeals(prev => ({
       ...prev,
-      [toWindow]: [...prev[toWindow], ...cloned],
+      [toWindow]: [...(prev[toWindow] || []), ...cloned],
     }));
+  };
+
+  const handleLoadMealsForDate = async (dateStr: string): Promise<MealMap> => {
+    if (dateStr === selectedDate) {
+      return meals;
+    }
+
+    if (user) {
+      try {
+        const savedStr = localStorage.getItem(`macrometrics_meals_${user.id}_${dateStr}`);
+        if (savedStr) {
+          return JSON.parse(savedStr) as MealMap;
+        }
+      } catch {
+        // segue para consulta remota
+      }
+
+      try {
+        const res = await fetch(`/api/v1/diaries/${dateStr}`, {
+          headers: { 'x-user-id': user.id },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.meals) {
+            try {
+              localStorage.setItem(
+                `macrometrics_meals_${user.id}_${dateStr}`,
+                JSON.stringify(data.meals)
+              );
+            } catch {
+              // ignora erro de storage
+            }
+            return data.meals as MealMap;
+          }
+        }
+      } catch {
+        // modo offline-first
+      }
+    }
+
+    return EMPTY_MEALS;
   };
 
   const handleAutoCompleteProtein = (source: 'sassami' | 'whey_growth') => {
@@ -637,6 +688,8 @@ export default function App() {
           missingProtein={missingProtein}
           remainingCalories={remainingCalories}
           currentUser={user}
+          selectedDate={selectedDate}
+          onLoadMealsForDate={handleLoadMealsForDate}
         />
       </main>
 
