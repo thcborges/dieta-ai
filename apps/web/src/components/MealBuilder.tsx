@@ -10,6 +10,7 @@ import {
   Plus,
   Trash2,
   Copy,
+  Zap,
   Sparkles,
   UtensilsCrossed,
   Sun,
@@ -26,6 +27,8 @@ import {
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
 import { ProteinAutocompleteModal } from './ProteinAutocompleteModal.js';
+import { QuickMacroModal } from './QuickMacroModal.js';
+import { CopyMealModal } from './CopyMealModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -46,12 +49,14 @@ interface MealBuilderProps {
   availableFoods?: FoodItem[];
   onAddFood: (window: MealWindow, item: LoggedFood) => void;
   onRemoveFood: (window: MealWindow, itemId: string) => void;
-  onCopyMeal: (fromWindow: MealWindow, toWindow: MealWindow) => void;
+  onCopyMeal: (fromWindow: MealWindow, toWindow: MealWindow, copiedItems?: LoggedFood[]) => void;
   onAutoCompleteProtein: (source: 'sassami' | 'whey_growth') => void;
   onRegisterFood?: (food: FoodItem) => void;
   missingProtein: number;
   remainingCalories: number;
   currentUser?: { id: string } | null;
+  selectedDate?: string;
+  onLoadMealsForDate?: (date: string) => Promise<MealMap> | MealMap;
 }
 
 const WINDOW_META: Record<
@@ -82,6 +87,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   missingProtein,
   remainingCalories,
   currentUser,
+  selectedDate,
+  onLoadMealsForDate,
 }) => {
   const [internalFoods, setInternalFoods] = useState<FoodItem[]>(() => {
     return availableFoods && availableFoods.length > 0 ? availableFoods : PREPOPULATED_FOODS;
@@ -90,8 +97,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   const [selectedFoodId, setSelectedFoodId] = useState<string>('sassami');
   const [servingGrams, setServingGrams] = useState<number | ''>(100);
   const [activeWindow, setActiveWindow] = useState<MealWindow>('lunch');
-  const [copyTargetWindow, setCopyTargetWindow] = useState<MealWindow>('dinner_event');
   const [showCopyModal, setShowCopyModal] = useState<MealWindow | null>(null);
+  const [quickMacroWindow, setQuickMacroWindow] = useState<MealWindow | null>(null);
 
   // Busca e Cadastro
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -537,7 +544,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         {(Object.keys(WINDOW_META) as MealWindow[]).map(windowKey => {
           const meta = WINDOW_META[windowKey];
           const Icon = meta.icon;
-          const items = meals[windowKey] || [];
+          const items = (meals && meals[windowKey]) || [];
 
           const totalCalories = items.reduce((acc, i) => acc + i.calories, 0);
           const totalProtein = Math.round(items.reduce((acc, i) => acc + i.protein, 0) * 10) / 10;
@@ -568,7 +575,17 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    title="Lançamento Rápido de Macros"
+                    aria-label="Lançamento Rápido de Macros"
+                    onClick={() => setQuickMacroWindow(windowKey)}
+                    className="p-1.5 rounded-lg text-m3-outline hover:text-amber-400 hover:bg-m3-surface-container-high transition-colors"
+                  >
+                    <Zap className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
                     title="Copiar Refeição"
+                    aria-label="Copiar Refeição"
                     onClick={() => setShowCopyModal(windowKey)}
                     className="p-1.5 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
                   >
@@ -645,50 +662,35 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         })}
       </div>
 
-      {/* Modal Simples de Cópia de Refeição */}
-      {showCopyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="bg-m3-surface-container-high border border-m3-outline rounded-2xl p-5 max-w-sm w-full text-m3-on-surface">
-            <h4 className="text-sm font-semibold mb-2">
-              Copiar {WINDOW_META[showCopyModal].label}
-            </h4>
-            <p className="text-xs text-m3-outline mb-4">
-              Selecione o destino para duplicar os alimentos desta refeição:
-            </p>
+      {/* Modal de Cópia de Refeição Completo (Entre Dias e Janelas com Edição de Porções e Remoção) */}
+      <CopyMealModal
+        isOpen={showCopyModal !== null}
+        initialSourceWindow={showCopyModal ?? 'breakfast'}
+        initialTargetWindow="dinner_event"
+        currentDate={selectedDate || new Date().toISOString().slice(0, 10)}
+        meals={meals}
+        onClose={() => setShowCopyModal(null)}
+        onConfirm={(targetWindow, copiedItems) => {
+          if (showCopyModal) {
+            onCopyMeal(showCopyModal, targetWindow, copiedItems);
+          }
+          setShowCopyModal(null);
+        }}
+        onLoadMealsForDate={onLoadMealsForDate}
+        currentUser={currentUser}
+      />
 
-            <select
-              value={copyTargetWindow}
-              onChange={e => setCopyTargetWindow(e.target.value as MealWindow)}
-              className="w-full bg-m3-surface-container border border-m3-outline-variant rounded-xl px-3 py-2 text-xs mb-4"
-            >
-              {Object.entries(WINDOW_META).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCopyModal(null)}
-                className="px-3 py-1.5 rounded-xl border border-m3-outline-variant text-xs text-m3-outline hover:text-m3-on-surface"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onCopyMeal(showCopyModal, copyTargetWindow);
-                  setShowCopyModal(null);
-                }}
-                className="px-4 py-1.5 rounded-xl bg-m3-primary text-m3-on-primary text-xs font-semibold shadow"
-              >
-                Confirmar Cópia
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Modal de Lançamento Rápido de Macros */}
+      {quickMacroWindow && (
+        <QuickMacroModal
+          isOpen={quickMacroWindow !== null}
+          windowKey={quickMacroWindow}
+          onClose={() => setQuickMacroWindow(null)}
+          onSave={food => {
+            onAddFood(quickMacroWindow, food);
+            setQuickMacroWindow(null);
+          }}
+        />
       )}
 
       {/* Modal de Scanner de Código de Barras / QR Code */}
