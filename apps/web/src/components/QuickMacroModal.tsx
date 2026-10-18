@@ -72,7 +72,7 @@ export const QuickMacroModal: React.FC<QuickMacroModalProps> = ({
       id: `quick_macro_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       foodId: 'quick_macro',
       name,
-      grams: 1, // Porção unitária
+      grams: 100, // Porção base de referência (100g)
       calories: Math.round(cal),
       protein: Math.round(p * 10) / 10,
       carbs: Math.round(c * 10) / 10,
