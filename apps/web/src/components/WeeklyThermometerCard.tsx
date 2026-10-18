@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   evaluateWeeklyThermometer,
+  getLocalDateString,
   type DietGoal,
   type RollingDayLog,
 } from '@dieta-ai/core';
@@ -41,7 +42,7 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
   const safeDays =
     days && days.length > 0
       ? days
-      : [{ date: new Date().toISOString().slice(0, 10), calories: 0 }];
+      : [{ date: getLocalDateString(), calories: 0 }];
 
   const report = evaluateWeeklyThermometer({
     goal,

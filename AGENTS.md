@@ -3,6 +3,7 @@
 > **Aviso Obrigatório para Agentes de IA:**
 > Todo prompt de entrada DEVE obrigatoriamente ler e analisar este arquivo antes de executar qualquer tarefa, verificando se há contradições com as regras, restrições e definições arquiteturais aqui documentadas.
 > Em caso de conflito, as regras deste arquivo prevalecem.
+> **Ciclo Completo Obrigatório por Iteração:** NENHUMA iteração é considerada concluída sem cumprir o fluxo integral: branch isolada ➔ testes BDD/TDD (cobertura ≥90%) ➔ push ➔ PR e merge em `develop` ➔ PR final de `develop` para `main` com relatório completo e link fornecido ao usuário.
 
 ---
 
@@ -21,6 +22,11 @@
 ## 2. Meta-Regras Inquebráveis de Desenvolvimento
 
 ### 2.1. Versionamento Git, Ciclo de Branches & Agente Revisor de PR
+
+> [!IMPORTANT]
+> **OBRIGATORIEDADE DE CICLO COMPLETO PARA TODA E QUALQUER ITERAÇÃO:**
+> O fluxo estruturado de branches DEVE ser executado integralmente em **CADA iteração** de desenvolvimento, sem exceções. Não é permitido finalizar uma tarefa sem completar o ciclo até a abertura do Pull Request para `main` com o link disponibilizado ao usuário.
+
 1. O repositório git está configurado localmente e remoto em `git@github.com:thcborges/dieta-ai.git`.
 2. **Branch Isolada por Iteração:**
    * Toda e qualquer implementação DEVE ser realizada em branch separada (`feat/<nome>` ou `fix/<nome>`).
@@ -28,13 +34,14 @@
 3. **Validação Remota com Trivy & Merge em Develop:**
    * Ao finalizar o desenvolvimento e os testes locais, realiza-se o push da branch para o repositório remoto (`git push origin <branch>`).
    * Abre-se o Pull Request apontando para a branch `develop`, disparando a esteira de CI do GitHub Actions com validação de segurança pelo **Trivy** e a suíte completa de testes.
-   * Após a validação com sucesso dos checks de CI e Trivy, a branch é mesclada (*merge*) com a branch `develop` para publicação no ambiente de desenvolvimento.
+   * Após a validação com sucesso dos checks de CI e Trivy, a branch DEVE ser mesclada (*merge*) com a branch `develop` para publicação no ambiente de desenvolvimento.
 4. **Agente Revisor de Pull Request (`pr-ui-reviewer`) & Testes de Estresse de UI:**
    * Um agente dedicado (`pr-ui-reviewer`) executa a auditoria de usabilidade e estresse da UI.
    * O agente utiliza o **Playwright E2E** executando testes automatizados herméticos (Desktop e Mobile) contra o servidor local do Vite e conectando-se ao **Firestore Emulator** local para validar a integridade da persistência e interações analíticas.
-5. **Conclusão da Iteração, PR para `main` e Telegram:**
-   * Somente após a aprovação integral dos testes de UI pelo revisor, cria-se o Pull Request apontando para a branch de produção `main`.
+5. **Conclusão Obrigatória da Iteração, PR para `main` e Telegram:**
+   * Imediatamente após o merge em `develop` e a validação dos testes, o agente DEVE obrigatoriamente criar o Pull Request apontando da branch `develop` para a branch de produção `main`.
    * A descrição do Pull Request DEVE conter um relatório completo e detalhado de tudo o que foi implementado na iteração.
+   * O agente DEVE informar o link direto do Pull Request gerado para `main` na sua resposta ao usuário.
    * Dispara-se simultaneamente uma notificação estruturada via **Telegram Bot** informando o encerramento da iteração, contendo a mesma descrição detalhada e o link direto do Pull Request aprovado e pronto para o merge.
 6. **Deploy Dev sob Demanda via Telegram:**
    * O Telegram Bot escuta o comando interativo `/deploy-dev` via long-polling no serviço `error-healer`.
@@ -175,12 +182,14 @@ Todo erro em tempo de execução (cliente ou backend) é capturado estruturadame
 
 ---
 
-## 7. Critérios de Aceite para Cada Entrega
+## 7. Critérios de Aceite para Cada Entrega (Checklist Obrigatório por Iteração)
 * [ ] Arquivo `AGENTS.md` verificado e sem contradições com a solicitação.
 * [ ] Testes unitários/BDD escritos previamente e com 100% de sucesso na feature desenvolvida.
 * [ ] Suíte completa de testes executada e íntegra.
 * [ ] Cobertura de testes aferida ≥ 90%.
 * [ ] Commits realizados com mensagens semânticas no repositório git local.
+* [ ] Pull Request para `develop` criado, validado na esteira CI (Trivy + testes) e mesclado (*merged*).
+* [ ] Pull Request para `main` (produção) criado a partir de `develop` com relatório minucioso de entrega e link informado.
 
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
