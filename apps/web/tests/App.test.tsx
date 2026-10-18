@@ -337,5 +337,135 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
 
     fetchSpy.mockRestore();
   });
+
+  it('deve permitir lançamento rápido de macros via botão de raio no diário e atualizar totais diários', async () => {
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges_quick',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText(/Orçamento Diário de Macronutrientes/i)).toBeInTheDocument();
+
+    // Clica no botão de raio do almoço
+    const quickMacroBtns = screen.getAllByTitle(/Lançamento Rápido de Macros/i);
+    expect(quickMacroBtns.length).toBe(4);
+    fireEvent.click(quickMacroBtns[1]!); // Almoço
+
+    // Modal de macros rápidos abre
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Descrição \/ Nome da Refeição/i), {
+      target: { value: 'Prato Executivo Análise Gemini' },
+    });
+    fireEvent.change(screen.getByLabelText(/Calorias \(kcal\)/i), {
+      target: { value: '620' },
+    });
+    fireEvent.change(screen.getByLabelText(/Proteínas \(g\)/i), {
+      target: { value: '52' },
+    });
+    fireEvent.change(screen.getByLabelText(/Carboidratos \(g\)/i), {
+      target: { value: '65' },
+    });
+    fireEvent.change(screen.getByLabelText(/Gorduras \(g\)/i), {
+      target: { value: '16' },
+    });
+
+    const submitBtn = screen.getByRole('button', { name: /Lançar na Refeição/i });
+    fireEvent.click(submitBtn);
+
+    // O item deve aparecer no almoço
+    expect(await screen.findByText(/Prato Executivo Análise Gemini/i)).toBeInTheDocument();
+    // E os totais da refeição devem refletir os 620 kcal e 52g de proteína
+    expect(screen.getAllByText(/620 kcal • 52g P • 65g C • 16g G/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('deve permitir copiar refeição de outro dia com controle de porção e remoção de itens atualizando o diário', async () => {
+    // Calcula a data de ontem de forma idêntica à do CopyMealModal
+    const today = new Date().toISOString().slice(0, 10);
+    const parts = today.split('-').map(Number);
+    const d = new Date(Date.UTC(parts[0]!, parts[1]! - 1, parts[2]!));
+    d.setUTCDate(d.getUTCDate() - 1);
+    const yesterdayDate = d.toISOString().slice(0, 10);
+
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges_copy_day',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+    localStorage.setItem(
+      `macrometrics_meals_usr_thcborges_copy_day_${yesterdayDate}`,
+      JSON.stringify({
+        breakfast: [],
+        lunch: [
+          {
+            id: 'yest_sassami',
+            foodId: 'sassami',
+            name: 'Sassami Grelhado Ontem',
+            grams: 200,
+            calories: 330,
+            protein: 62,
+            carbs: 0,
+            fat: 7.2,
+            fiber: 0,
+          },
+          {
+            id: 'yest_arroz',
+            foodId: 'arroz_branco',
+            name: 'Arroz Branco Ontem',
+            grams: 150,
+            calories: 195,
+            protein: 3.75,
+            carbs: 42,
+            fat: 0.45,
+            fiber: 0.6,
+          },
+        ],
+        afternoon_snack: [],
+        dinner_event: [],
+      })
+    );
+
+    render(<App />);
+
+    // Clica em copiar refeição do almoço
+    const copyBtns = screen.getAllByTitle(/Copiar Refeição/i);
+    fireEvent.click(copyBtns[1]!); // Almoço
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Seleciona Ontem como data de origem
+    const yesterdayBtn = screen.getByRole('button', { name: /Ontem/i });
+    fireEvent.click(yesterdayBtn);
+
+    // Deve carregar os itens de ontem
+    expect(await screen.findByText('Sassami Grelhado Ontem')).toBeInTheDocument();
+    expect(screen.getByText('Arroz Branco Ontem')).toBeInTheDocument();
+
+    // Remove arroz
+    const removeArrozBtn = screen.getByLabelText(/Remover Arroz Branco Ontem da cópia/i);
+    fireEvent.click(removeArrozBtn);
+    expect(screen.queryByText('Arroz Branco Ontem')).not.toBeInTheDocument();
+
+    // Ajusta Sassami para 100g (reduz pela metade)
+    const sassamiGramsInput = screen.getByLabelText(/Porção de Sassami Grelhado Ontem/i);
+    fireEvent.change(sassamiGramsInput, { target: { value: '100' } });
+
+    // Confirma a cópia para o almoço de hoje
+    const confirmBtn = screen.getByRole('button', { name: /Confirmar Cópia/i });
+    fireEvent.click(confirmBtn);
+
+    // Deve estar no diário de hoje com 100g e macros recalculados (330 / 2 = 165 kcal, 31g P)
+    expect(await screen.findByText(/Sassami Grelhado Ontem/i)).toBeInTheDocument();
+    expect(screen.getByText('(100g)')).toBeInTheDocument();
+    expect(screen.getAllByText(/165 kcal • 31g P/i).length).toBeGreaterThanOrEqual(1);
+  });
 });
 

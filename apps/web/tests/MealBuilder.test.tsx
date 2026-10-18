@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MealBuilder } from '../src/components/MealBuilder.js';
 
 describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', () => {
@@ -534,8 +534,100 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
 
       expect(screen.getByText(/Cadastrar Novo Alimento/i)).toBeInTheDocument();
     });
+
+    it('deve exibir botão de raio ao lado do botão de copiar e abrir o modal de Lançamento Rápido de Macros', () => {
+      const onAddFood = vi.fn();
+
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={onAddFood}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const quickMacroBtns = screen.getAllByTitle(/Lançamento Rápido de Macros/i);
+      expect(quickMacroBtns.length).toBe(4);
+
+      // Clica no botão de raio do almoço
+      fireEvent.click(quickMacroBtns[1]!);
+
+      // Modal de macros rápidos aberto
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText(/Lançamento Rápido de Macros/i)).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/Descrição \/ Nome da Refeição/i), {
+        target: { value: 'Prato Gemini Foto' },
+      });
+      fireEvent.change(screen.getByLabelText(/Calorias \(kcal\)/i), {
+        target: { value: '520' },
+      });
+      fireEvent.change(screen.getByLabelText(/Proteínas \(g\)/i), {
+        target: { value: '45' },
+      });
+
+      const submitBtn = screen.getByRole('button', { name: /Lançar na Refeição/i });
+      fireEvent.click(submitBtn);
+
+      expect(onAddFood).toHaveBeenCalledWith(
+        'lunch',
+        expect.objectContaining({
+          name: 'Prato Gemini Foto',
+          calories: 520,
+          protein: 45,
+        })
+      );
+    });
+
+    it('deve permitir copiar refeição com controle de porção e remoção de itens via CopyMealModal', () => {
+      const onCopyMeal = vi.fn();
+
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={onCopyMeal}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      // Clica em copiar café da manhã
+      const copyButtons = screen.getAllByTitle(/Copiar Refeição/i);
+      fireEvent.click(copyButtons[0]!);
+
+      // Modal de cópia com resumo de itens
+      const modal = screen.getByRole('dialog');
+      expect(modal).toBeInTheDocument();
+      expect(within(modal).getByText(/Ovos Inteiros/i)).toBeInTheDocument();
+
+      // Ajusta porção de ovos de 100g para 150g
+      const eggsInput = screen.getByLabelText(/Porção de Ovos Inteiros/i);
+      fireEvent.change(eggsInput, { target: { value: '150' } });
+
+      const confirmBtn = screen.getByRole('button', { name: /Confirmar Cópia/i });
+      fireEvent.click(confirmBtn);
+
+      expect(onCopyMeal).toHaveBeenCalledWith(
+        'breakfast',
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Ovos Inteiros',
+            grams: 150,
+          }),
+        ])
+      );
+    });
   });
 });
+
 
 
 
