@@ -111,6 +111,25 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     expect(lunchIds).not.toContain('cafe_especial');
   });
 
+  it('deve retornar exatamente 10 alimentos sugeridos para cada janela de refeição em getCommonFoodsForMeal', () => {
+    const windows: MealWindow[] = ['breakfast', 'lunch', 'afternoon_snack', 'dinner_event'];
+    for (const w of windows) {
+      const foods = getCommonFoodsForMeal(w, PREPOPULATED_FOODS);
+      expect(foods).toHaveLength(10);
+    }
+  });
+
+  it('deve priorizar alimentos do histórico antes de completar os 10 mais comuns em getCommonFoodsForMeal', () => {
+    const customHistory: MealLogEntry[] = [
+      { mealWindow: 'lunch', foodId: 'tilapia_grelhada', count: 50 },
+      { mealWindow: 'lunch', foodId: 'patinho_moido', count: 40 },
+    ];
+    const lunchFoods = getCommonFoodsForMeal('lunch', PREPOPULATED_FOODS, customHistory);
+    expect(lunchFoods).toHaveLength(10);
+    expect(lunchFoods[0]?.id).toBe('tilapia_grelhada');
+    expect(lunchFoods[1]?.id).toBe('patinho_moido');
+  });
+
   it('deve buscar alimentos por nome (case-insensitive) via searchFoodItems', () => {
     const results = searchFoodItems(PREPOPULATED_FOODS, 'sassami');
     expect(results.length).toBeGreaterThan(0);

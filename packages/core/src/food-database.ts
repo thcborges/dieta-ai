@@ -643,23 +643,84 @@ export function getMealFrequentFoodSuggestions(
 }
 
 export const COMMON_FOOD_PRESETS_BY_WINDOW: Record<MealWindow, string[]> = {
-  breakfast: ['ovos_inteiros', 'claras_pasteurizadas', 'pao_integral', 'cafe_especial'],
-  lunch: ['sassami', 'feijao_preto', 'arroz_branco', 'batata_doce'],
-  afternoon_snack: ['whey_growth_30g', 'ovos_inteiros', 'pao_integral'],
-  dinner_event: ['sassami', 'batata_doce', 'pizza_calabresa', 'salgadinho_festa'],
+  breakfast: [
+    'ovos_inteiros',
+    'claras_pasteurizadas',
+    'pao_integral',
+    'cafe_especial',
+    'banana_prata',
+    'queijo_cottage',
+    'queijo_minas_light',
+    'iogurte_desnatado',
+    'pasta_amendoim_integral',
+    'whey_growth_30g',
+  ],
+  lunch: [
+    'sassami',
+    'peito_frango_grelhado',
+    'feijao_preto',
+    'arroz_branco',
+    'batata_doce',
+    'patinho_moido',
+    'tilapia_grelhada',
+    'frango_desfiado_cozido',
+    'sobrecoxa_frango_assada',
+    'ovos_inteiros',
+  ],
+  afternoon_snack: [
+    'whey_growth_30g',
+    'whey_black_skull',
+    'banana_prata',
+    'maca_fuji',
+    'iogurte_desnatado',
+    'barra_proteina_growth',
+    'pao_integral',
+    'pasta_amendoim_integral',
+    'queijo_cottage',
+    'leite_desnatado',
+  ],
+  dinner_event: [
+    'sassami',
+    'patinho_moido',
+    'peito_frango_grelhado',
+    'batata_doce',
+    'arroz_branco',
+    'feijao_preto',
+    'tilapia_grelhada',
+    'pizza_calabresa',
+    'pizza_mussarela',
+    'salgadinho_festa',
+  ],
 };
 
 /**
- * Retorna os alimentos mais comuns para uma janela de refeição específica.
+ * Retorna os 10 alimentos mais comuns para uma janela de refeição específica,
+ * priorizando histórico de consumo do usuário quando disponível.
  */
 export function getCommonFoodsForMeal(
   window: MealWindow,
-  availableFoods: FoodItem[] = PREPOPULATED_FOODS
+  availableFoods: FoodItem[] = PREPOPULATED_FOODS,
+  history?: MealLogEntry[],
+  limit: number = 10
 ): FoodItem[] {
-  const commonIds = COMMON_FOOD_PRESETS_BY_WINDOW[window] || [];
+  let targetIds: string[] = [];
+
+  if (history && history.length > 0) {
+    const frequentFromHistory = getMealFrequentFoodSuggestions(history, window, limit);
+    targetIds = [...frequentFromHistory];
+  }
+
+  const presets = COMMON_FOOD_PRESETS_BY_WINDOW[window] || [];
+  for (const pid of presets) {
+    if (!targetIds.includes(pid)) {
+      targetIds.push(pid);
+    }
+    if (targetIds.length >= limit) break;
+  }
+
   const foodMap = new Map<string, FoodItem>(availableFoods.map(f => [f.id, f]));
   const result: FoodItem[] = [];
-  for (const id of commonIds) {
+  for (const id of targetIds) {
     const found = foodMap.get(id);
     if (found) {
       result.push(found);

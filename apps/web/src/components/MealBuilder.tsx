@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   type MealWindow,
   PREPOPULATED_FOODS,
@@ -477,12 +477,29 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     onAddFood(window, newFood);
   };
 
-  const commonFoods = getCommonFoodsForMeal(activeWindow, internalFoods);
-  const otherFoods = internalFoods.filter(f => !commonFoods.some(cf => cf.id === f.id));
+  const commonFoods = useMemo(() => {
+    return getCommonFoodsForMeal(activeWindow, internalFoods);
+  }, [activeWindow, internalFoods]);
+
+  const otherFoods = useMemo(() => {
+    return internalFoods.filter(f => !commonFoods.some(cf => cf.id === f.id));
+  }, [internalFoods, commonFoods]);
+
+  const displayedFoods = useMemo(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length > 0) {
+      if (searchResults.length > 0) {
+        return searchResults;
+      }
+      return searchFoodItems(internalFoods, trimmed, currentUser?.id);
+    }
+    // Quando não houver busca ativa, traz os 10 alimentos mais consumidos na janela ativa
+    return commonFoods;
+  }, [searchQuery, searchResults, internalFoods, currentUser, commonFoods]);
 
   return (
     <div className="space-y-6">
-      {/* Barra de Ação Rápida Cronometer-Style (Porção & Peso no Topo) */}
+      {/* Barra de Ação Rápida Cronometer-Style */}
       <div className="bg-m3-surface-container rounded-2xl p-4 border border-m3-outline-variant shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
@@ -528,6 +545,36 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                 </span>
               )}
             </button>
+          </div>
+        </div>
+
+        {/* Item 1: Janela de Refeição (Primeiro Item do Lançamento Rápido) */}
+        <div className="mb-4 p-3 bg-m3-surface-container-low border border-m3-outline-variant/60 rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="window-select"
+                className="text-xs font-mono text-m3-primary uppercase font-bold tracking-wider"
+              >
+                Janela de Refeição:
+              </label>
+              <select
+                id="window-select"
+                aria-label="Janela de Refeição"
+                value={activeWindow}
+                onChange={e => handleWindowChange(e.target.value as MealWindow)}
+                className="bg-m3-surface-container-high border border-m3-outline-variant rounded-xl px-3 py-1.5 text-xs text-m3-on-surface font-semibold focus:outline-none focus:border-m3-primary"
+              >
+                {Object.entries(WINDOW_META).map(([key, meta]) => (
+                  <option key={key} value={key}>
+                    {meta.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="text-[11px] text-m3-outline font-mono">
+              Alimentos sugeridos atualizados para: <span className="text-m3-on-surface font-medium">{WINDOW_META[activeWindow].label}</span>
+            </div>
           </div>
         </div>
 
@@ -597,33 +644,185 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           )}
         </form>
 
-        {/* Lista de Resultados da Busca de Alimentos (M3 Card List) */}
-        {searchResults.length > 0 && (
-          <div
-            data-testid="search-results-list"
-            className="mb-4 p-3 bg-m3-surface-container-high border border-m3-outline-variant rounded-2xl space-y-2 shadow-md animate-fadeIn"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-m3-outline-variant/60">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-m3-on-surface">
-                  Resultados da busca ({searchResults.length} alimentos):
-                </span>
-                <span className="text-[11px] text-m3-outline hidden sm:inline font-mono">
-                  Selecione para ajustar a porção ou lance diretamente
+        {/* Painel do Alimento Selecionado e Porção para Lançamento */}
+        <div className="mb-4 p-3.5 bg-m3-surface-container-high border border-m3-outline-variant rounded-2xl shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            <div className="sm:col-span-7">
+              <span className="block text-[11px] font-mono text-m3-outline uppercase mb-1">
+                Alimento Selecionado
+              </span>
+              <div
+                data-testid="selected-food-display"
+                className="flex items-center justify-between p-2.5 bg-m3-surface-container-low border border-m3-primary/50 rounded-xl min-h-[42px]"
+              >
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-m3-on-surface truncate">
+                      {selectedFood.name}
+                    </span>
+                    {selectedFood.isRecipe && (
+                      <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/30 px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                        Receita
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-m3-outline font-mono mt-0.5">
+                    <span className="text-m3-primary font-medium">{selectedFood.caloriesPer100g} kcal/100g</span>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-medium">{selectedFood.proteinPer100g}g P</span>
+                    <span>•</span>
+                    <span className="text-amber-400">{selectedFood.carbsPer100g}g C</span>
+                    <span>•</span>
+                    <span className="text-purple-400">{selectedFood.fatPer100g}g G</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono shrink-0">
+                  Pronto para Lançar
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setSearchResults([])}
-                className="text-xs text-m3-outline hover:text-m3-on-surface transition-colors px-2 py-0.5 rounded-lg hover:bg-m3-surface-container"
-                title="Fechar lista de resultados"
+
+              {/* Elemento acessível para testes e leitores de tela */}
+              <select
+                id="food-select"
+                aria-label="Alimento Selecionado"
+                value={selectedFoodId}
+                onChange={e => {
+                  const id = e.target.value;
+                  setSelectedFoodId(id);
+                  const found = internalFoods.find(f => f.id === id);
+                  if (found) setServingGrams(found.servingSizeGrams || 100);
+                }}
+                className="sr-only"
               >
-                ✕ Fechar
-              </button>
+                {searchResults.length > 0 && (
+                  <optgroup label="Resultados da Busca">
+                    {searchResults.map(food => (
+                      <option key={`search_opt_${food.id}`} value={food.id}>
+                        {food.name} ({food.caloriesPer100g} kcal/100g)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label={`Mais Comuns para ${WINDOW_META[activeWindow].label}`}>
+                  {commonFoods.map(food => (
+                    <option key={`common_${food.id}`} value={food.id}>
+                      {food.name} ({food.caloriesPer100g} kcal/100g)
+                    </option>
+                  ))}
+                </optgroup>
+                {otherFoods.length > 0 && (
+                  <optgroup label="Todos os Alimentos Disponíveis">
+                    {otherFoods.map(food => (
+                      <option key={`all_${food.id}`} value={food.id}>
+                        {food.name} ({food.caloriesPer100g} kcal/100g)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
             </div>
 
-            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {searchResults.map(food => {
+            <div className="sm:col-span-3">
+              <label
+                htmlFor="serving-input"
+                className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
+              >
+                Porção (Gramas)
+              </label>
+              <input
+                id="serving-input"
+                type="number"
+                min="1"
+                max="2000"
+                value={servingGrams}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setServingGrams('');
+                  } else {
+                    const num = Number(val);
+                    setServingGrams(isNaN(num) ? '' : num);
+                  }
+                }}
+                placeholder="Ex: 100"
+                className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary h-[42px]"
+              />
+            </div>
+
+            <div className="sm:col-span-2 flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleAddFoodSubmit(activeWindow)}
+                className="flex-1 flex items-center justify-center gap-1 bg-m3-primary text-m3-on-primary hover:bg-m3-primary/90 font-medium text-xs py-2 px-2.5 rounded-xl transition-all shadow-sm h-[42px]"
+              >
+                <Plus className="w-4 h-4" />
+                Lançar
+              </button>
+              {selectedFood.isRecipe && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rec =
+                      recipes.find(r => r.id === selectedFood.id) ||
+                      (selectedFood.recipeData as RecipeInput) || {
+                        id: selectedFood.id,
+                        name: selectedFood.name,
+                        servings: 1,
+                        ingredients: [],
+                      };
+                    setRecipeToLog(rec);
+                    setIsLogRecipeOpen(true);
+                  }}
+                  className="px-2.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-medium transition-colors flex items-center justify-center h-[42px]"
+                  title="Lançar por Fração / Porção da Receita"
+                  aria-label="Lançar por Fração / Porção"
+                >
+                  <ChefHat className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Lista Fixa de Alimentos / Resultados da Busca (Sempre Disponível) */}
+        <div
+          data-testid="search-results-list"
+          className="p-3 bg-m3-surface-container-high border border-m3-outline-variant rounded-2xl space-y-2 shadow-md"
+        >
+          <div className="flex items-center justify-between pb-2 border-b border-m3-outline-variant/60">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-m3-on-surface">
+                {searchQuery.trim().length > 0
+                  ? `Resultados da busca (${displayedFoods.length} alimentos):`
+                  : `Alimentos sugeridos para ${WINDOW_META[activeWindow].label} (10 mais consumidos):`}
+              </span>
+              <span className="text-[11px] text-m3-outline hidden sm:inline font-mono">
+                Selecione para definir porção e lançar
+              </span>
+            </div>
+            {searchQuery.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setSearchFeedback(null);
+                }}
+                className="text-xs text-m3-outline hover:text-m3-on-surface transition-colors px-2 py-0.5 rounded-lg hover:bg-m3-surface-container"
+                title="Limpar busca e voltar aos sugeridos"
+              >
+                Limpar Busca
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {displayedFoods.length === 0 ? (
+              <div className="p-4 text-center text-xs text-m3-outline">
+                Nenhum alimento encontrado para "{searchQuery}". Clique em "Consultar" acima para buscar online no Open Food Facts ou cadastre um novo alimento.
+              </div>
+            ) : (
+              displayedFoods.map(food => {
                 const isSelected = food.id === selectedFoodId;
                 return (
                   <div
@@ -689,150 +888,22 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                       </button>
                       <button
                         type="button"
-                        aria-label={`Lançar ${food.name}`}
+                        aria-label={
+                          searchQuery.trim().length > 0
+                            ? `Lançar ${food.name}`
+                            : `Adicionar ${food.name}`
+                        }
                         onClick={() => handleDirectLaunchFromSearch(food, activeWindow)}
                         className="flex items-center gap-1 bg-m3-primary/20 hover:bg-m3-primary/30 text-m3-primary border border-m3-primary/40 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
                         title={`Lançar ${food.servingSizeGrams || 100}g em ${WINDOW_META[activeWindow].label}`}
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Lançar</span>
+                        <span>{searchQuery.trim().length > 0 ? 'Lançar' : '+ Rápido'}</span>
                       </button>
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Linha de Inputs: Peso/Porção SEMPRE no Topo */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-          <div className="sm:col-span-5">
-            <label
-              htmlFor="food-select"
-              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
-            >
-              Alimento Selecionado
-            </label>
-            <select
-              id="food-select"
-              aria-label="Alimento Selecionado"
-              value={selectedFoodId}
-              onChange={e => {
-                const id = e.target.value;
-                setSelectedFoodId(id);
-                const found = internalFoods.find(f => f.id === id);
-                if (found) setServingGrams(found.servingSizeGrams || 100);
-              }}
-              className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs text-m3-on-surface font-medium focus:outline-none focus:border-m3-primary"
-            >
-              {searchResults.length > 0 && (
-                <optgroup label="Resultados da Busca">
-                  {searchResults.map(food => (
-                    <option key={`search_opt_${food.id}`} value={food.id}>
-                      {food.name} ({food.caloriesPer100g} kcal/100g)
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              <optgroup label={`Mais Comuns para ${WINDOW_META[activeWindow].label}`}>
-                {commonFoods.map(food => (
-                  <option key={`common_${food.id}`} value={food.id}>
-                    {food.name} ({food.caloriesPer100g} kcal/100g)
-                  </option>
-                ))}
-              </optgroup>
-              {otherFoods.length > 0 && (
-                <optgroup label="Todos os Alimentos Disponíveis">
-                  {otherFoods.map(food => (
-                    <option key={`all_${food.id}`} value={food.id}>
-                      {food.name} ({food.caloriesPer100g} kcal/100g)
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label
-              htmlFor="serving-input"
-              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
-            >
-              Porção (Gramas)
-            </label>
-            <input
-              id="serving-input"
-              type="number"
-              min="1"
-              max="2000"
-              value={servingGrams}
-              onChange={e => {
-                const val = e.target.value;
-                if (val === '') {
-                  setServingGrams('');
-                } else {
-                  const num = Number(val);
-                  setServingGrams(isNaN(num) ? '' : num);
-                }
-              }}
-              placeholder="Ex: 100"
-              className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs font-mono text-m3-on-surface focus:outline-none focus:border-m3-primary"
-            />
-          </div>
-
-          <div className="sm:col-span-3">
-            <label
-              htmlFor="window-select"
-              className="block text-[11px] font-mono text-m3-outline uppercase mb-1"
-            >
-              Janela de Refeição
-            </label>
-            <select
-              id="window-select"
-              aria-label="Janela de Refeição"
-              value={activeWindow}
-              onChange={e => handleWindowChange(e.target.value as MealWindow)}
-              className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs text-m3-on-surface font-medium focus:outline-none focus:border-m3-primary"
-            >
-              {Object.entries(WINDOW_META).map(([key, meta]) => (
-                <option key={key} value={key}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="sm:col-span-2 flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleAddFoodSubmit(activeWindow)}
-              className="flex-1 flex items-center justify-center gap-1 bg-m3-surface-container-highest hover:bg-m3-surface-variant border border-m3-outline text-m3-on-surface text-xs font-medium py-2 px-2.5 rounded-xl transition-colors"
-            >
-              <Plus className="w-4 h-4 text-m3-primary" />
-              Lançar
-            </button>
-            {selectedFood.isRecipe && (
-              <button
-                type="button"
-                onClick={() => {
-                  const rec =
-                    recipes.find(r => r.id === selectedFood.id) ||
-                    (selectedFood.recipeData as RecipeInput) || {
-                      id: selectedFood.id,
-                      name: selectedFood.name,
-                      servings: 1,
-                      ingredients: [],
-                    };
-                  setRecipeToLog(rec);
-                  setIsLogRecipeOpen(true);
-                }}
-                className="px-2.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-medium transition-colors flex items-center justify-center"
-                title="Lançar por Fração / Porção da Receita"
-                aria-label="Lançar por Fração / Porção"
-              >
-                <ChefHat className="w-4 h-4" />
-              </button>
+              })
             )}
           </div>
         </div>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   calculateRecipeMacros,
+  searchFoodItems,
   type FoodItem,
   type RecipeInput,
   type RecipeIngredient,
 } from '@dieta-ai/core';
-import { X, Plus, Trash2, ChefHat, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, ChefHat, Sparkles, AlertCircle, Search } from 'lucide-react';
 
 interface RecipeBuilderModalProps {
   isOpen: boolean;
@@ -27,10 +28,16 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const [servingUnitName, setServingUnitName] = useState('porção');
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
 
-  // Estado para adicionar novo ingrediente
+  // Estado para adicionar novo ingrediente e busca
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allFoodsList, setAllFoodsList] = useState<FoodItem[]>(availableFoods);
   const [selectedFoodId, setSelectedFoodId] = useState<string>('');
   const [ingredientGrams, setIngredientGrams] = useState<number | ''>(100);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAllFoodsList(availableFoods);
+  }, [availableFoods]);
 
   useEffect(() => {
     if (editingRecipe) {
@@ -45,21 +52,33 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
       setIngredients([]);
     }
     setErrorMessage(null);
+    setSearchQuery('');
   }, [editingRecipe, isOpen]);
 
   useEffect(() => {
-    if (availableFoods.length > 0 && !selectedFoodId) {
-      setSelectedFoodId(availableFoods[0].id);
+    if (allFoodsList.length > 0 && !selectedFoodId) {
+      setSelectedFoodId(allFoodsList[0].id);
     }
-  }, [availableFoods, selectedFoodId]);
+  }, [allFoodsList, selectedFoodId]);
 
   const foodMap = useMemo(() => {
     const map = new Map<string, FoodItem>();
-    for (const food of availableFoods) {
+    for (const food of allFoodsList) {
       map.set(food.id, food);
     }
     return map;
-  }, [availableFoods]);
+  }, [allFoodsList]);
+
+  // Lista fixa e sempre disponível com suporte a busca em tempo real
+  const filteredFoods = useMemo(() => {
+    const query = searchQuery.trim();
+    if (!query) return allFoodsList;
+    return searchFoodItems(allFoodsList, query);
+  }, [allFoodsList, searchQuery]);
+
+  const selectedFood = useMemo(() => {
+    return foodMap.get(selectedFoodId) || allFoodsList.find(f => f.id === selectedFoodId) || null;
+  }, [foodMap, selectedFoodId, allFoodsList]);
 
   // Cálculo em tempo real dos macros da receita
   const calculation = useMemo(() => {
@@ -71,9 +90,9 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         servingUnitName,
         ingredients,
       },
-      availableFoods
+      allFoodsList
     );
-  }, [name, servings, servingUnitName, ingredients, availableFoods]);
+  }, [name, servings, servingUnitName, ingredients, allFoodsList]);
 
   if (!isOpen) return null;
 
@@ -227,19 +246,51 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               Ingredientes da Receita
             </h3>
 
-            {/* Input de Adicionar Ingrediente */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            {/* Campo de Busca de Ingredientes */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar ingrediente por nome, marca ou corte..."
+                className="w-full bg-[#131314] border border-[#3c4043] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-[#a8c7fa] transition-colors"
+              />
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Painel de Lançamento / Ingrediente Selecionado */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-[#131314] border border-[#2e2f30] rounded-xl">
               <div className="sm:col-span-7">
-                <label htmlFor="select-food-ingredient" className="block text-xs text-neutral-400 mb-1">
-                  Selecionar Ingrediente
-                </label>
+                <span className="block text-xs text-neutral-400 mb-1 font-mono uppercase">
+                  Ingrediente Selecionado
+                </span>
+                <div className="flex items-center justify-between p-2.5 bg-[#1a1b1c] border border-[#a8c7fa]/40 rounded-xl min-h-[42px]">
+                  {selectedFood ? (
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="text-xs font-semibold text-white truncate">{selectedFood.name}</div>
+                      <div className="text-[11px] text-neutral-400 font-mono">
+                        {selectedFood.caloriesPer100g} kcal • {selectedFood.proteinPer100g}g P • {selectedFood.carbsPer100g}g C • {selectedFood.fatPer100g}g G por 100g
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-neutral-500">Selecione um ingrediente na lista abaixo</span>
+                  )}
+                  {selectedFood && (
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono shrink-0">
+                      Pronto
+                    </span>
+                  )}
+                </div>
+
+                {/* Elemento acessível para testes e leitores de tela */}
                 <select
                   id="select-food-ingredient"
+                  aria-label="Selecionar Ingrediente"
                   value={selectedFoodId}
                   onChange={e => setSelectedFoodId(e.target.value)}
-                  className="w-full bg-[#131314] border border-[#3c4043] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#a8c7fa]"
+                  className="sr-only"
                 >
-                  {availableFoods.map(food => (
+                  {allFoodsList.map(food => (
                     <option key={food.id} value={food.id}>
                       {food.name} ({food.caloriesPer100g} kcal/100g | {food.proteinPer100g}g P)
                     </option>
@@ -248,7 +299,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               </div>
 
               <div className="sm:col-span-3">
-                <label htmlFor="ingredient-grams-input" className="block text-xs text-neutral-400 mb-1">
+                <label htmlFor="ingredient-grams-input" className="block text-xs text-neutral-400 mb-1 font-mono uppercase">
                   Quantidade (g)
                 </label>
                 <input
@@ -257,7 +308,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                   min="1"
                   value={ingredientGrams}
                   onChange={e => setIngredientGrams(e.target.value === '' ? '' : Math.max(1, Number(e.target.value)))}
-                  className="w-full bg-[#131314] border border-[#3c4043] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#a8c7fa] font-mono"
+                  className="w-full bg-[#1a1b1c] border border-[#3c4043] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#a8c7fa] font-mono h-[42px]"
                 />
               </div>
 
@@ -265,7 +316,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddIngredient}
-                  className="w-full h-[38px] bg-[#a8c7fa] hover:bg-[#8ab4f8] text-neutral-950 font-medium text-xs rounded-xl flex items-center justify-center gap-1 transition-colors"
+                  className="w-full h-[42px] bg-[#a8c7fa] hover:bg-[#8ab4f8] text-neutral-950 font-medium text-xs rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Adicionar
@@ -273,45 +324,120 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               </div>
             </div>
 
-            {/* Lista de Ingredientes Adicionados */}
-            {ingredients.length === 0 ? (
-              <div className="py-6 text-center text-xs text-neutral-500 border border-dashed border-[#2e2f30] rounded-xl">
-                Nenhum ingrediente adicionado ainda. Escolha um alimento acima e clique em Adicionar.
+            {/* Lista Fixa de Ingredientes / Resultados da Busca (Sempre Disponível) */}
+            <div className="p-3 bg-[#131314] border border-[#2e2f30] rounded-xl space-y-2">
+              <div className="flex items-center justify-between pb-1.5 border-b border-[#2e2f30]">
+                <span className="text-xs font-semibold text-neutral-300">
+                  {searchQuery.trim().length > 0
+                    ? `Resultados da busca (${filteredFoods.length} alimentos):`
+                    : `Ingredientes Disponíveis (${filteredFoods.length}):`}
+                </span>
+                <span className="text-[11px] text-neutral-500 font-mono hidden sm:inline">
+                  Clique para selecionar ou adicione diretamente
+                </span>
               </div>
-            ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {ingredients.map(ing => {
-                  const food = foodMap.get(ing.foodId);
-                  const factor = ing.gramsOrUnits / 100;
-                  const cals = food ? Math.round(food.caloriesPer100g * factor) : 0;
-                  const prot = food ? Math.round(food.proteinPer100g * factor * 10) / 10 : 0;
 
-                  return (
-                    <div
-                      key={ing.foodId}
-                      className="flex items-center justify-between p-2.5 bg-[#1e1f20] border border-[#2e2f30] rounded-xl text-xs"
-                    >
-                      <div className="flex-1 min-w-0 pr-3">
-                        <div className="font-medium text-neutral-200 truncate">
-                          {food?.name || ing.foodId}
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {filteredFoods.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-neutral-500">
+                    Nenhum alimento encontrado para "{searchQuery}".
+                  </div>
+                ) : (
+                  filteredFoods.map(food => {
+                    const isSelected = food.id === selectedFoodId;
+                    return (
+                      <div
+                        key={food.id}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+                          isSelected
+                            ? 'bg-[#a8c7fa]/10 border-[#a8c7fa] text-white shadow-sm'
+                            : 'bg-[#1a1b1c] border-[#2e2f30] hover:border-[#3c4043] text-neutral-300'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0 pr-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-white truncate">{food.name}</span>
+                            {food.isRecipe && (
+                              <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/30 px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                                Receita
+                              </span>
+                            )}
+                            {food.isCustom && !food.isRecipe && (
+                              <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded-full font-mono">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                            {food.caloriesPer100g} kcal • {food.proteinPer100g}g P • {food.carbsPer100g}g C • {food.fatPer100g}g G por 100g
+                          </div>
                         </div>
-                        <div className="text-neutral-400 font-mono text-[11px]">
-                          {ing.gramsOrUnits}g • {cals} kcal • {prot}g P
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            aria-label={`Selecionar ${food.name}`}
+                            onClick={() => setSelectedFoodId(food.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                              isSelected
+                                ? 'bg-[#a8c7fa] text-neutral-950 font-semibold'
+                                : 'bg-[#2e2f30] hover:bg-[#3c4043] text-neutral-200'
+                            }`}
+                          >
+                            {isSelected ? '✓ Selecionado' : 'Selecionar'}
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveIngredient(ing.foodId)}
-                        aria-label={`Remover ${food?.name || ing.foodId}`}
-                        className="p-1.5 text-neutral-400 hover:text-red-400 rounded-lg hover:bg-neutral-800 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Lista de Ingredientes Adicionados */}
+            <div>
+              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                Ingredientes Adicionados ({ingredients.length})
+              </h4>
+              {ingredients.length === 0 ? (
+                <div className="py-5 text-center text-xs text-neutral-500 border border-dashed border-[#2e2f30] rounded-xl">
+                  Nenhum ingrediente adicionado ainda. Escolha um alimento acima e clique em Adicionar.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {ingredients.map(ing => {
+                    const food = foodMap.get(ing.foodId);
+                    const factor = ing.gramsOrUnits / 100;
+                    const cals = food ? Math.round(food.caloriesPer100g * factor) : 0;
+                    const prot = food ? Math.round(food.proteinPer100g * factor * 10) / 10 : 0;
+
+                    return (
+                      <div
+                        key={ing.foodId}
+                        className="flex items-center justify-between p-2.5 bg-[#1e1f20] border border-[#2e2f30] rounded-xl text-xs"
+                      >
+                        <div className="flex-1 min-w-0 pr-3">
+                          <div className="font-medium text-neutral-200 truncate">
+                            {food?.name || ing.foodId}
+                          </div>
+                          <div className="text-neutral-400 font-mono text-[11px]">
+                            {ing.gramsOrUnits}g • {cals} kcal • {prot}g P
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(ing.foodId)}
+                          aria-label={`Remover ${food?.name || ing.foodId}`}
+                          className="p-1.5 text-neutral-400 hover:text-red-400 rounded-lg hover:bg-neutral-800 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Resumo Nutricional Analítico */}
@@ -321,96 +447,72 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-[#a8c7fa]" />
                 Resumo Nutricional da Receita
               </h3>
-              <div className="text-[11px] font-mono text-neutral-400">
-                Peso Total: <strong className="text-white">{calculation.totalWeightGrams}g</strong>
-              </div>
-            </div>
-
-            {/* Grid Comparativo: Total vs Porção */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {/* Receita Completa */}
-              <div className="bg-[#1a1b1c] p-3 rounded-xl border border-[#282a2d] space-y-1.5">
-                <div className="text-neutral-400 text-[11px] font-medium border-b border-[#282a2d] pb-1">
-                  Receita Completa ({calculation.totalServings} {servingUnitName}s)
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Calorias:</span>
-                  <span className="font-semibold text-white">{calculation.totalMacros.calories} kcal</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Proteínas:</span>
-                  <span className="font-semibold text-blue-400">{calculation.totalMacros.proteinGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Carboidratos:</span>
-                  <span className="font-semibold text-amber-400">{calculation.totalMacros.carbGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Gorduras:</span>
-                  <span className="font-semibold text-rose-400">{calculation.totalMacros.fatGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Fibras:</span>
-                  <span className="font-semibold text-emerald-400">{calculation.totalMacros.fiberGrams}g</span>
-                </div>
-              </div>
-
-              {/* Por Porção */}
-              <div className="bg-[#1a1b1c] p-3 rounded-xl border border-[#282a2d] space-y-1.5">
-                <div className="text-[#a8c7fa] text-[11px] font-medium border-b border-[#282a2d] pb-1 flex justify-between">
-                  <span>Por {servingUnitName}</span>
-                  <span className="font-mono text-neutral-400 text-[10px]">
-                    {calculation.totalWeightGrams > 0
-                      ? `~${Math.round(calculation.totalWeightGrams / calculation.totalServings)}g`
-                      : ''}
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Calorias:</span>
-                  <span className="font-semibold text-white">{calculation.perServing.calories} kcal</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Proteínas:</span>
-                  <span className="font-semibold text-blue-400">{calculation.perServing.proteinGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Carboidratos:</span>
-                  <span className="font-semibold text-amber-400">{calculation.perServing.carbGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Gorduras:</span>
-                  <span className="font-semibold text-rose-400">{calculation.perServing.fatGrams}g</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Fibras:</span>
-                  <span className="font-semibold text-emerald-400">{calculation.perServing.fiberGrams}g</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Indicador de Densidade Proteica */}
-            <div className="bg-[#1a1b1c] px-3 py-2 rounded-xl border border-[#282a2d] flex items-center justify-between text-xs">
-              <span className="text-neutral-400">Densidade Proteica:</span>
-              <span className="font-mono font-bold text-[#a8c7fa]">
-                {calculation.proteinDensity}g / 100 kcal
+              <span className="text-[11px] font-mono text-[#a8c7fa] bg-[#a8c7fa]/10 px-2 py-0.5 rounded-full">
+                {calculation.totalServings} {servingUnitName || 'porção'}(ões) • Total {calculation.totalWeightGrams}g
               </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="p-2.5 bg-[#1e1f20] rounded-xl border border-[#2e2f30]">
+                <div className="text-[10px] text-neutral-400 uppercase font-mono">Calorias / Porção</div>
+                <div className="text-lg font-bold text-white font-mono mt-0.5">
+                  {calculation.perServing.calories}{' '}
+                  <span className="text-[11px] font-normal text-neutral-400">kcal</span>
+                </div>
+                <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                  Total: {calculation.totalMacros.calories} kcal
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-[#1e1f20] rounded-xl border border-[#2e2f30]">
+                <div className="text-[10px] text-emerald-400 uppercase font-mono">Proteínas / Porção</div>
+                <div className="text-lg font-bold text-emerald-400 font-mono mt-0.5">
+                  {calculation.perServing.proteinGrams}{' '}
+                  <span className="text-[11px] font-normal text-neutral-400">g</span>
+                </div>
+                <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                  Total: {calculation.totalMacros.proteinGrams}g
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-[#1e1f20] rounded-xl border border-[#2e2f30]">
+                <div className="text-[10px] text-amber-400 uppercase font-mono">Carboidratos / Porção</div>
+                <div className="text-lg font-bold text-amber-400 font-mono mt-0.5">
+                  {calculation.perServing.carbGrams}{' '}
+                  <span className="text-[11px] font-normal text-neutral-400">g</span>
+                </div>
+                <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                  Total: {calculation.totalMacros.carbGrams}g
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-[#1e1f20] rounded-xl border border-[#2e2f30]">
+                <div className="text-[10px] text-purple-400 uppercase font-mono">Gorduras / Porção</div>
+                <div className="text-lg font-bold text-purple-400 font-mono mt-0.5">
+                  {calculation.perServing.fatGrams}{' '}
+                  <span className="text-[11px] font-normal text-neutral-400">g</span>
+                </div>
+                <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                  Total: {calculation.totalMacros.fatGrams}g
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#2e2f30]">
+          {/* Rodapé com Ações */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2e2f30]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 text-xs font-medium transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-[#3c4043] text-neutral-300 hover:text-white hover:bg-neutral-800 text-sm font-medium transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#a8c7fa] hover:bg-[#8ab4f8] text-neutral-950 text-xs font-semibold tracking-wide transition-colors shadow-lg shadow-[#a8c7fa]/10"
+              className="px-5 py-2.5 rounded-xl bg-[#a8c7fa] hover:bg-[#8ab4f8] text-neutral-950 text-sm font-semibold transition-colors shadow-lg"
             >
-              Salvar Receita
+              {editingRecipe ? 'Atualizar Receita' : 'Salvar Receita'}
             </button>
           </div>
         </form>
