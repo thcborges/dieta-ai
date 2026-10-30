@@ -41,6 +41,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -69,6 +70,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -92,6 +94,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -115,6 +118,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -146,6 +150,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -166,6 +171,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -303,6 +309,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 

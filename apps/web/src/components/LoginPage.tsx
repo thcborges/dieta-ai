@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl?: string;
+  isAdmin?: boolean;
 }
 
 interface LoginPageProps {
@@ -66,6 +67,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           id: data.blindIndex || `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
           email: data.user?.email || trimmedEmail,
           name: data.user?.name || name.trim() || 'Usuário MacroMetrics',
+          isAdmin: Boolean(data.user?.isAdmin),
         };
         onLogin(authenticatedUser);
       } else {

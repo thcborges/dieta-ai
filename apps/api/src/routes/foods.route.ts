@@ -2,7 +2,10 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { foodCacheService } from '../services/food-cache.service.js';
 
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-secret-token-key-us-central1';
+function isAuthorizedAdmin(token: unknown): boolean {
+  const expectedToken = process.env.ADMIN_TOKEN;
+  return Boolean(expectedToken && token === expectedToken);
+}
 
 const customFoodSchema = z.object({
   name: z.string().min(1),
@@ -21,7 +24,7 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { barcode: string } }>('/api/v1/foods/barcode/:barcode', async (req, reply) => {
     const { barcode } = req.params;
     const userId = req.headers['x-user-id'] as string | undefined;
-    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+    const isAdmin = isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const food = await foodCacheService.getByBarcode(barcode, userId, isAdmin);
 
@@ -42,7 +45,7 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
   // Listagem de alimentos no banco de dados / cache (respeita isolamento de alimentos não-validados)
   app.get('/api/v1/foods', async (req) => {
     const userId = req.headers['x-user-id'] as string | undefined;
-    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+    const isAdmin = isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const foods = foodCacheService.getAllFoods(userId, isAdmin);
     return {
@@ -56,7 +59,7 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     const query = req.query.q || '';
     const includeRemote = req.query.include_remote === 'true';
     const userId = req.headers['x-user-id'] as string | undefined;
-    const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
+    const isAdmin = isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const result = await foodCacheService.searchFoods(query, userId, isAdmin, includeRemote);
     return {
@@ -88,7 +91,7 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
   // Validação de alimento por administrador do sistema (torna disponível globalmente)
   app.patch<{ Params: { id: string } }>('/api/v1/foods/:id/validate', async (req, reply) => {
     const adminToken = req.headers['x-admin-token'];
-    if (adminToken !== ADMIN_TOKEN) {
+    if (!isAuthorizedAdmin(adminToken)) {
       return reply.status(403).send({
         error: 'UNAUTHORIZED_ADMIN',
         message: 'Apenas administradores podem validar informações nutricionais de alimentos.',
