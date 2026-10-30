@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter @dieta-ai/web dev",
     "dev:api": "pnpm --filter @dieta-ai/api dev",
+    "dev:healer": "pnpm --filter @dieta-ai/error-healer start",
     "preview": "pnpm --filter @dieta-ai/web preview",
     "test": "pnpm --workspace-concurrency=1 -r test",
     "test:coverage": "pnpm --workspace-concurrency=1 -r test:coverage",

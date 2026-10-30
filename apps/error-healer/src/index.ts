@@ -7,6 +7,18 @@ export { AgyRunnerService } from './services/agy-runner.service.js';
 export { PubSubConsumerService } from './services/pubsub-consumer.service.js';
 
 export function bootstrap() {
+  if (process.env.NODE_ENV !== 'test' && typeof process.loadEnvFile === 'function') {
+    try {
+      process.loadEnvFile();
+    } catch {
+      try {
+        process.loadEnvFile('apps/error-healer/.env');
+      } catch {
+        // Arquivo .env opcional
+      }
+    }
+  }
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   const subscriptionName = process.env.PUBSUB_SUBSCRIPTION || 'dieta-ai-errors-dev-sub';
