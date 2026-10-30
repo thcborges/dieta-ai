@@ -133,7 +133,12 @@ export default function App() {
         const parsed = JSON.parse(savedFoods) as FoodItem[];
         const map = new Map<string, FoodItem>();
         for (const f of PREPOPULATED_FOODS) map.set(f.id, f);
-        for (const f of parsed) map.set(f.id, f);
+        for (const f of parsed) {
+          // Preserva itens customizados do usuário e novos itens consultados
+          if (f.isCustom || !map.has(f.id)) {
+            map.set(f.id, f);
+          }
+        }
         return Array.from(map.values());
       }
       return PREPOPULATED_FOODS;

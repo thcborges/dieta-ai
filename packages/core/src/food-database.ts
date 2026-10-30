@@ -191,6 +191,204 @@ export const PREPOPULATED_FOODS: FoodItem[] = [
     fiberPer100g: 0,
   },
   {
+    id: 'whey_growth_isolado',
+    name: 'Whey Protein Isolado 90% (Growth)',
+    servingDescription: '1 scoop (30g)',
+    servingSizeGrams: 30,
+    caloriesPer100g: 370,
+    proteinPer100g: 90.0,
+    carbsPer100g: 0.0,
+    fatPer100g: 0.5,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'whey_dux_concentrado',
+    name: 'Whey Protein Concentrado (DUX Nutrition)',
+    servingDescription: '1 scoop (30g)',
+    servingSizeGrams: 30,
+    caloriesPer100g: 397,
+    proteinPer100g: 73.3,
+    carbsPer100g: 13.3,
+    fatPer100g: 6.7,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'whey_dux_isolado',
+    name: 'Whey Protein Isolado (DUX Nutrition)',
+    servingDescription: '1 scoop (30g)',
+    servingSizeGrams: 30,
+    caloriesPer100g: 373,
+    proteinPer100g: 80.0,
+    carbsPer100g: 6.7,
+    fatPer100g: 3.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'whey_integralmedica_100',
+    name: '100% Pure Whey (Integralmédica)',
+    servingDescription: '1 scoop (30g)',
+    servingSizeGrams: 30,
+    caloriesPer100g: 400,
+    proteinPer100g: 70.0,
+    carbsPer100g: 16.7,
+    fatPer100g: 6.7,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'whey_probiotica_100',
+    name: '100% Pure Whey (Probiótica)',
+    servingDescription: '1 scoop (30g)',
+    servingSizeGrams: 30,
+    caloriesPer100g: 400,
+    proteinPer100g: 76.7,
+    carbsPer100g: 10.0,
+    fatPer100g: 6.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'whey_optimum_gold',
+    name: '100% Whey Gold Standard (Optimum Nutrition)',
+    servingDescription: '1 scoop (30.4g)',
+    servingSizeGrams: 30.4,
+    caloriesPer100g: 395,
+    proteinPer100g: 78.9,
+    carbsPer100g: 9.9,
+    fatPer100g: 4.9,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'patinho_moido',
+    name: 'Carne Bovina Patinho Moído Grelhado',
+    servingDescription: '1 porção (100g)',
+    servingSizeGrams: 100,
+    caloriesPer100g: 219,
+    proteinPer100g: 35.9,
+    carbsPer100g: 0.0,
+    fatPer100g: 7.3,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'tilapia_grelhada',
+    name: 'Filé de Tilápia Grelhado',
+    servingDescription: '1 filé (100g)',
+    servingSizeGrams: 100,
+    caloriesPer100g: 128,
+    proteinPer100g: 26.0,
+    carbsPer100g: 0.0,
+    fatPer100g: 2.7,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'atum_solido_agua',
+    name: 'Atum Sólido em Água (Lata)',
+    servingDescription: '1 lata drenada (120g)',
+    servingSizeGrams: 120,
+    caloriesPer100g: 116,
+    proteinPer100g: 26.0,
+    carbsPer100g: 0.0,
+    fatPer100g: 1.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'iogurte_desnatado',
+    name: 'Iogurte Natural Desnatado',
+    servingDescription: '1 pote (170g)',
+    servingSizeGrams: 170,
+    caloriesPer100g: 43,
+    proteinPer100g: 4.3,
+    carbsPer100g: 6.5,
+    fatPer100g: 0.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'leite_desnatado',
+    name: 'Leite Desnatado Pasteurizado',
+    servingDescription: '1 copo (200ml)',
+    servingSizeGrams: 200,
+    caloriesPer100g: 35,
+    proteinPer100g: 3.2,
+    carbsPer100g: 5.0,
+    fatPer100g: 0.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'queijo_cottage',
+    name: 'Queijo Cottage Fresco Light',
+    servingDescription: '2 colheres de sopa (50g)',
+    servingSizeGrams: 50,
+    caloriesPer100g: 72,
+    proteinPer100g: 12.0,
+    carbsPer100g: 3.0,
+    fatPer100g: 1.5,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'queijo_minas_light',
+    name: 'Queijo Minas Frescal Light',
+    servingDescription: '1 fatia média (50g)',
+    servingSizeGrams: 50,
+    caloriesPer100g: 160,
+    proteinPer100g: 16.0,
+    carbsPer100g: 2.0,
+    fatPer100g: 10.0,
+    fiberPer100g: 0,
+  },
+  {
+    id: 'pasta_amendoim_integral',
+    name: 'Pasta de Amendoim Integral',
+    servingDescription: '1 colher de sopa (20g)',
+    servingSizeGrams: 20,
+    caloriesPer100g: 588,
+    proteinPer100g: 28.0,
+    carbsPer100g: 18.0,
+    fatPer100g: 50.0,
+    fiberPer100g: 8.0,
+  },
+  {
+    id: 'banana_prata',
+    name: 'Banana Prata',
+    servingDescription: '1 unidade média (100g)',
+    servingSizeGrams: 100,
+    caloriesPer100g: 89,
+    proteinPer100g: 1.1,
+    carbsPer100g: 22.8,
+    fatPer100g: 0.3,
+    fiberPer100g: 2.6,
+  },
+  {
+    id: 'maca_fuji',
+    name: 'Maçã Fuji com Casca',
+    servingDescription: '1 unidade média (130g)',
+    servingSizeGrams: 130,
+    caloriesPer100g: 52,
+    proteinPer100g: 0.3,
+    carbsPer100g: 13.8,
+    fatPer100g: 0.2,
+    fiberPer100g: 2.4,
+  },
+  {
+    id: 'barra_proteina_growth',
+    name: 'Barra de Proteína Protein Bar (Growth)',
+    servingDescription: '1 barra (40g)',
+    servingSizeGrams: 40,
+    caloriesPer100g: 388,
+    proteinPer100g: 32.5,
+    carbsPer100g: 27.5,
+    fatPer100g: 16.0,
+    fiberPer100g: 10.0,
+  },
+  {
+    id: 'creatina_monohidratada',
+    name: 'Creatina Monohidratada 100% Pura (Creapure)',
+    servingDescription: '1 dosador (3g)',
+    servingSizeGrams: 3,
+    caloriesPer100g: 0,
+    proteinPer100g: 0.0,
+    carbsPer100g: 0.0,
+    fatPer100g: 0.0,
+    fiberPer100g: 0,
+  },
+  {
     id: 'arroz_branco',
     name: 'Arroz Branco Cozido',
     servingDescription: '1 escumadeira (100g)',
@@ -490,7 +688,22 @@ export function filterVisibleFoods(
 }
 
 /**
- * Busca alimentos por nome (case-insensitive) ou código de barras na lista fornecida,
+ * Normaliza texto para busca: converte para minúsculas, remove espaços extras,
+ * colapsa caracteres repetidos em excesso (ex: "blackskulll" -> "blackskull"),
+ * substitui separadores comuns por espaços e remove marcas diacríticas / acentos (ex: "Pão" -> "pao").
+ */
+export function normalizeSearchText(text: string): string {
+  return (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/(.)\1{2,}/g, '$1$1')
+    .replace(/[_\-./()]/g, ' ')
+    .trim();
+}
+
+/**
+ * Busca alimentos por nome (insensível a maiúsculas, acentuação e espaçamento), código de barras ou múltiplos tokens
  * respeitando as regras de visibilidade e moderação de alimentos customizados.
  */
 export function searchFoodItems(
@@ -500,14 +713,47 @@ export function searchFoodItems(
   isAdmin: boolean = false
 ): FoodItem[] {
   const visibleItems = filterVisibleFoods(items, userId, isAdmin);
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return visibleItems;
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return visibleItems;
+
+  const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  const unspacedQuery = normalizedQuery.replace(/\s+/g, '');
+
   return visibleItems.filter(item => {
-    return (
-      item.name.toLowerCase().includes(normalized) ||
-      item.id.toLowerCase().includes(normalized) ||
-      ((item as { barcode?: string }).barcode?.toLowerCase().includes(normalized) ?? false)
-    );
+    const normalizedName = normalizeSearchText(item.name);
+    const normalizedId = normalizeSearchText(item.id);
+    const normalizedBarcode = (item as { barcode?: string }).barcode
+      ? normalizeSearchText((item as { barcode?: string }).barcode!)
+      : '';
+
+    const unspacedName = normalizedName.replace(/\s+/g, '');
+    const unspacedId = normalizedId.replace(/\s+/g, '');
+
+    // 1. Correspondência direta por substring contígua
+    if (
+      normalizedName.includes(normalizedQuery) ||
+      normalizedId.includes(normalizedQuery) ||
+      (normalizedBarcode && normalizedBarcode.includes(normalizedQuery))
+    ) {
+      return true;
+    }
+
+    // 2. Correspondência sem espaços (ex: "blackskull" ou "blackskulll" -> "black skull")
+    if (unspacedName.includes(unspacedQuery) || unspacedId.includes(unspacedQuery)) {
+      return true;
+    }
+
+    // 3. Correspondência multi-token: todos os termos digitados devem existir no nome, ID ou código de barras
+    return queryTokens.every(token => {
+      const unspacedToken = token.replace(/\s+/g, '');
+      return (
+        normalizedName.includes(token) ||
+        normalizedId.includes(token) ||
+        normalizedBarcode.includes(token) ||
+        unspacedName.includes(unspacedToken) ||
+        unspacedId.includes(unspacedToken)
+      );
+    });
   });
 }
 
