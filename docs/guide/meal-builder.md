@@ -72,8 +72,65 @@ Para flexibilidade máxima sem lentidão, o cadastro e seleção de alimentos se
 
 ## 🔄 Cópia Ágil de Refeições & Módulo de Receitas
 
-- **Cópia de Refeições:** Duplicação instantânea de refeições de dias anteriores ou entre janelas (ex: replicar o almoço de ontem no almoço de hoje com um clique).
-- **Módulo de Receitas Compostas:** Criação de preparações culinárias (como bolos de whey, cappuccino proteico ou tortas fit), armazenando o rendimento total e permitindo o lançamento no diário em frações ou porções fracionadas.
+### Cópia de Refeições
+Duplicação instantânea de refeições de dias anteriores ou entre janelas (ex: replicar o almoço de ontem no almoço de hoje com um clique) através do modal `CopyMealModal`, permitindo ajustar porções ou remover ingredientes antes de confirmar a cópia.
+
+---
+
+## 👨‍🍳 Módulo de Receitas Compostas & Engenharia Reversa
+
+O **Módulo de Receitas** permite planejar, criar e editar preparações compostas por múltiplos ingredientes com rendimento customizado (ex: *Bolo de Whey Cappuccino*, *Panqueca Anabólica*, *Torta Proteica de Frango e Claras*).
+
+### 1. Motor de Cálculo e Formulas Analíticas
+
+Dada uma receita $R$ composta por um conjunto de ingredientes $\{I_1, I_2, \dots, I_n\}$ com rendimento $S$ porções e pesos em gramas $g_i$:
+
+$$\text{Kcal}_{total} = \sum_{i=1}^n \left( \frac{\text{Kcal}_{100g, i}}{100} \times g_i \right)$$
+
+$$\text{Proteína}_{total} = \sum_{i=1}^n \left( \frac{\text{P}_{100g, i}}{100} \times g_i \right)$$
+
+$$\text{Carboidratos}_{total} = \sum_{i=1}^n \left( \frac{\text{C}_{100g, i}}{100} \times g_i \right)$$
+
+$$\text{Gordura}_{total} = \sum_{i=1}^n \left( \frac{\text{G}_{100g, i}}{100} \times g_i \right)$$
+
+$$\text{Peso Total} = \sum_{i=1}^n g_i$$
+
+A densidade proteica da receita é calculada diretamente sobre os valores brutos para evitar distorções de arredondamento:
+
+$$\text{Densidade Proteica (g/100 kcal)} = \frac{\text{Proteína}_{total}}{\text{Kcal}_{total}} \times 100$$
+
+Os macronutrientes por porção são obtidos dividindo os totais pelo número de porções:
+
+$$\text{Macro}_{porção} = \frac{\text{Macro}_{total}}{S}$$
+
+### 2. Modais e Experiência do Usuário (M3 Dark Theme)
+
+1. **Gerenciador de Receitas (`RecipeListModal`):**
+   - Acessível pelo botão **Receitas** na barra Cronometer UX do Construtor de Refeições.
+   - Lista todas as receitas cadastradas pelo usuário exibindo o rendimento (ex: `4 fatias`), peso total estimado, densidade proteica e macros por porção.
+   - Ações diretas de **Lançar no Diário**, **Editar** e **Excluir**.
+2. **Criador & Editor de Receitas (`RecipeBuilderModal`):**
+   - Permite informar nome, rendimento em porções e nome customizado da unidade (ex: `fatia`, `porção`, `pote`, `unidade`).
+   - Seletor dinâmico de ingredientes com base nos alimentos do banco pré-populado ou alimentos customizados cadastrados pelo usuário.
+   - Resumo nutricional analítico reativo atualizado a cada ingrediente adicionado ou removido.
+3. **Lançador de Porções e Frações no Diário (`LogRecipeModal`):**
+   - **Modo Porção:** Seleção de porções inteiras ou fracionadas (ex: 0.5, 1, 1.5, 2 fatias).
+   - **Modo Fração:** Seleção ágil de frações da receita inteira (1/4, 1/3, 1/2 ou 1/1).
+   - **Modo Gramas:** Entrada direta do peso em gramas pesado na balança pelo usuário.
+   - Recálculo matemático em tempo real e adição atômica na janela de refeição escolhida.
+
+### 3. Integração com o Banco de Alimentos & API REST
+
+- **Conversão Automática em Alimento (`FoodItem`):**
+  - Toda receita criada gera um alimento pesquisável com `isRecipe: true`, permitindo busca por nome ou seleção direta no Construtor de Refeições.
+- **Rotas da API (`apps/api`):**
+  - `GET /api/v1/recipes`: Lista receitas salvas do usuário autenticado (`x-user-id`).
+  - `GET /api/v1/recipes/:id`: Detalhes de uma receita específica.
+  - `POST /api/v1/recipes`: Criação de nova receita composta e sincronização com o cache de alimentos.
+  - `PUT /api/v1/recipes/:id`: Atualização de receita existente e recálculo dos macros.
+  - `DELETE /api/v1/recipes/:id`: Remoção da receita e do cache associado.
+- **Resiliência Offline-First:**
+  - As receitas são persistidas no `localStorage` sob a chave isolada `macrometrics_recipes_${userId}` e sincronizadas em segundo plano com a API do Cloud Run conectada ao Firestore.
 
 ---
 

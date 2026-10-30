@@ -37,8 +37,9 @@ export class FoodCacheService {
   async searchFoods(
     query: string,
     userId?: string,
-    isAdmin: boolean = false
-  ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' }> {
+    isAdmin: boolean = false,
+    includeRemote: boolean = false
+  ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' | 'combined' }> {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
       return { foods: this.getAllFoods(userId, isAdmin), source: 'cache' };
@@ -62,11 +63,11 @@ export class FoodCacheService {
       isAdmin
     ) as CachedFood[];
 
-    if (cachedResults.length > 0) {
+    if (!includeRemote && cachedResults.length > 0) {
       return { foods: cachedResults, source: 'cache' };
     }
 
-    // 2. Se não encontrar no nosso banco de dados, consulta a API do Open Food Facts
+    // 2. Se não encontrar no nosso banco de dados OU se includeRemote=true, consulta a API do Open Food Facts
     try {
       const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
       const response = await fetch(url, {
@@ -117,12 +118,27 @@ export class FoodCacheService {
           }
 
           if (offResults.length > 0) {
+            if (cachedResults.length > 0) {
+              const seenIds = new Set(cachedResults.map(f => f.id));
+              const merged = [...cachedResults];
+              for (const off of offResults) {
+                if (!seenIds.has(off.id) && (!off.barcode || !merged.some(m => m.barcode === off.barcode))) {
+                  seenIds.add(off.id);
+                  merged.push(off);
+                }
+              }
+              return { foods: merged, source: 'combined' };
+            }
             return { foods: offResults, source: 'open_food_facts' };
           }
         }
       }
     } catch {
       // Ignora erro de rede
+    }
+
+    if (cachedResults.length > 0) {
+      return { foods: cachedResults, source: 'cache' };
     }
 
     return { foods: [], source: 'cache' };
@@ -232,6 +248,20 @@ export class FoodCacheService {
     this.inMemoryCache.set(id, cachedFood);
 
     return cachedFood;
+  }
+
+  saveFoodItem(food: FoodItem): CachedFood {
+    const cached: CachedFood = {
+      ...food,
+      source: 'manual',
+      updatedAt: new Date().toISOString(),
+    };
+    this.inMemoryCache.set(food.id, cached);
+    return cached;
+  }
+
+  deleteFoodItem(foodId: string): boolean {
+    return this.inMemoryCache.delete(foodId);
   }
 
   validateFood(foodId: string): CachedFood | null {

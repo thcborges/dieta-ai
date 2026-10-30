@@ -50,4 +50,41 @@ test.describe('Cadastro e Consulta de Alimentos com Cache e Open Food Facts (UX 
     const foodSelect = page.getByLabel('Alimento Selecionado');
     await expect(foodSelect).toHaveValue('feijao_preto');
   });
+
+  test('deve retornar lista de wheys ao consultar "whey" e permitir lançar Whey Black Skull', async ({ page }) => {
+    const searchInput = page.getByPlaceholder(/Consultar alimento ou código de barras/i);
+    await searchInput.fill('whey');
+    await page.getByRole('button', { name: /Consultar/i }).click();
+
+    // Deve exibir o container com os resultados da busca
+    const resultsContainer = page.getByTestId('search-results-list');
+    await expect(resultsContainer).toBeVisible();
+    await expect(resultsContainer.getByText(/Whey Protein Concentrado 80% \(Growth\)/i)).toBeVisible();
+    await expect(resultsContainer.getByText(/Whey Protein 100% HD \(Black Skull\)/i)).toBeVisible();
+
+    // Clica para selecionar o Whey Black Skull
+    await page.getByRole('button', { name: /Selecionar Whey Protein 100% HD \(Black Skull\)/i }).click();
+
+    const foodSelect = page.getByLabel('Alimento Selecionado');
+    await expect(foodSelect).toHaveValue('whey_black_skull');
+
+    // Lança no diário
+    await page.getByRole('button', { name: /^Lançar$/i }).click();
+    await expect(page.locator('div.font-medium').filter({ hasText: 'Whey Protein 100% HD (Black Skull)' })).toBeVisible();
+  });
+
+  test('deve retornar lista de opções ao consultar "frango" e permitir lançar sobrecoxa assada diretamente', async ({ page }) => {
+    const searchInput = page.getByPlaceholder(/Consultar alimento ou código de barras/i);
+    await searchInput.fill('frango');
+    await page.getByRole('button', { name: /Consultar/i }).click();
+
+    const resultsContainer = page.getByTestId('search-results-list');
+    await expect(resultsContainer).toBeVisible();
+    await expect(resultsContainer.getByText(/Peito de Frango Grelhado/i)).toBeVisible();
+    await expect(resultsContainer.getByText(/Sobrecoxa de Frango Assada sem Pele/i)).toBeVisible();
+
+    // Lança Sobrecoxa diretamente pelo botão no card de resultado
+    await page.getByRole('button', { name: /Lançar Sobrecoxa de Frango Assada sem Pele/i }).click();
+    await expect(page.locator('div.font-medium').filter({ hasText: 'Sobrecoxa de Frango Assada sem Pele' })).toBeVisible();
+  });
 });

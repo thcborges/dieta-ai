@@ -467,5 +467,73 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     expect(screen.getByText('(100g)')).toBeInTheDocument();
     expect(screen.getAllByText(/165 kcal • 31g P/i).length).toBeGreaterThanOrEqual(1);
   });
+
+  it('deve permitir abrir o modal de receitas, criar uma nova receita e lançar porção no diário', async () => {
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges_recipes',
+        email: 'thcborges@example.com',
+        name: 'Líder Técnico',
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText(/Orçamento Diário de Macronutrientes/i)).toBeInTheDocument();
+
+    // Clica no botão "Receitas (0)"
+    const recipesBtn = screen.getByRole('button', { name: /Minhas Receitas/i });
+    fireEvent.click(recipesBtn);
+
+    // Modal de lista de receitas deve abrir com estado vazio
+    expect(screen.getByText(/Nenhuma receita cadastrada/i)).toBeInTheDocument();
+
+    // Clica em "Criar Primeira Receita"
+    const createFirstBtn = screen.getByRole('button', { name: /Criar Primeira Receita/i });
+    fireEvent.click(createFirstBtn);
+
+    // Modal de criação de receita deve estar aberto
+    expect(screen.getByText(/Criar Nova Receita/i)).toBeInTheDocument();
+
+    // Preenche nome e porções
+    const nameInput = screen.getByLabelText(/Nome da Receita \*/i);
+    fireEvent.change(nameInput, { target: { value: 'Bolo Proteico de Frango' } });
+
+    const servingsInput = screen.getByLabelText(/Rendimento \(Porções\) \*/i);
+    fireEvent.change(servingsInput, { target: { value: '4' } });
+
+    // Adiciona ingrediente (sassami 200g)
+    const foodSelect = screen.getByLabelText(/Selecionar Ingrediente/i);
+    fireEvent.change(foodSelect, { target: { value: 'sassami' } });
+
+    const gramsInput = screen.getByLabelText(/Quantidade \(g\)/i);
+    fireEvent.change(gramsInput, { target: { value: '200' } });
+
+    const addIngBtn = screen.getByRole('button', { name: /^Adicionar$/i });
+    fireEvent.click(addIngBtn);
+
+    // Salva a receita
+    const saveRecipeBtn = screen.getByRole('button', { name: /Salvar Receita/i });
+    fireEvent.click(saveRecipeBtn);
+
+    // A receita deve constar no modal de receitas com rendimento de 4 porções
+    expect(await screen.findByText('Bolo Proteico de Frango')).toBeInTheDocument();
+    expect(screen.getByText(/4 porções/i)).toBeInTheDocument();
+
+    // Clica no botão Lançar da receita
+    const logRecipeBtn = screen.getByRole('button', { name: /Lançar Bolo Proteico de Frango no Diário/i });
+    fireEvent.click(logRecipeBtn);
+
+    // Modal de Lançamento no diário abre
+    expect(screen.getByText(/Lançar Receita no Diário/i)).toBeInTheDocument();
+
+    // Clica em Adicionar ao Diário
+    const confirmLogBtn = screen.getByRole('button', { name: /Adicionar ao Diário/i });
+    fireEvent.click(confirmLogBtn);
+
+    // O item lançado deve aparecer no diário
+    expect(await screen.findByText(/Bolo Proteico de Frango \(1 porção\)/i)).toBeInTheDocument();
+  });
 });
 
