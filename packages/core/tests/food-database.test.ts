@@ -123,17 +123,83 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     expect(notFound.length).toBe(0);
   });
 
-  it('deve retornar lista de múltiplos wheys ao buscar "whey" (incluindo Growth e Black Skull)', () => {
+  it('deve encontrar alimentos ignorando acentuação (ex: pao -> Pão, feijao -> Feijão)', () => {
+    const customWithAccent = {
+      id: 'custom_snack_xyz',
+      name: 'Pão de Queijo Artesanal de Minas',
+      servingDescription: '1 unidade (50g)',
+      servingSizeGrams: 50,
+      caloriesPer100g: 270,
+      proteinPer100g: 8,
+      carbsPer100g: 30,
+      fatPer100g: 14,
+      fiberPer100g: 1,
+      isCustom: true,
+      isValidated: true,
+    };
+    const paoCustomResults = searchFoodItems([customWithAccent], 'pao');
+    expect(paoCustomResults.length).toBe(1);
+
+    const paoResults = searchFoodItems(PREPOPULATED_FOODS, 'pao');
+    expect(paoResults.length).toBeGreaterThanOrEqual(1);
+    expect(paoResults.some(f => f.name.includes('Pão'))).toBe(true);
+
+    const feijaoResults = searchFoodItems(PREPOPULATED_FOODS, 'feijao');
+    expect(feijaoResults.length).toBeGreaterThanOrEqual(1);
+    expect(feijaoResults.some(f => f.name.includes('Feijão'))).toBe(true);
+
+    const cafeResults = searchFoodItems(PREPOPULATED_FOODS, 'cafe');
+    expect(cafeResults.length).toBeGreaterThanOrEqual(1);
+    expect(cafeResults.some(f => f.name.includes('Café'))).toBe(true);
+  });
+
+  it('deve encontrar alimentos por múltiplos tokens fora de ordem (ex: "whey growth", "frango assado")', () => {
+    const growthResults = searchFoodItems(PREPOPULATED_FOODS, 'whey growth');
+    expect(growthResults.length).toBeGreaterThanOrEqual(1);
+    expect(growthResults[0]?.name).toContain('Growth');
+
+    const blackSkullResults = searchFoodItems(PREPOPULATED_FOODS, 'skull whey');
+    expect(blackSkullResults.length).toBeGreaterThanOrEqual(1);
+    expect(blackSkullResults[0]?.name).toContain('Black Skull');
+
+    const frangoResults = searchFoodItems(PREPOPULATED_FOODS, 'assada frango');
+    expect(frangoResults.length).toBeGreaterThanOrEqual(1);
+    expect(frangoResults.some(f => f.name.includes('Sobrecoxa'))).toBe(true);
+  });
+
+  it('deve retornar lista de múltiplos wheys ao buscar "whey" (incluindo Growth, Dux, Max Titanium e Black Skull)', () => {
     const wheyResults = searchFoodItems(PREPOPULATED_FOODS, 'whey');
-    expect(wheyResults.length).toBeGreaterThanOrEqual(2);
+    expect(wheyResults.length).toBeGreaterThanOrEqual(6);
     
     const ids = wheyResults.map(f => f.id);
     expect(ids).toContain('whey_growth_30g');
+    expect(ids).toContain('whey_growth_isolado');
     expect(ids).toContain('whey_black_skull');
+    expect(ids).toContain('whey_dux_concentrado');
+    expect(ids).toContain('whey_dux_isolado');
+    expect(ids).toContain('whey_max_titanium');
+  });
 
-    const blackSkull = wheyResults.find(f => f.id === 'whey_black_skull');
-    expect(blackSkull?.name).toContain('Black Skull');
-    expect(blackSkull?.proteinPer100g).toBeGreaterThan(60);
+  it('deve permitir escolher o whey específico por termos de busca como "whey growth", "whey blackskulll" ou "whey dux"', () => {
+    // Busca "whey growth"
+    const growthResults = searchFoodItems(PREPOPULATED_FOODS, 'whey growth');
+    expect(growthResults.length).toBeGreaterThanOrEqual(2);
+    expect(growthResults.every(f => f.name.includes('Growth'))).toBe(true);
+
+    // Busca "whey blackskulll" (com erro de digitação de repetição e sem espaço)
+    const blackSkullTypoResults = searchFoodItems(PREPOPULATED_FOODS, 'whey blackskulll');
+    expect(blackSkullTypoResults.length).toBeGreaterThanOrEqual(1);
+    expect(blackSkullTypoResults[0]?.name).toContain('Black Skull');
+
+    // Busca "whey blackskull" (sem espaço)
+    const blackSkullNoSpaceResults = searchFoodItems(PREPOPULATED_FOODS, 'whey blackskull');
+    expect(blackSkullNoSpaceResults.length).toBeGreaterThanOrEqual(1);
+    expect(blackSkullNoSpaceResults[0]?.name).toContain('Black Skull');
+
+    // Busca "whey dux"
+    const duxResults = searchFoodItems(PREPOPULATED_FOODS, 'whey dux');
+    expect(duxResults.length).toBeGreaterThanOrEqual(2);
+    expect(duxResults.every(f => f.name.includes('DUX'))).toBe(true);
   });
 
   it('deve retornar lista de múltiplos cortes ao buscar "frango" (peito grelhado, sobrecoxa assada, sassami)', () => {

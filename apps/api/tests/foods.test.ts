@@ -198,7 +198,7 @@ describe('Foods & Open Food Facts Cache API', () => {
     expect(body2.foods[0].name).toBe('Granola Artesanal Zero Açúcar');
   });
 
-  it('deve retornar lista com múltiplos itens ao buscar "whey" (incluindo Growth e Black Skull)', async () => {
+  it('deve retornar lista com múltiplos itens ao buscar "whey" (incluindo Growth, Dux e Black Skull)', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/foods/search?q=whey',
@@ -206,10 +206,50 @@ describe('Foods & Open Food Facts Cache API', () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.foods.length).toBeGreaterThanOrEqual(2);
+    expect(body.foods.length).toBeGreaterThanOrEqual(4);
     const ids = body.foods.map((f: { id: string }) => f.id);
     expect(ids).toContain('whey_growth_30g');
+    expect(ids).toContain('whey_dux_concentrado');
     expect(ids).toContain('whey_black_skull');
+  });
+
+  it('deve buscar por múltiplos tokens fora de ordem via API (ex: "whey growth", "skull whey")', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=whey+growth',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.foods.length).toBeGreaterThanOrEqual(1);
+    expect(body.foods[0].name).toContain('Growth');
+
+    const responseReverse = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=skull+whey',
+    });
+    expect(responseReverse.statusCode).toBe(200);
+    const bodyReverse = responseReverse.json();
+    expect(bodyReverse.foods.length).toBeGreaterThanOrEqual(1);
+    expect(bodyReverse.foods[0].name).toContain('Black Skull');
+  });
+
+  it('deve buscar ignorando acentuação via API (ex: pao -> Pão, feijao -> Feijão)', async () => {
+    const responsePao = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=pao',
+    });
+    expect(responsePao.statusCode).toBe(200);
+    const bodyPao = responsePao.json();
+    expect(bodyPao.foods.some((f: { name: string }) => f.name.includes('Pão'))).toBe(true);
+
+    const responseFeijao = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=feijao',
+    });
+    expect(responseFeijao.statusCode).toBe(200);
+    const bodyFeijao = responseFeijao.json();
+    expect(bodyFeijao.foods.some((f: { name: string }) => f.name.includes('Feijão'))).toBe(true);
   });
 
   it('deve retornar lista com múltiplos cortes ao buscar "frango" (peito grelhado, sobrecoxa assada, sassami)', async () => {
