@@ -125,8 +125,42 @@ describe('RecipeBuilderModal (Criação e Edição de Receitas M3)', () => {
     const removeBtn = screen.getByRole('button', { name: /Remover Feijão Preto Cozido/i });
     fireEvent.click(removeBtn);
 
-    // Apenas a opção do select deve restar
-    expect(screen.getAllByText(/Feijão Preto Cozido/i).length).toBe(1);
+    // O botão de remover o ingrediente não deve mais existir na lista de adicionados
+    expect(screen.queryByRole('button', { name: /Remover Feijão Preto Cozido/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Nenhum ingrediente adicionado ainda/i)).toBeInTheDocument();
+  });
+
+  it('deve manter a lista de ingredientes fixa, filtrar por busca e permitir selecionar card para adicionar', () => {
+    render(
+      <RecipeBuilderModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSaveRecipe={vi.fn()}
+        availableFoods={sampleFoods}
+      />
+    );
+
+    // Lista fixa visível
+    expect(screen.getByText(/Ingredientes Disponíveis/i)).toBeInTheDocument();
+
+    // Filtra por termo de busca
+    const searchInput = screen.getByPlaceholderText(/Buscar ingrediente por nome/i);
+    fireEvent.change(searchInput, { target: { value: 'whey growth' } });
+
+    // Resultados filtrados
+    expect(screen.getByText(/Resultados da busca/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Whey Protein Concentrado 80% \(Growth\)/i).length).toBeGreaterThanOrEqual(1);
+
+    // Clica em Selecionar
+    const selectBtn = screen.getByRole('button', { name: /Selecionar Whey Protein Concentrado 80% \(Growth\)/i });
+    fireEvent.click(selectBtn);
+
+    // Ingrediente selecionado passa a estar visível no painel de lançamento com botão Adicionar
+    const addBtn = screen.getByRole('button', { name: /^Adicionar$/i });
+    fireEvent.click(addBtn);
+
+    // Agora o whey está na lista de adicionados
+    expect(screen.getByRole('button', { name: /Remover Whey Protein Concentrado 80% \(Growth\)/i })).toBeInTheDocument();
   });
 
   it('deve carregar dados para edição quando editingRecipe for fornecido', () => {
