@@ -102,6 +102,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
 
   // Busca e Cadastro
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchFeedback, setSearchFeedback] = useState<{
     type: 'success' | 'error';
@@ -210,23 +211,71 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     }
   };
 
+  const handleSelectFoodFromSearch = (food: FoodItem) => {
+    setInternalFoods(prev => {
+      if (prev.some(f => f.id === food.id)) return prev;
+      return [food, ...prev];
+    });
+    setSelectedFoodId(food.id);
+    setServingGrams(food.servingSizeGrams || 100);
+    setSearchFeedback({
+      type: 'success',
+      message: `Alimento selecionado: ${food.name}`,
+    });
+  };
+
+  const handleDirectLaunchFromSearch = (food: FoodItem, window: MealWindow) => {
+    setInternalFoods(prev => {
+      if (prev.some(f => f.id === food.id)) return prev;
+      return [food, ...prev];
+    });
+    const grams = food.servingSizeGrams || 100;
+    const factor = grams / 100;
+    const newFood: LoggedFood = {
+      id: `${food.id}_${Date.now()}`,
+      foodId: food.id,
+      name: food.name,
+      grams,
+      calories: Math.round(food.caloriesPer100g * factor),
+      protein: Math.round(food.proteinPer100g * factor * 10) / 10,
+      carbs: Math.round(food.carbsPer100g * factor * 10) / 10,
+      fat: Math.round(food.fatPer100g * factor * 10) / 10,
+      fiber: Math.round((food.fiberPer100g ?? 0) * factor * 10) / 10,
+    };
+    onAddFood(window, newFood);
+    setSearchFeedback({
+      type: 'success',
+      message: `"${food.name}" lançado com sucesso em ${WINDOW_META[window].label}!`,
+    });
+  };
+
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
     if (!query) return;
 
     setSearchFeedback(null);
+    setSearchResults([]);
 
     // 1. Consulta em primeiro lugar o nosso banco de dados local
     const localMatches = searchFoodItems(internalFoods, query, currentUser?.id);
     if (localMatches.length > 0) {
-      const found = localMatches[0]!;
-      setSelectedFoodId(found.id);
-      setServingGrams(found.servingSizeGrams || 100);
-      setSearchFeedback({
-        type: 'success',
-        message: `Alimento encontrado no banco local: ${found.name}`,
-      });
+      setSearchResults(localMatches);
+      const first = localMatches[0]!;
+      setSelectedFoodId(first.id);
+      setServingGrams(first.servingSizeGrams || 100);
+
+      if (localMatches.length === 1) {
+        setSearchFeedback({
+          type: 'success',
+          message: `Alimento encontrado no banco local: ${first.name}`,
+        });
+      } else {
+        setSearchFeedback({
+          type: 'success',
+          message: `${localMatches.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
+        });
+      }
       return;
     }
 
@@ -242,25 +291,40 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       }
       const data = await res.json();
       if (data.foods && Array.isArray(data.foods) && data.foods.length > 0) {
-        const offFood: FoodItem = data.foods[0];
+        const offFoods: FoodItem[] = data.foods;
         setInternalFoods(prev => {
-          if (prev.some(f => f.id === offFood.id)) return prev;
-          return [offFood, ...prev];
+          const existingIds = new Set(prev.map(p => p.id));
+          const toAdd = offFoods.filter(f => !existingIds.has(f.id));
+          return [...toAdd, ...prev];
         });
-        onRegisterFood?.(offFood);
-        setSelectedFoodId(offFood.id);
-        setServingGrams(offFood.servingSizeGrams || 100);
-        setSearchFeedback({
-          type: 'success',
-          message: `Alimento encontrado e salvo no banco de dados: ${offFood.name}`,
-        });
+        for (const f of offFoods) {
+          onRegisterFood?.(f);
+        }
+        setSearchResults(offFoods);
+        const first = offFoods[0]!;
+        setSelectedFoodId(first.id);
+        setServingGrams(first.servingSizeGrams || 100);
+
+        if (offFoods.length === 1) {
+          setSearchFeedback({
+            type: 'success',
+            message: `Alimento encontrado e salvo no banco de dados: ${first.name}`,
+          });
+        } else {
+          setSearchFeedback({
+            type: 'success',
+            message: `${offFoods.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
+          });
+        }
       } else {
+        setSearchResults([]);
         setSearchFeedback({
           type: 'error',
           message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
         });
       }
     } catch {
+      setSearchResults([]);
       setSearchFeedback({
         type: 'error',
         message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
@@ -437,6 +501,99 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           )}
         </form>
 
+        {/* Lista de Resultados da Busca de Alimentos (M3 Card List) */}
+        {searchResults.length > 0 && (
+          <div
+            data-testid="search-results-list"
+            className="mb-4 p-3 bg-m3-surface-container-high border border-m3-outline-variant rounded-2xl space-y-2 shadow-md animate-fadeIn"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-m3-outline-variant/60">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-m3-on-surface">
+                  Resultados da busca ({searchResults.length} alimentos):
+                </span>
+                <span className="text-[11px] text-m3-outline hidden sm:inline font-mono">
+                  Selecione para ajustar a porção ou lance diretamente
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSearchResults([])}
+                className="text-xs text-m3-outline hover:text-m3-on-surface transition-colors px-2 py-0.5 rounded-lg hover:bg-m3-surface-container"
+                title="Fechar lista de resultados"
+              >
+                ✕ Fechar
+              </button>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {searchResults.map(food => {
+                const isSelected = food.id === selectedFoodId;
+                return (
+                  <div
+                    key={food.id}
+                    data-testid={`search-item-${food.id}`}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-m3-primary/10 border-m3-primary text-m3-on-surface shadow-sm'
+                        : 'bg-m3-surface-container-low border-m3-outline-variant/60 hover:border-m3-outline text-m3-on-surface'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 pr-3 mb-2 sm:mb-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-m3-on-surface truncate">
+                          {food.name}
+                        </span>
+                        {food.isCustom && (
+                          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded-full font-mono">
+                            Custom
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-m3-outline mt-0.5 font-mono">
+                        <span>{food.servingDescription || `${food.servingSizeGrams || 100}g`}</span>
+                        <span>•</span>
+                        <span className="text-m3-primary font-medium">{food.caloriesPer100g} kcal/100g</span>
+                        <span>•</span>
+                        <span className="text-emerald-400 font-medium">{food.proteinPer100g}g P</span>
+                        <span>•</span>
+                        <span className="text-amber-400">{food.carbsPer100g}g C</span>
+                        <span>•</span>
+                        <span className="text-purple-400">{food.fatPer100g}g G</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        aria-label={`Selecionar ${food.name}`}
+                        onClick={() => handleSelectFoodFromSearch(food)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                          isSelected
+                            ? 'bg-m3-primary text-m3-on-primary font-semibold shadow-sm'
+                            : 'bg-m3-surface-container-highest hover:bg-m3-surface-variant text-m3-on-surface border border-m3-outline-variant'
+                        }`}
+                      >
+                        {isSelected ? '✓ Selecionado' : 'Selecionar'}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Lançar ${food.name}`}
+                        onClick={() => handleDirectLaunchFromSearch(food, activeWindow)}
+                        className="flex items-center gap-1 bg-m3-primary/20 hover:bg-m3-primary/30 text-m3-primary border border-m3-primary/40 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+                        title={`Lançar ${food.servingSizeGrams || 100}g em ${WINDOW_META[activeWindow].label}`}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Lançar</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Linha de Inputs: Peso/Porção SEMPRE no Topo */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
           <div className="sm:col-span-5">
@@ -458,6 +615,15 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               }}
               className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl px-3 py-2 text-xs text-m3-on-surface font-medium focus:outline-none focus:border-m3-primary"
             >
+              {searchResults.length > 0 && (
+                <optgroup label="Resultados da Busca">
+                  {searchResults.map(food => (
+                    <option key={`search_opt_${food.id}`} value={food.id}>
+                      {food.name} ({food.caloriesPer100g} kcal/100g)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               <optgroup label={`Mais Comuns para ${WINDOW_META[activeWindow].label}`}>
                 {commonFoods.map(food => (
                   <option key={`common_${food.id}`} value={food.id}>

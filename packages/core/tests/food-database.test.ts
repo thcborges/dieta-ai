@@ -123,6 +123,29 @@ describe('Food Database & Meal Intelligence (Módulo 3)', () => {
     expect(notFound.length).toBe(0);
   });
 
+  it('deve retornar lista de múltiplos wheys ao buscar "whey" (incluindo Growth e Black Skull)', () => {
+    const wheyResults = searchFoodItems(PREPOPULATED_FOODS, 'whey');
+    expect(wheyResults.length).toBeGreaterThanOrEqual(2);
+    
+    const ids = wheyResults.map(f => f.id);
+    expect(ids).toContain('whey_growth_30g');
+    expect(ids).toContain('whey_black_skull');
+
+    const blackSkull = wheyResults.find(f => f.id === 'whey_black_skull');
+    expect(blackSkull?.name).toContain('Black Skull');
+    expect(blackSkull?.proteinPer100g).toBeGreaterThan(60);
+  });
+
+  it('deve retornar lista de múltiplos cortes ao buscar "frango" (peito grelhado, sobrecoxa assada, sassami)', () => {
+    const frangoResults = searchFoodItems(PREPOPULATED_FOODS, 'frango');
+    expect(frangoResults.length).toBeGreaterThanOrEqual(3);
+
+    const names = frangoResults.map(f => f.name.toLowerCase());
+    expect(names.some(n => n.includes('peito') && n.includes('grelhado'))).toBe(true);
+    expect(names.some(n => n.includes('sobrecoxa') && n.includes('assada'))).toBe(true);
+    expect(names.some(n => n.includes('sassami'))).toBe(true);
+  });
+
   describe('Visibilidade e Moderação de Alimentos Cadastrados', () => {
     const customFoodUserA = {
       id: 'custom_panqueca_user_a',

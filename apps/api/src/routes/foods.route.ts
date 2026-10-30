@@ -52,12 +52,13 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Busca de alimentos (respeita isolamento de alimentos não-validados por usuário)
-  app.get<{ Querystring: { q?: string } }>('/api/v1/foods/search', async (req) => {
+  app.get<{ Querystring: { q?: string; include_remote?: string } }>('/api/v1/foods/search', async (req) => {
     const query = req.query.q || '';
+    const includeRemote = req.query.include_remote === 'true';
     const userId = req.headers['x-user-id'] as string | undefined;
     const isAdmin = req.headers['x-admin-token'] === ADMIN_TOKEN;
 
-    const result = await foodCacheService.searchFoods(query, userId, isAdmin);
+    const result = await foodCacheService.searchFoods(query, userId, isAdmin, includeRemote);
     return {
       source: result.source,
       query,

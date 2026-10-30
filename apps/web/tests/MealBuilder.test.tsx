@@ -304,6 +304,88 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     fetchSpy.mockRestore();
   });
 
+  it('deve exibir lista de opções ao consultar "whey" e permitir selecionar Whey Black Skull para lançamento', async () => {
+    const onAddFood = vi.fn();
+
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={onAddFood}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+    fireEvent.change(searchInput, { target: { value: 'whey' } });
+
+    const searchBtn = screen.getByRole('button', { name: /Consultar/i });
+    fireEvent.click(searchBtn);
+
+    // Deve exibir o painel com múltiplos resultados de whey
+    const resultsContainer = await screen.findByTestId('search-results-list');
+    expect(resultsContainer).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Whey Protein Concentrado 80% \(Growth\)/i)).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Whey Protein 100% HD \(Black Skull\)/i)).toBeInTheDocument();
+
+    // Usuário clica para selecionar o Whey Black Skull
+    const selectBlackSkullBtn = screen.getByRole('button', { name: /Selecionar Whey Protein 100% HD \(Black Skull\)/i });
+    fireEvent.click(selectBlackSkullBtn);
+
+    // Deve atualizar o seletor principal e porção recomendada
+    const select = screen.getByLabelText(/Alimento Selecionado/i) as HTMLSelectElement;
+    expect(select.value).toBe('whey_black_skull');
+
+    // Lança o alimento selecionado
+    const launchBtn = screen.getByRole('button', { name: /^Lançar$/i });
+    fireEvent.click(launchBtn);
+
+    expect(onAddFood).toHaveBeenCalled();
+    const calledFood = onAddFood.mock.calls[0][1];
+    expect(calledFood.foodId).toBe('whey_black_skull');
+    expect(calledFood.name).toContain('Black Skull');
+  });
+
+  it('deve exibir lista de cortes ao consultar "frango" e permitir lançar diretamente Sobrecoxa Assada ou Peito Grelhado', async () => {
+    const onAddFood = vi.fn();
+
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={onAddFood}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+    fireEvent.change(searchInput, { target: { value: 'frango' } });
+
+    const searchBtn = screen.getByRole('button', { name: /Consultar/i });
+    fireEvent.click(searchBtn);
+
+    // Deve exibir resultados contendo Peito Grelhado e Sobrecoxa Assada
+    const resultsContainer = await screen.findByTestId('search-results-list');
+    expect(resultsContainer).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Peito de Frango Grelhado/i)).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Sobrecoxa de Frango Assada sem Pele/i)).toBeInTheDocument();
+
+    // Usuário usa o botão de lançamento direto do card da Sobrecoxa
+    const directLaunchBtn = screen.getByRole('button', { name: /Lançar Sobrecoxa de Frango Assada sem Pele/i });
+    fireEvent.click(directLaunchBtn);
+
+    expect(onAddFood).toHaveBeenCalled();
+    const calledFood = onAddFood.mock.calls[0][1];
+    expect(calledFood.foodId).toBe('sobrecoxa_frango_assada');
+    expect(calledFood.name).toContain('Sobrecoxa de Frango Assada');
+  });
+
   it('deve abrir o modal de cadastro de novo alimento e adicionar à lista de opções', () => {
     const onRegisterFood = vi.fn();
     const onAddFood = vi.fn();

@@ -198,6 +198,75 @@ describe('Foods & Open Food Facts Cache API', () => {
     expect(body2.foods[0].name).toBe('Granola Artesanal Zero Açúcar');
   });
 
+  it('deve retornar lista com múltiplos itens ao buscar "whey" (incluindo Growth e Black Skull)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=whey',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.foods.length).toBeGreaterThanOrEqual(2);
+    const ids = body.foods.map((f: { id: string }) => f.id);
+    expect(ids).toContain('whey_growth_30g');
+    expect(ids).toContain('whey_black_skull');
+  });
+
+  it('deve retornar lista com múltiplos cortes ao buscar "frango" (peito grelhado, sobrecoxa assada, sassami)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=frango',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.foods.length).toBeGreaterThanOrEqual(3);
+    const names = body.foods.map((f: { name: string }) => f.name.toLowerCase());
+    expect(names.some((n: string) => n.includes('peito'))).toBe(true);
+    expect(names.some((n: string) => n.includes('sobrecoxa'))).toBe(true);
+    expect(names.some((n: string) => n.includes('sassami'))).toBe(true);
+  });
+
+  it('deve permitir buscar no Open Food Facts e mesclar com cache quando include_remote=true', async () => {
+    const mockOFFSearchResponse = {
+      count: 1,
+      products: [
+        {
+          code: '7899999999999',
+          product_name: 'Whey Protein Isolado Dux Nutrition',
+          serving_quantity: '30',
+          nutriments: {
+            'energy-kcal_100g': 390,
+            proteins_100g: 84,
+            carbohydrates_100g: 5,
+            fat_100g: 3,
+            fiber_100g: 0,
+          },
+        },
+      ],
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockOFFSearchResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/foods/search?q=whey&include_remote=true',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.source).toBe('combined');
+    expect(body.foods.some((f: { name: string }) => f.name.includes('Dux Nutrition'))).toBe(true);
+    expect(body.foods.some((f: { id: string }) => f.id === 'whey_growth_30g')).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
+
   it('deve listar todos os alimentos do banco de dados via GET /api/v1/foods', async () => {
     const response = await app.inject({
       method: 'GET',
