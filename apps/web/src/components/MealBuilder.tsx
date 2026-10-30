@@ -267,15 +267,37 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     });
   };
 
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    const query = val.trim();
+    if (query.length >= 2) {
+      const matches = searchFoodItems(internalFoods, query, currentUser?.id);
+      setSearchResults(matches);
+      if (matches.length > 0) {
+        setSelectedFoodId(matches[0].id);
+        setServingGrams(matches[0].servingSizeGrams || 100);
+        setSearchFeedback({
+          type: 'success',
+          message: `${matches.length} alimento(s) encontrado(s) no banco local para "${query}". Escolha abaixo ou consulte online:`,
+        });
+      } else {
+        setSearchFeedback(null);
+      }
+    } else if (query.length === 0) {
+      setSearchResults([]);
+      setSearchFeedback(null);
+    }
+  };
+
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
     if (!query) return;
 
     setSearchFeedback(null);
-    setSearchResults([]);
 
-    // 1. Consulta em primeiro lugar o nosso banco de dados local
+    // 1. Consulta em primeiro lugar o nosso banco de dados local (resposta instantânea offline-first)
     const localMatches = searchFoodItems(internalFoods, query, currentUser?.id);
     if (localMatches.length > 0) {
       setSearchResults(localMatches);
@@ -294,44 +316,82 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           message: `${localMatches.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
         });
       }
-      return;
     }
 
-    // 2. Não encontrado localmente: consulta a API (cache do Firestore / Open Food Facts)
+    // 2. Consulta a API com include_remote=true para complementar com Open Food Facts
     setIsSearching(true);
     try {
       const headers: Record<string, string> = {};
       if (currentUser?.id) headers['x-user-id'] = currentUser.id;
 
-      const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}`, { headers });
-      if (!res.ok) {
-        throw new Error('Falha na requisição');
-      }
-      const data = await res.json();
-      if (data.foods && Array.isArray(data.foods) && data.foods.length > 0) {
-        const offFoods: FoodItem[] = data.foods;
-        setInternalFoods(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
-          const toAdd = offFoods.filter(f => !existingIds.has(f.id));
-          return [...toAdd, ...prev];
-        });
-        for (const f of offFoods) {
-          onRegisterFood?.(f);
-        }
-        setSearchResults(offFoods);
-        const first = offFoods[0]!;
-        setSelectedFoodId(first.id);
-        setServingGrams(first.servingSizeGrams || 100);
+      const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}&include_remote=true`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.foods && Array.isArray(data.foods) && data.foods.length > 0) {
+          const apiFoods: FoodItem[] = data.foods;
+          setInternalFoods(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const toAdd = apiFoods.filter(f => !existingIds.has(f.id));
+            return [...toAdd, ...prev];
+          });
+          for (const f of apiFoods) {
+            onRegisterFood?.(f);
+          }
 
-        if (offFoods.length === 1) {
+          // Mescla resultados locais com remotos sem duplicatas
+          const mergedResults = [...localMatches];
+          const existingIds = new Set(mergedResults.map(r => r.id));
+          const existingBarcodes = new Set(
+            mergedResults.map(r => (r as { barcode?: string }).barcode).filter(Boolean)
+          );
+
+          for (const f of apiFoods) {
+            const barcode = (f as { barcode?: string }).barcode;
+            if (!existingIds.has(f.id) && (!barcode || !existingBarcodes.has(barcode))) {
+              existingIds.add(f.id);
+              if (barcode) existingBarcodes.add(barcode);
+              mergedResults.push(f);
+            }
+          }
+
+          setSearchResults(mergedResults);
+          if (mergedResults.length > 0 && !selectedFoodId) {
+            setSelectedFoodId(mergedResults[0].id);
+            setServingGrams(mergedResults[0].servingSizeGrams || 100);
+          }
+
+          if (mergedResults.length === 1) {
+            if (localMatches.length === 1) {
+              setSearchFeedback({
+                type: 'success',
+                message: `Alimento encontrado no banco local: ${mergedResults[0].name}`,
+              });
+            } else {
+              setSearchFeedback({
+                type: 'success',
+                message: `Alimento encontrado e salvo no banco de dados: ${mergedResults[0].name}`,
+              });
+            }
+          } else {
+            setSearchFeedback({
+              type: 'success',
+              message: `${mergedResults.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
+            });
+          }
+          return;
+        }
+      }
+
+      if (localMatches.length > 0) {
+        if (localMatches.length === 1) {
           setSearchFeedback({
             type: 'success',
-            message: `Alimento encontrado e salvo no banco de dados: ${first.name}`,
+            message: `Alimento encontrado no banco local: ${localMatches[0].name}`,
           });
         } else {
           setSearchFeedback({
             type: 'success',
-            message: `${offFoods.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
+            message: `${localMatches.length} alimentos encontrados para "${query}". Escolha um abaixo para lançar:`,
           });
         }
       } else {
@@ -342,11 +402,18 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         });
       }
     } catch {
-      setSearchResults([]);
-      setSearchFeedback({
-        type: 'error',
-        message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
-      });
+      if (localMatches.length > 0) {
+        setSearchFeedback({
+          type: 'success',
+          message: `${localMatches.length} alimento(s) encontrado(s) no banco local para "${query}".`,
+        });
+      } else {
+        setSearchResults([]);
+        setSearchFeedback({
+          type: 'error',
+          message: 'Alimento não encontrado no banco de dados nem no Open Food Facts.',
+        });
+      }
     } finally {
       setIsSearching(false);
     }
@@ -471,7 +538,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               <input
                 type="text"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={handleSearchInputChange}
                 placeholder="Consultar alimento ou código de barras no banco / Open Food Facts..."
                 className="w-full bg-m3-surface-container-low border border-m3-outline-variant rounded-xl pl-8 pr-3 py-2 text-xs text-m3-on-surface placeholder:text-m3-outline/60 focus:outline-none focus:border-m3-primary"
               />
@@ -581,6 +648,16 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                         {food.isCustom && !food.isRecipe && (
                           <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded-full font-mono">
                             Custom
+                          </span>
+                        )}
+                        {food.id.startsWith('off_') && (
+                          <span className="text-[10px] bg-blue-500/15 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded-full font-mono">
+                            Open Food Facts
+                          </span>
+                        )}
+                        {!food.isRecipe && !food.isCustom && !food.id.startsWith('off_') && (
+                          <span className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-mono">
+                            Banco Local
                           </span>
                         )}
                       </div>

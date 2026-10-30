@@ -350,6 +350,73 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
     expect(calledFood.name).toContain('Black Skull');
   });
 
+  it('deve permitir buscar e escolher "whey growth" em tempo real', async () => {
+    const onAddFood = vi.fn();
+
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={onAddFood}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+    // Digita "whey growth" - busca reativa em tempo real
+    fireEvent.change(searchInput, { target: { value: 'whey growth' } });
+
+    const resultsContainer = await screen.findByTestId('search-results-list');
+    expect(resultsContainer).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Whey Protein Concentrado 80% \(Growth\)/i)).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Whey Protein Isolado 90% \(Growth\)/i)).toBeInTheDocument();
+    // Não deve conter Black Skull pois a busca foi específica para Growth
+    expect(within(resultsContainer).queryByText(/Black Skull/i)).not.toBeInTheDocument();
+
+    // Seleciona o isolado da Growth
+    const selectIsoladoBtn = screen.getByRole('button', { name: /Selecionar Whey Protein Isolado 90% \(Growth\)/i });
+    fireEvent.click(selectIsoladoBtn);
+
+    const select = screen.getByLabelText(/Alimento Selecionado/i) as HTMLSelectElement;
+    expect(select.value).toBe('whey_growth_isolado');
+  });
+
+  it('deve permitir escolher "whey blackskulll" mesmo com erro de digitação ou sem espaço', async () => {
+    const onAddFood = vi.fn();
+
+    render(
+      <MealBuilder
+        meals={mockMeals}
+        onAddFood={onAddFood}
+        onRemoveFood={vi.fn()}
+        onCopyMeal={vi.fn()}
+        onAutoCompleteProtein={vi.fn()}
+        missingProtein={20}
+        remainingCalories={400}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Consultar alimento ou código de barras/i);
+    // Digita com repetição de letras e sem espaço: "whey blackskulll"
+    fireEvent.change(searchInput, { target: { value: 'whey blackskulll' } });
+
+    const resultsContainer = await screen.findByTestId('search-results-list');
+    expect(resultsContainer).toBeInTheDocument();
+    expect(within(resultsContainer).getByText(/Whey Protein 100% HD \(Black Skull\)/i)).toBeInTheDocument();
+
+    // Lança diretamente com 1 clique
+    const directLaunchBtn = screen.getByRole('button', { name: /Lançar Whey Protein 100% HD \(Black Skull\)/i });
+    fireEvent.click(directLaunchBtn);
+
+    expect(onAddFood).toHaveBeenCalled();
+    const calledFood = onAddFood.mock.calls[0][1];
+    expect(calledFood.foodId).toBe('whey_black_skull');
+    expect(calledFood.name).toContain('Black Skull');
+  });
+
   it('deve exibir lista de cortes ao consultar "frango" e permitir lançar diretamente Sobrecoxa Assada ou Peito Grelhado', async () => {
     const onAddFood = vi.fn();
 

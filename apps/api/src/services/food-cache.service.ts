@@ -1,4 +1,4 @@
-import { PREPOPULATED_FOODS, filterVisibleFoods, type FoodItem } from '@dieta-ai/core';
+import { PREPOPULATED_FOODS, filterVisibleFoods, normalizeSearchText, type FoodItem } from '@dieta-ai/core';
 
 export interface CachedFood extends FoodItem {
   barcode?: string;
@@ -40,19 +40,30 @@ export class FoodCacheService {
     isAdmin: boolean = false,
     includeRemote: boolean = false
   ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' | 'combined' }> {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) {
       return { foods: this.getAllFoods(userId, isAdmin), source: 'cache' };
     }
 
+    const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
+
     // 1. Consulta em primeiro lugar o nosso banco de dados (cache / prepopulated / custom)
     const cachedFoodsMap = new Map<string, CachedFood>();
     for (const food of this.inMemoryCache.values()) {
-      if (
-        food.name.toLowerCase().includes(normalizedQuery) ||
-        food.id.toLowerCase().includes(normalizedQuery) ||
-        (food.barcode && food.barcode.toLowerCase().includes(normalizedQuery))
-      ) {
+      const normName = normalizeSearchText(food.name);
+      const normId = normalizeSearchText(food.id);
+      const normBarcode = food.barcode ? normalizeSearchText(food.barcode) : '';
+
+      const matchesContiguous =
+        normName.includes(normalizedQuery) ||
+        normId.includes(normalizedQuery) ||
+        (normBarcode && normBarcode.includes(normalizedQuery));
+
+      const matchesTokens = queryTokens.every(
+        token => normName.includes(token) || normId.includes(token) || (normBarcode && normBarcode.includes(token))
+      );
+
+      if (matchesContiguous || matchesTokens) {
         cachedFoodsMap.set(food.id, { ...food, source: 'cache' });
       }
     }
