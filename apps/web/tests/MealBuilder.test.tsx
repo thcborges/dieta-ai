@@ -853,6 +853,77 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
       expect(screen.getAllByText(/Bolo de Whey Cappuccino/i).length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('Lista Fixa de Alimentos, Janela no Topo & Seleção para Lançamento (UX Refinada)', () => {
+    it('deve ter a Janela de Refeição como primeiro item do lançamento e lista fixa com 10 alimentos sugeridos da janela ativa', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      // 1. Janela de Refeição está presente
+      const windowSelect = screen.getByLabelText(/Janela de Refeição/i);
+      expect(windowSelect).toBeInTheDocument();
+
+      // 2. A lista de resultado/alimentos é fixa e está sempre visível
+      const listContainer = screen.getByTestId('search-results-list');
+      expect(listContainer).toBeInTheDocument();
+
+      // Inicialmente em Almoço, exibe os 10 mais consumidos para Almoço
+      expect(screen.getByText(/Alimentos sugeridos para Almoço \(10 mais consumidos\)/i)).toBeInTheDocument();
+      expect(within(listContainer).getByText(/Filé de Sassami Desfiado Cozido/i)).toBeInTheDocument();
+      expect(within(listContainer).getByText(/Feijão Preto Cozido/i)).toBeInTheDocument();
+
+      // 3. Ao alterar a janela para Café da Manhã, a lista passa a trazer os 10 mais consumidos do café
+      fireEvent.change(windowSelect, { target: { value: 'breakfast' } });
+      expect(screen.getByText(/Alimentos sugeridos para Café da Manhã \/ Pré-Treino \(10 mais consumidos\)/i)).toBeInTheDocument();
+      expect(within(listContainer).getByText(/Ovo de Galinha Inteiro Cozido\/Mexido/i)).toBeInTheDocument();
+      expect(within(listContainer).getByText(/Pão Integral 100%/i)).toBeInTheDocument();
+    });
+
+    it('ao selecionar um item da lista fixa ele deve estar disponível no painel para ajuste de porção e lançamento', () => {
+      const onAddFood = vi.fn();
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={onAddFood}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      // Clica em selecionar Batata-Doce da lista fixa
+      const selectBatataBtn = screen.getByRole('button', { name: /Selecionar Batata-Doce Cozida/i });
+      fireEvent.click(selectBatataBtn);
+
+      // Painel de alimento selecionado deve exibir Batata-Doce
+      const selectedDisplay = screen.getByTestId('selected-food-display');
+      expect(within(selectedDisplay).getByText(/Batata-Doce Cozida/i)).toBeInTheDocument();
+
+      // Altera gramas para 150g
+      const servingInput = screen.getByLabelText(/Porção \(Gramas\)/i);
+      fireEvent.change(servingInput, { target: { value: '150' } });
+
+      // Clica no botão Lançar do painel
+      const launchBtn = screen.getByRole('button', { name: /^Lançar$/i });
+      fireEvent.click(launchBtn);
+
+      expect(onAddFood).toHaveBeenCalled();
+      const added = onAddFood.mock.calls[0][1];
+      expect(added.foodId).toBe('batata_doce');
+      expect(added.grams).toBe(150);
+    });
+  });
 });
 
 
