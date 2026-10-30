@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MealBuilder } from '../src/components/MealBuilder.js';
+import { PREPOPULATED_FOODS, type FoodItem } from '@dieta-ai/core';
 
 describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', () => {
   const mockMeals = {
@@ -706,6 +707,83 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
           }),
         ])
       );
+    });
+
+    it('deve abrir o modal de gerenciamento de receitas ao clicar no botão Receitas', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+          recipes={[
+            {
+              id: 'recipe_bolo',
+              name: 'Bolo de Cenoura Fit',
+              servings: 6,
+              ingredients: [{ foodId: 'sassami', gramsOrUnits: 200 }],
+            },
+          ]}
+        />
+      );
+
+      const recipesBtn = screen.getByRole('button', { name: /Minhas Receitas/i });
+      expect(recipesBtn).toBeInTheDocument();
+      expect(recipesBtn).toHaveTextContent('Receitas (1)');
+
+      fireEvent.click(recipesBtn);
+      expect(screen.getByText('Bolo de Cenoura Fit')).toBeInTheDocument();
+      expect(screen.getByText(/6 porções/i)).toBeInTheDocument();
+    });
+
+    it('deve exibir o botão de lançamento por porção/fração quando o alimento selecionado for uma receita', () => {
+      const sampleRecipeFood: FoodItem = {
+        id: 'recipe_whey_bolo',
+        name: 'Bolo de Whey Cappuccino',
+        caloriesPer100g: 150,
+        proteinPer100g: 20,
+        carbsPer100g: 10,
+        fatPer100g: 2,
+        fiberPer100g: 1,
+        isRecipe: true,
+        recipeData: {
+          id: 'recipe_whey_bolo',
+          name: 'Bolo de Whey Cappuccino',
+          servings: 4,
+          servingUnitName: 'fatia',
+          ingredients: [{ foodId: 'sassami', gramsOrUnits: 100 }],
+        },
+      };
+
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          availableFoods={[sampleRecipeFood, ...PREPOPULATED_FOODS]}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+          recipes={[sampleRecipeFood.recipeData!]}
+        />
+      );
+
+      // Seleciona a receita no select
+      const foodSelect = screen.getByLabelText(/Alimento Selecionado/i);
+      fireEvent.change(foodSelect, { target: { value: 'recipe_whey_bolo' } });
+
+      // O botão de lançar por fração/porção (ícone ChefHat) deve aparecer
+      const fractionLogBtn = screen.getByRole('button', { name: /Lançar por Fração \/ Porção/i });
+      expect(fractionLogBtn).toBeInTheDocument();
+
+      fireEvent.click(fractionLogBtn);
+      // Deve abrir o LogRecipeModal
+      expect(screen.getByText(/Lançar Receita no Diário/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Bolo de Whey Cappuccino/i).length).toBeGreaterThanOrEqual(1);
     });
   });
 });

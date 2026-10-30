@@ -250,6 +250,20 @@ export class FoodCacheService {
     return cachedFood;
   }
 
+  saveFoodItem(food: FoodItem): CachedFood {
+    const cached: CachedFood = {
+      ...food,
+      source: 'manual',
+      updatedAt: new Date().toISOString(),
+    };
+    this.inMemoryCache.set(food.id, cached);
+    return cached;
+  }
+
+  deleteFoodItem(foodId: string): boolean {
+    return this.inMemoryCache.delete(foodId);
+  }
+
   validateFood(foodId: string): CachedFood | null {
     const food = this.inMemoryCache.get(foodId);
     if (!food) {

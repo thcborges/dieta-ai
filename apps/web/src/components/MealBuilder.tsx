@@ -5,6 +5,7 @@ import {
   type FoodItem,
   getCommonFoodsForMeal,
   searchFoodItems,
+  type RecipeInput,
 } from '@dieta-ai/core';
 import {
   Plus,
@@ -23,12 +24,16 @@ import {
   CheckCircle,
   AlertCircle,
   ScanBarcode,
+  ChefHat,
 } from 'lucide-react';
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
 import { ProteinAutocompleteModal } from './ProteinAutocompleteModal.js';
 import { QuickMacroModal } from './QuickMacroModal.js';
 import { CopyMealModal } from './CopyMealModal.js';
+import { RecipeListModal } from './RecipeListModal.js';
+import { RecipeBuilderModal } from './RecipeBuilderModal.js';
+import { LogRecipeModal } from './LogRecipeModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -47,11 +52,14 @@ export type MealMap = Record<MealWindow, LoggedFood[]>;
 interface MealBuilderProps {
   meals: MealMap;
   availableFoods?: FoodItem[];
+  recipes?: RecipeInput[];
   onAddFood: (window: MealWindow, item: LoggedFood) => void;
   onRemoveFood: (window: MealWindow, itemId: string) => void;
   onCopyMeal: (fromWindow: MealWindow, toWindow: MealWindow, copiedItems?: LoggedFood[]) => void;
   onAutoCompleteProtein: (source: 'sassami' | 'whey_growth') => void;
   onRegisterFood?: (food: FoodItem) => void;
+  onSaveRecipe?: (recipe: RecipeInput) => void;
+  onDeleteRecipe?: (recipeId: string) => void;
   missingProtein: number;
   remainingCalories: number;
   currentUser?: { id: string } | null;
@@ -79,11 +87,14 @@ const FREQUENT_PRESETS_BY_WINDOW: Record<MealWindow, string[]> = {
 export const MealBuilder: React.FC<MealBuilderProps> = ({
   meals,
   availableFoods,
+  recipes = [],
   onAddFood,
   onRemoveFood,
   onCopyMeal,
   onAutoCompleteProtein,
   onRegisterFood,
+  onSaveRecipe,
+  onDeleteRecipe,
   missingProtein,
   remainingCalories,
   currentUser,
@@ -99,6 +110,13 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   const [activeWindow, setActiveWindow] = useState<MealWindow>('lunch');
   const [showCopyModal, setShowCopyModal] = useState<MealWindow | null>(null);
   const [quickMacroWindow, setQuickMacroWindow] = useState<MealWindow | null>(null);
+
+  // Gestão de Receitas Compostas (Módulo 3)
+  const [isRecipeListOpen, setIsRecipeListOpen] = useState<boolean>(false);
+  const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState<boolean>(false);
+  const [isLogRecipeOpen, setIsLogRecipeOpen] = useState<boolean>(false);
+  const [editingRecipe, setEditingRecipe] = useState<RecipeInput | null>(null);
+  const [recipeToLog, setRecipeToLog] = useState<RecipeInput | null>(null);
 
   // Busca e Cadastro
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -407,7 +425,18 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
             </h3>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Botão Gerenciar Receitas */}
+            <button
+              type="button"
+              onClick={() => setIsRecipeListOpen(true)}
+              className="flex items-center gap-1.5 bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant text-xs text-amber-300 font-medium px-3 py-1.5 rounded-xl transition-all shadow-sm"
+              aria-label="Minhas Receitas"
+            >
+              <ChefHat className="w-3.5 h-3.5 text-amber-400" />
+              <span>Receitas ({recipes.length})</span>
+            </button>
+
             {/* Botão Cadastrar Novo Alimento */}
             <button
               type="button"
@@ -544,7 +573,12 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                         <span className="text-xs font-semibold text-m3-on-surface truncate">
                           {food.name}
                         </span>
-                        {food.isCustom && (
+                        {food.isRecipe && (
+                          <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/30 px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                            Receita
+                          </span>
+                        )}
+                        {food.isCustom && !food.isRecipe && (
                           <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded-full font-mono">
                             Custom
                           </span>
@@ -692,15 +726,37 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
             </select>
           </div>
 
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 flex gap-1.5">
             <button
               type="button"
               onClick={() => handleAddFoodSubmit(activeWindow)}
-              className="w-full flex items-center justify-center gap-1.5 bg-m3-surface-container-highest hover:bg-m3-surface-variant border border-m3-outline text-m3-on-surface text-xs font-medium py-2 px-3 rounded-xl transition-colors"
+              className="flex-1 flex items-center justify-center gap-1 bg-m3-surface-container-highest hover:bg-m3-surface-variant border border-m3-outline text-m3-on-surface text-xs font-medium py-2 px-2.5 rounded-xl transition-colors"
             >
               <Plus className="w-4 h-4 text-m3-primary" />
               Lançar
             </button>
+            {selectedFood.isRecipe && (
+              <button
+                type="button"
+                onClick={() => {
+                  const rec =
+                    recipes.find(r => r.id === selectedFood.id) ||
+                    (selectedFood.recipeData as RecipeInput) || {
+                      id: selectedFood.id,
+                      name: selectedFood.name,
+                      servings: 1,
+                      ingredients: [],
+                    };
+                  setRecipeToLog(rec);
+                  setIsLogRecipeOpen(true);
+                }}
+                className="px-2.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-medium transition-colors flex items-center justify-center"
+                title="Lançar por Fração / Porção da Receita"
+                aria-label="Lançar por Fração / Porção"
+              >
+                <ChefHat className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -901,6 +957,58 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
             });
           });
           onAutoCompleteProtein?.('sassami');
+        }}
+      />
+
+      {/* Modal de Gestão / Lista de Receitas */}
+      <RecipeListModal
+        isOpen={isRecipeListOpen}
+        onClose={() => setIsRecipeListOpen(false)}
+        recipes={recipes}
+        availableFoods={internalFoods}
+        onOpenCreate={() => {
+          setEditingRecipe(null);
+          setIsRecipeBuilderOpen(true);
+        }}
+        onOpenEdit={rec => {
+          setEditingRecipe(rec);
+          setIsRecipeBuilderOpen(true);
+        }}
+        onOpenLog={rec => {
+          setRecipeToLog(rec);
+          setIsLogRecipeOpen(true);
+        }}
+        onDeleteRecipe={id => onDeleteRecipe?.(id)}
+      />
+
+      {/* Modal de Criação e Edição de Receitas */}
+      <RecipeBuilderModal
+        isOpen={isRecipeBuilderOpen}
+        onClose={() => {
+          setIsRecipeBuilderOpen(false);
+          setEditingRecipe(null);
+        }}
+        onSaveRecipe={rec => {
+          onSaveRecipe?.(rec);
+          setIsRecipeBuilderOpen(false);
+          setEditingRecipe(null);
+        }}
+        availableFoods={internalFoods}
+        editingRecipe={editingRecipe}
+      />
+
+      {/* Modal de Lançamento de Porção / Fração de Receita no Diário */}
+      <LogRecipeModal
+        isOpen={isLogRecipeOpen}
+        onClose={() => {
+          setIsLogRecipeOpen(false);
+          setRecipeToLog(null);
+        }}
+        recipe={recipeToLog}
+        availableFoods={internalFoods}
+        defaultWindow={activeWindow}
+        onLogPortion={(targetWindow, item) => {
+          onAddFood(targetWindow, item);
         }}
       />
     </div>

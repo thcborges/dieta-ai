@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   auditDailyIntake,
   solveProteinDeficit,
@@ -10,6 +10,9 @@ import {
   type EventBufferInput,
   type MealWindow,
   type FoodItem,
+  type RecipeInput,
+  recipeToFoodItem,
+  calculateRecipeMacros,
 } from '@dieta-ai/core';
 import { MacroSummary } from './components/MacroSummary.js';
 import { AuditorBanner } from './components/AuditorBanner.js';
@@ -139,6 +142,18 @@ export default function App() {
     }
   });
 
+  // Receitas compostas do usuário (Módulo 3)
+  const [recipes, setRecipes] = useState<RecipeInput[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('macrometrics_auth_user');
+      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const savedRecipes = localStorage.getItem(`macrometrics_recipes_${userId}`);
+      return savedRecipes ? (JSON.parse(savedRecipes) as RecipeInput[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Modais
   const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -219,6 +234,28 @@ export default function App() {
         } else {
           setAvailableFoods(PREPOPULATED_FOODS);
         }
+
+        // Sincroniza receitas do usuário
+        const savedRecipes = localStorage.getItem(`macrometrics_recipes_${user.id}`);
+        if (savedRecipes) {
+          setRecipes(JSON.parse(savedRecipes));
+        } else {
+          setRecipes([]);
+        }
+
+        fetch('/api/v1/recipes', {
+          headers: { 'x-user-id': user.id },
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (Array.isArray(data) && activeUserRef.current === user.id) {
+              setRecipes(data);
+              localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(data));
+            }
+          })
+          .catch(() => {
+            // Mantém funcionamento offline-first
+          });
 
         // Sincroniza com /api/v1/diary na autenticação inicial da sessão
         const today = getLocalDateString();
@@ -431,12 +468,92 @@ export default function App() {
     activeUserRef.current = null;
     setUser(null);
     setMeals(EMPTY_MEALS);
+    setRecipes([]);
     try {
       localStorage.removeItem('macrometrics_auth_user');
     } catch {
       // Ignora erro de storage
     }
   };
+
+  const handleSaveRecipe = async (newOrUpdatedRecipe: RecipeInput) => {
+    const recipeId = newOrUpdatedRecipe.id || `recipe_${Date.now()}`;
+    const recipeWithId: RecipeInput = { ...newOrUpdatedRecipe, id: recipeId };
+
+    setRecipes(prev => {
+      const exists = prev.some(r => r.id === recipeId);
+      const next = exists
+        ? prev.map(r => (r.id === recipeId ? recipeWithId : r))
+        : [recipeWithId, ...prev];
+
+      if (user) {
+        try {
+          localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(next));
+        } catch {
+          // Ignora erro de storage
+        }
+      }
+      return next;
+    });
+
+    if (user) {
+      try {
+        await fetch(`/api/v1/recipes/${recipeId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': user.id,
+          },
+          body: JSON.stringify(recipeWithId),
+        });
+      } catch {
+        // Modo offline-first resiliente
+      }
+    }
+  };
+
+  const handleDeleteRecipe = async (recipeId: string) => {
+    setRecipes(prev => {
+      const next = prev.filter(r => r.id !== recipeId);
+      if (user) {
+        try {
+          localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(next));
+        } catch {
+          // Ignora erro de storage
+        }
+      }
+      return next;
+    });
+
+    if (user) {
+      try {
+        await fetch(`/api/v1/recipes/${recipeId}`, {
+          method: 'DELETE',
+          headers: {
+            'x-user-id': user.id,
+          },
+        });
+      } catch {
+        // Modo offline-first resiliente
+      }
+    }
+  };
+
+  const combinedAvailableFoods = useMemo(() => {
+    const recipeFoods = recipes.map(recipe => {
+      const calc = calculateRecipeMacros(recipe, availableFoods);
+      return recipeToFoodItem(recipe, calc, user?.id);
+    });
+
+    const map = new Map<string, FoodItem>();
+    for (const f of availableFoods) {
+      if (!f.isRecipe) map.set(f.id, f);
+    }
+    for (const rf of recipeFoods) {
+      map.set(rf.id, rf);
+    }
+    return Array.from(map.values());
+  }, [recipes, availableFoods, user?.id]);
 
   // Se o usuário NÃO estiver logado, exibe a Página Principal de Login
   // Nenhum alimento pode ser lançado sem autenticação
@@ -784,12 +901,15 @@ export default function App() {
         {/* Construtor de Refeições com UX Cronometer */}
         <MealBuilder
           meals={meals}
-          availableFoods={availableFoods}
+          availableFoods={combinedAvailableFoods}
+          recipes={recipes}
           onAddFood={handleAddFood}
           onRemoveFood={handleRemoveFood}
           onCopyMeal={handleCopyMeal}
           onAutoCompleteProtein={handleAutoCompleteProtein}
           onRegisterFood={handleRegisterFood}
+          onSaveRecipe={handleSaveRecipe}
+          onDeleteRecipe={handleDeleteRecipe}
           missingProtein={missingProtein}
           remainingCalories={remainingCalories}
           currentUser={user}
