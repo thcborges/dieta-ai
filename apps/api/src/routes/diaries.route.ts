@@ -1,10 +1,11 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
   firestoreDiaryService,
   type MealWindow,
   type MealMap,
 } from '../services/firestore-diary.service.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const loggedFoodSchema = z.object({
   id: z.string().min(1),
@@ -35,16 +36,35 @@ function isValidDate(dateStr: string): boolean {
   return !isNaN(d.getTime());
 }
 
+function checkUserAccess(req: FastifyRequest, reply: FastifyReply): string | null {
+  const authUserId = req.user?.id;
+  const clientUserId = req.headers['x-user-id'] as string | undefined;
+
+  if (authUserId && clientUserId && clientUserId !== authUserId) {
+    reply.status(403).send({
+      error: 'FORBIDDEN',
+      message: 'Acesso negado: Tentativa de acesso a dados de outro usuário.',
+    });
+    return null;
+  }
+
+  const effectiveUserId = authUserId || clientUserId;
+  if (!effectiveUserId) {
+    reply.status(401).send({
+      error: 'UNAUTHORIZED',
+      message: 'Autenticação necessária para acessar o diário alimentar.',
+    });
+    return null;
+  }
+
+  return effectiveUserId;
+}
+
 export const diaryRoutes: FastifyPluginAsync = async (app) => {
   // Consulta o diário de refeições de uma data específica
-  app.get<{ Params: { date: string } }>('/api/v1/diaries/:date', async (req, reply) => {
-    const userId = req.headers['x-user-id'] as string | undefined;
-    if (!userId) {
-      return reply.status(401).send({
-        error: 'UNAUTHORIZED',
-        message: 'Cabeçalho x-user-id é obrigatório para consultar o diário alimentar.',
-      });
-    }
+  app.get<{ Params: { date: string } }>('/api/v1/diaries/:date', { preHandler: [requireAuth] }, async (req, reply) => {
+    const userId = checkUserAccess(req, reply);
+    if (!userId) return;
 
     const { date } = req.params;
     if (!isValidDate(date)) {
@@ -59,14 +79,9 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Salva / Atualiza o diário completo de uma data no Firestore
-  app.put<{ Params: { date: string } }>('/api/v1/diaries/:date', async (req, reply) => {
-    const userId = req.headers['x-user-id'] as string | undefined;
-    if (!userId) {
-      return reply.status(401).send({
-        error: 'UNAUTHORIZED',
-        message: 'Cabeçalho x-user-id é obrigatório para salvar o diário alimentar.',
-      });
-    }
+  app.put<{ Params: { date: string } }>('/api/v1/diaries/:date', { preHandler: [requireAuth] }, async (req, reply) => {
+    const userId = checkUserAccess(req, reply);
+    if (!userId) return;
 
     const { date } = req.params;
     if (!isValidDate(date)) {
@@ -99,14 +114,10 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   // Adiciona um alimento diretamente a uma janela de refeição
   app.post<{ Params: { date: string; window: string } }>(
     '/api/v1/diaries/:date/meals/:window',
+    { preHandler: [requireAuth] },
     async (req, reply) => {
-      const userId = req.headers['x-user-id'] as string | undefined;
-      if (!userId) {
-        return reply.status(401).send({
-          error: 'UNAUTHORIZED',
-          message: 'Cabeçalho x-user-id é obrigatório.',
-        });
-      }
+      const userId = checkUserAccess(req, reply);
+      if (!userId) return;
 
       const { date, window } = req.params;
       if (!isValidDate(date)) {
@@ -145,14 +156,10 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   // Remove um alimento específico do diário no Firestore
   app.delete<{ Params: { date: string; window: string; itemId: string } }>(
     '/api/v1/diaries/:date/meals/:window/:itemId',
+    { preHandler: [requireAuth] },
     async (req, reply) => {
-      const userId = req.headers['x-user-id'] as string | undefined;
-      if (!userId) {
-        return reply.status(401).send({
-          error: 'UNAUTHORIZED',
-          message: 'Cabeçalho x-user-id é obrigatório.',
-        });
-      }
+      const userId = checkUserAccess(req, reply);
+      if (!userId) return;
 
       const { date, window, itemId } = req.params;
       if (!isValidDate(date)) {

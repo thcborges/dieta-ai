@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { recipeService } from '../services/recipe.service.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const recipeSchema = z.object({
   id: z.string().optional(),
@@ -17,10 +18,14 @@ const recipeSchema = z.object({
     .min(1),
 });
 
+function getUserId(req: FastifyRequest): string | undefined {
+  return req.user?.id || (req.headers['x-user-id'] as string | undefined);
+}
+
 export const recipeRoutes: FastifyPluginAsync = async (app) => {
   // Listar receitas do usuário
-  app.get('/api/v1/recipes', async (req) => {
-    const userId = req.headers['x-user-id'] as string | undefined;
+  app.get('/api/v1/recipes', { preHandler: [requireAuth] }, async (req) => {
+    const userId = getUserId(req);
     const recipes = await recipeService.getRecipes(userId);
     return {
       recipes,
@@ -29,9 +34,9 @@ export const recipeRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Obter receita por ID
-  app.get<{ Params: { id: string } }>('/api/v1/recipes/:id', async (req, reply) => {
+  app.get<{ Params: { id: string } }>('/api/v1/recipes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
     const { id } = req.params;
-    const userId = req.headers['x-user-id'] as string | undefined;
+    const userId = getUserId(req);
     const recipe = await recipeService.getRecipeById(id, userId);
     if (!recipe) {
       return reply.status(404).send({
@@ -43,7 +48,7 @@ export const recipeRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Criar nova receita
-  app.post('/api/v1/recipes', async (req, reply) => {
+  app.post('/api/v1/recipes', { preHandler: [requireAuth] }, async (req, reply) => {
     const parseResult = recipeSchema.safeParse(req.body);
     if (!parseResult.success) {
       return reply.status(400).send({
@@ -52,13 +57,13 @@ export const recipeRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const userId = req.headers['x-user-id'] as string | undefined;
+    const userId = getUserId(req);
     const saved = await recipeService.createRecipe(parseResult.data, userId);
     return reply.status(201).send(saved);
   });
 
   // Atualizar receita existente
-  app.put<{ Params: { id: string } }>('/api/v1/recipes/:id', async (req, reply) => {
+  app.put<{ Params: { id: string } }>('/api/v1/recipes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
     const { id } = req.params;
     const parseResult = recipeSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -68,7 +73,7 @@ export const recipeRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const userId = req.headers['x-user-id'] as string | undefined;
+    const userId = getUserId(req);
     const updated = await recipeService.updateRecipe(id, parseResult.data, userId);
     if (!updated) {
       return reply.status(404).send({
@@ -80,9 +85,9 @@ export const recipeRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Excluir receita
-  app.delete<{ Params: { id: string } }>('/api/v1/recipes/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/v1/recipes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
     const { id } = req.params;
-    const userId = req.headers['x-user-id'] as string | undefined;
+    const userId = getUserId(req);
     const deleted = await recipeService.deleteRecipe(id, userId);
     if (!deleted) {
       return reply.status(404).send({

@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { diaryService, type MealMap } from '../services/diary.service.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const loggedFoodSchema = z.object({
   id: z.string(),
@@ -24,16 +25,33 @@ const updateDiarySchema = z.object({
 });
 
 export const diaryRoutes: FastifyPluginAsync = async (app) => {
-  // Consulta as refeições do diário pertencentes estritamente ao usuário autenticado
-  app.get('/api/v1/diary', async (req, reply) => {
-    const userId = (req.headers['x-user-id'] as string) || (req.headers['authorization'] as string);
-    if (!userId || userId.trim() === '') {
+  const authenticateDiary = async (req: FastifyRequest, reply: FastifyReply) => {
+    const authHeader = req.headers.authorization;
+    const legacyUserId = req.headers['x-user-id'] as string | undefined;
+
+    if (!authHeader && !legacyUserId) {
       return reply.status(401).send({
         error: 'USER_AUTHENTICATION_REQUIRED',
         message: 'Acesso negado: Diário vinculado exclusivamente a contas autenticadas.',
       });
     }
 
+    return requireAuth(req, reply);
+  };
+
+  // Consulta as refeições do diário pertencentes estritamente ao usuário autenticado
+  app.get('/api/v1/diary', { preHandler: [authenticateDiary] }, async (req, reply) => {
+    const authUserId = req.user?.id;
+    const clientUserId = req.headers['x-user-id'] as string | undefined;
+
+    if (authUserId && clientUserId && clientUserId !== authUserId) {
+      return reply.status(403).send({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado: Tentativa de acesso a dados de outro usuário.',
+      });
+    }
+
+    const userId = (authUserId || clientUserId)!;
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
     const meals = diaryService.getDiary(cleanUserId);
 
@@ -44,15 +62,18 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Atualiza/persiste as refeições do diário vinculado à conta do usuário autenticado
-  app.put('/api/v1/diary', async (req, reply) => {
-    const userId = (req.headers['x-user-id'] as string) || (req.headers['authorization'] as string);
-    if (!userId || userId.trim() === '') {
-      return reply.status(401).send({
-        error: 'USER_AUTHENTICATION_REQUIRED',
-        message: 'Acesso negado: Diário vinculado exclusivamente a contas autenticadas.',
+  app.put('/api/v1/diary', { preHandler: [authenticateDiary] }, async (req, reply) => {
+    const authUserId = req.user?.id;
+    const clientUserId = req.headers['x-user-id'] as string | undefined;
+
+    if (authUserId && clientUserId && clientUserId !== authUserId) {
+      return reply.status(403).send({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado: Tentativa de acesso a dados de outro usuário.',
       });
     }
 
+    const userId = (authUserId || clientUserId)!;
     const parseResult = updateDiarySchema.safeParse(req.body);
     if (!parseResult.success) {
       return reply.status(400).send({
