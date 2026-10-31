@@ -2,8 +2,10 @@ services:
   firestore-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     container_name: dieta-ai-firestore-emulator
-    command: gcloud beta emulators firestore start --host-port=0.0.0.0:8080
+    command: gcloud beta emulators firestore start --host-port=0.0.0.0:8080 --rules=/rules/firestore.rules
     ports:
       - "8080:8080"
+    volumes:
+      - ./firestore.rules:/rules/firestore.rules:ro
     environment:
       - FIRESTORE_PROJECT_ID=thcborges-dieta-ai-dev

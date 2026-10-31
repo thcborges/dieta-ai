@@ -162,7 +162,7 @@ export default function App() {
   // Modais
   const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [isAdmin] = useState(true);
+  const isAdmin = Boolean(user?.isAdmin);
 
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
@@ -951,7 +951,6 @@ export default function App() {
           try {
             await fetch(`/api/v1/admin/users/${id}`, {
               method: 'DELETE',
-              headers: { 'x-admin-token': 'admin-secret-token-key-us-central1' },
             });
           } catch {
             // offline-first resiliente

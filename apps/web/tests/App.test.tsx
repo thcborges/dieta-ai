@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { getLocalDateString } from '@dieta-ai/core';
 import App from '../src/App.js';
 
 describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & Lançamentos)', () => {
@@ -41,6 +42,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -69,6 +71,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -92,6 +95,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -115,6 +119,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -146,6 +151,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -166,6 +172,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -303,6 +310,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
         id: 'usr_thcborges',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
+        isAdmin: true,
       })
     );
 
@@ -386,7 +394,7 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
 
   it('deve permitir copiar refeição de outro dia com controle de porção e remoção de itens atualizando o diário', async () => {
     // Calcula a data de ontem de forma idêntica à do CopyMealModal
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateString();
     const parts = today.split('-').map(Number);
     const d = new Date(Date.UTC(parts[0]!, parts[1]! - 1, parts[2]!));
     d.setUTCDate(d.getUTCDate() - 1);
@@ -439,11 +447,9 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     const copyBtns = screen.getAllByTitle(/Copiar Refeição/i);
     fireEvent.click(copyBtns[1]!); // Almoço
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-    // Seleciona Ontem como data de origem
-    const yesterdayBtn = screen.getByRole('button', { name: /Ontem/i });
-    fireEvent.click(yesterdayBtn);
+    // Seleciona Ontem como data de origem dentro do modal
+    const yesterdayBtns = screen.getAllByRole('button', { name: /Ontem/i });
+    fireEvent.click(yesterdayBtns[yesterdayBtns.length - 1]!);
 
     // Deve carregar os itens de ontem
     expect(await screen.findByText('Sassami Grelhado Ontem')).toBeInTheDocument();

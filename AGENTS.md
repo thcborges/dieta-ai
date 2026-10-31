@@ -60,6 +60,26 @@
    * **Passo 1:** Ao desenvolver uma nova feature, execute *apenas* os testes da respectiva feature.
    * **Passo 2:** Somente após os testes da feature passarem com 100% de sucesso, execute a **suíte completa de testes** do projeto para atestar a não-regressão.
 
+### 2.3. Diretrizes Inquebráveis de Segurança Zero-Trust no Cliente e Validação no Servidor
+
+> [!IMPORTANT]
+> **PREMISSA ZERO-TRUST DO CLIENTE / NAVEGADOR:**
+> Parta sempre do princípio de que qualquer código ou dado que roda no navegador/cliente pode ser lido, inspecionado e arbitrariamente alterado pelo usuário. Nunca confie no cliente para cálculos de negócio, decisões de autorização ou integridade de dados.
+
+1. **Regras de Negócio e Cálculos no Servidor:**
+   - Todo cálculo de negócio, regras de permissão, papéis de admin, limites de plano, metas e validações críticas NÃO podem existir exclusivamente no cliente.
+   - O servidor (API Fastify no Cloud Run) DEVE recalcular todos os valores e totais com base na verdade do banco de dados, ignorando montantes, macros ou somatórios enviados pelo cliente.
+2. **Segregação Estrita de Segredos e Chaves:**
+   - Chaves privadas, tokens de administração, segredos de APIs (ex.: chaves de IA, tokens de webhook/Telegram, peppers HMAC) NUNCA podem ser expostos no código do frontend nem em variáveis injetadas no bundle web (`VITE_*`, `NEXT_PUBLIC_*`).
+   - Toda chave secreta deve residir exclusivamente no backend ou Secret Manager.
+   - Apenas chaves públicas por design (ex.: Client ID do Google Sign-In) são permitidas no cliente.
+3. **Controle de Acesso Mínimo e Identidade Autenticada:**
+   - NUNCA confiar em cabeçalhos de identidade enviados livremente pelo cliente (como `x-user-id` ou tokens estáticos de admin).
+   - A identidade do usuário DEVE ser comprovada por token criptográfico assinado (Google ID Token / JWT) validado no backend com extração segura do Subject ID (`sub`).
+   - Cada usuário só acessa, altera e exclui seus próprios recursos.
+   - Operações administrativas requerem verificação de claims de administração atreladas à identidade autenticada ou listas de controle no servidor, jamais tokens compartilhados no cliente.
+   - Nenhuma proteção de segurança pode ser desabilitada ou afrouxada para "fazer o código funcionar".
+
 ---
 
 ## 3. Arquitetura do Sistema e Stack Tecnológica

@@ -87,7 +87,16 @@ export class FirestoreDiaryService {
   private inMemoryFallback: Map<string, DailyDiaryDoc> = new Map();
 
   constructor(options?: { firestore?: Firestore; pepper?: string }) {
-    this.pepper = options?.pepper || process.env.BLIND_INDEX_PEPPER || 'macrometrics-secret-pepper-us-central1';
+    const configuredPepper = options?.pepper || process.env.BLIND_INDEX_PEPPER || process.env.LGPD_SECRET_PEPPER;
+    if (!configuredPepper) {
+      if (process.env.NODE_ENV === 'test') {
+        this.pepper = 'test-blind-index-pepper-32chars!!';
+      } else {
+        throw new Error('Configuração de segurança ausente: BLIND_INDEX_PEPPER deve ser definido via variáveis de ambiente.');
+      }
+    } else {
+      this.pepper = configuredPepper;
+    }
     if (options?.firestore) {
       this.firestore = options.firestore;
     }
