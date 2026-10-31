@@ -36,6 +36,11 @@ variable "rules_file_path" {
   default     = ""
 }
 
+locals {
+  default_rules_path  = fileexists("${path.module}/../../../../firestore.rules") ? "${path.module}/../../../../firestore.rules" : "${path.module}/firestore.rules"
+  resolved_rules_path = var.rules_file_path != "" ? var.rules_file_path : local.default_rules_path
+}
+
 resource "google_firestore_database" "database" {
   project                     = var.project_id
   name                        = var.database_name
@@ -51,7 +56,7 @@ resource "google_firebaserules_ruleset" "firestore" {
   source {
     files {
       name    = "firestore.rules"
-      content = file(coalesce(var.rules_file_path, "${path.module}/../../../firestore.rules"))
+      content = file(local.resolved_rules_path)
     }
   }
 
