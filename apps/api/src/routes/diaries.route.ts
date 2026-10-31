@@ -6,16 +6,21 @@ import {
   type MealMap,
 } from '../services/firestore-diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import {
+  recalculateMealItem,
+  recalculateMealMap,
+  type RawMealItemInput,
+} from '../services/macro-recalculation.service.js';
 
 const loggedFoodSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).optional(),
   foodId: z.string().min(1),
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
   grams: z.number().positive(),
-  calories: z.number().nonnegative(),
-  protein: z.number().nonnegative(),
-  carbs: z.number().nonnegative(),
-  fat: z.number().nonnegative(),
+  calories: z.number().nonnegative().optional(),
+  protein: z.number().nonnegative().optional(),
+  carbs: z.number().nonnegative().optional(),
+  fat: z.number().nonnegative().optional(),
   fiber: z.number().nonnegative().optional().default(0),
 });
 
@@ -99,10 +104,15 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    const recalculatedMeals = recalculateMealMap(
+      parseResult.data.meals as Record<string, RawMealItemInput[]>,
+      userId
+    );
+
     const saved = await firestoreDiaryService.saveDiary(
       userId,
       date,
-      parseResult.data.meals as MealMap
+      recalculatedMeals
     );
 
     return reply.status(200).send({
@@ -142,11 +152,16 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
+      const recalculatedItem = recalculateMealItem(
+        parseResult.data as RawMealItemInput,
+        userId
+      );
+
       const updated = await firestoreDiaryService.addFoodToMeal(
         userId,
         date,
         window as MealWindow,
-        parseResult.data
+        recalculatedItem
       );
 
       return reply.status(200).send(updated);

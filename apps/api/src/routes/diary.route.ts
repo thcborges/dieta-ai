@@ -2,25 +2,29 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { diaryService, type MealMap } from '../services/diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import {
+  recalculateMealMap,
+  type RawMealItemInput,
+} from '../services/macro-recalculation.service.js';
 
 const loggedFoodSchema = z.object({
-  id: z.string(),
-  foodId: z.string(),
-  name: z.string(),
+  id: z.string().optional(),
+  foodId: z.string().min(1),
+  name: z.string().optional(),
   grams: z.number().nonnegative(),
-  calories: z.number().nonnegative(),
-  protein: z.number().nonnegative(),
-  carbs: z.number().nonnegative(),
-  fat: z.number().nonnegative(),
+  calories: z.number().nonnegative().optional(),
+  protein: z.number().nonnegative().optional(),
+  carbs: z.number().nonnegative().optional(),
+  fat: z.number().nonnegative().optional(),
   fiber: z.number().nonnegative().optional().default(0),
 });
 
 const updateDiarySchema = z.object({
   meals: z.object({
-    breakfast: z.array(loggedFoodSchema),
-    lunch: z.array(loggedFoodSchema),
-    afternoon_snack: z.array(loggedFoodSchema),
-    dinner_event: z.array(loggedFoodSchema),
+    breakfast: z.array(loggedFoodSchema).optional().default([]),
+    lunch: z.array(loggedFoodSchema).optional().default([]),
+    afternoon_snack: z.array(loggedFoodSchema).optional().default([]),
+    dinner_event: z.array(loggedFoodSchema).optional().default([]),
   }),
 });
 
@@ -83,7 +87,11 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
-    const savedMeals = diaryService.saveDiary(cleanUserId, parseResult.data.meals as MealMap);
+    const recalculatedMeals = recalculateMealMap(
+      parseResult.data.meals as Record<string, RawMealItemInput[]>,
+      cleanUserId
+    );
+    const savedMeals = diaryService.saveDiary(cleanUserId, recalculatedMeals);
 
     return reply.status(200).send({
       success: true,

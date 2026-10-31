@@ -25,6 +25,10 @@ export class FoodCacheService {
     }
   }
 
+  getById(id: string): CachedFood | null {
+    return this.inMemoryCache.get(id) || null;
+  }
+
   getAllFoods(userId?: string, isAdmin: boolean = false): CachedFood[] {
     const map = new Map<string, CachedFood>();
     for (const food of this.inMemoryCache.values()) {
