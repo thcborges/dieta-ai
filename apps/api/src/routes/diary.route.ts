@@ -1,11 +1,14 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { auditDailyIntake } from '@dieta-ai/core';
 import { diaryService, type MealMap } from '../services/diary.service.js';
+import { calculateDiaryTotals } from '../services/firestore-diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {
   recalculateMealMap,
   type RawMealItemInput,
 } from '../services/macro-recalculation.service.js';
+import { userGoalsService } from '../services/user-goals.service.js';
 
 const loggedFoodSchema = z.object({
   id: z.string().optional(),
@@ -58,10 +61,23 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     const userId = (authUserId || clientUserId)!;
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
     const meals = diaryService.getDiary(cleanUserId);
+    const totals = calculateDiaryTotals(meals);
+    const goals = userGoalsService.getGoals(cleanUserId);
+    const auditReport = auditDailyIntake({
+      weightKg: goals.weightKg,
+      plannedDailyDeficitKcal: goals.dailyDeficitKcal,
+      targetCalories: goals.calories,
+      targetProteinGrams: goals.proteinGrams,
+      currentCalories: totals.calories,
+      currentProteinGrams: totals.protein,
+    });
 
     return reply.status(200).send({
       userId: cleanUserId,
       meals,
+      totals,
+      goals,
+      auditReport,
     });
   });
 
@@ -92,11 +108,24 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
       cleanUserId
     );
     const savedMeals = diaryService.saveDiary(cleanUserId, recalculatedMeals);
+    const totals = calculateDiaryTotals(savedMeals);
+    const goals = userGoalsService.getGoals(cleanUserId);
+    const auditReport = auditDailyIntake({
+      weightKg: goals.weightKg,
+      plannedDailyDeficitKcal: goals.dailyDeficitKcal,
+      targetCalories: goals.calories,
+      targetProteinGrams: goals.proteinGrams,
+      currentCalories: totals.calories,
+      currentProteinGrams: totals.protein,
+    });
 
     return reply.status(200).send({
       success: true,
       userId: cleanUserId,
       meals: savedMeals,
+      totals,
+      goals,
+      auditReport,
     });
   });
 };

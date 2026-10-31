@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { auditDailyIntake } from '@dieta-ai/core';
 import {
   firestoreDiaryService,
   type MealWindow,
@@ -11,6 +12,7 @@ import {
   recalculateMealMap,
   type RawMealItemInput,
 } from '../services/macro-recalculation.service.js';
+import { userGoalsService } from '../services/user-goals.service.js';
 
 const loggedFoodSchema = z.object({
   id: z.string().min(1).optional(),
@@ -80,7 +82,21 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const diary = await firestoreDiaryService.getDiary(userId, date);
-    return reply.status(200).send(diary);
+    const goals = userGoalsService.getGoals(userId);
+    const auditReport = auditDailyIntake({
+      weightKg: goals.weightKg,
+      plannedDailyDeficitKcal: goals.dailyDeficitKcal,
+      targetCalories: goals.calories,
+      targetProteinGrams: goals.proteinGrams,
+      currentCalories: diary.totals.calories,
+      currentProteinGrams: diary.totals.protein,
+    });
+
+    return reply.status(200).send({
+      ...diary,
+      goals,
+      auditReport,
+    });
   });
 
   // Salva / Atualiza o diário completo de uma data no Firestore
@@ -115,9 +131,21 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
       recalculatedMeals
     );
 
+    const goals = userGoalsService.getGoals(userId);
+    const auditReport = auditDailyIntake({
+      weightKg: goals.weightKg,
+      plannedDailyDeficitKcal: goals.dailyDeficitKcal,
+      targetCalories: goals.calories,
+      targetProteinGrams: goals.proteinGrams,
+      currentCalories: saved.totals.calories,
+      currentProteinGrams: saved.totals.protein,
+    });
+
     return reply.status(200).send({
       success: true,
       ...saved,
+      goals,
+      auditReport,
     });
   });
 
