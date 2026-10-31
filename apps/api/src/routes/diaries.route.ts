@@ -4,7 +4,6 @@ import { auditDailyIntake } from '@dieta-ai/core';
 import {
   firestoreDiaryService,
   type MealWindow,
-  type MealMap,
 } from '../services/firestore-diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {

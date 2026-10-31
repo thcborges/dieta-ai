@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { auditDailyIntake } from '@dieta-ai/core';
-import { diaryService, type MealMap } from '../services/diary.service.js';
+import { diaryService } from '../services/diary.service.js';
 import { calculateDiaryTotals } from '../services/firestore-diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {
