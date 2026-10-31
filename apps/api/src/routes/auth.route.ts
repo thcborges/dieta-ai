@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { generateBlindIndex } from '@dieta-ai/core';
+import { authService } from '../services/auth.service.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const googleAuthSchema = z.object({
   googleIdToken: z.string().min(1),
@@ -8,9 +9,8 @@ const googleAuthSchema = z.object({
   name: z.string().optional(),
 });
 
-const DEFAULT_PEPPER = process.env.LGPD_SECRET_PEPPER || 'dieta-ai-production-pepper-secret-key-32chars';
-
 export const authRoutes: FastifyPluginAsync = async (app) => {
+  // Autenticação com Google ID Token e emissão de Session JWT criptografado
   app.post('/api/v1/auth/google', async (req, reply) => {
     const parseResult = googleAuthSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -20,20 +20,49 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const { email, name } = parseResult.data;
+    const { googleIdToken, email, name } = parseResult.data;
 
-    // Gera o Blind Index HMAC para busca determinística sem expor identidade
-    const blindIndex = generateBlindIndex(email, DEFAULT_PEPPER);
+    let verified;
+    try {
+      verified = await authService.verifyGoogleIdToken(googleIdToken, email);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha na verificação';
+      return reply.status(401).send({
+        error: 'INVALID_GOOGLE_TOKEN',
+        message,
+      });
+    }
+
+    const blindIndex = authService.getBlindUserId(verified.sub);
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const isAdmin = authService.isEmailAdmin(verified.email);
+
+    const sessionToken = authService.createSessionToken({
+      sub: verified.sub,
+      email: verified.email,
+      name: name || verified.name,
+      isAdmin,
+      blindUserId: blindIndex,
+    });
 
     return reply.status(200).send({
       sessionId,
+      sessionToken,
       blindIndex,
       user: {
-        email,
-        name: name || 'Usuário MacroMetrics',
+        id: verified.sub,
+        email: verified.email,
+        name: name || verified.name,
         googleIdTokenVerified: true,
+        isAdmin,
       },
+    });
+  });
+
+  // Consulta dados e perfil de autorização do usuário logado via Bearer token
+  app.get('/api/v1/auth/me', { preHandler: [requireAuth] }, async (req, reply) => {
+    return reply.status(200).send({
+      user: req.user,
     });
   });
 };
