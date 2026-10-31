@@ -30,6 +30,12 @@ variable "database_name" {
   default     = "(default)"
 }
 
+variable "rules_file_path" {
+  type        = string
+  description = "Caminho do arquivo firestore.rules para isolamento de segurança"
+  default     = ""
+}
+
 resource "google_firestore_database" "database" {
   project                     = var.project_id
   name                        = var.database_name
@@ -38,6 +44,26 @@ resource "google_firestore_database" "database" {
   concurrency_mode            = "OPTIMISTIC"
   app_engine_integration_mode = "DISABLED"
   delete_protection_state     = "DELETE_PROTECTION_ENABLED"
+}
+
+resource "google_firebaserules_ruleset" "firestore" {
+  project = var.project_id
+  source {
+    files {
+      name    = "firestore.rules"
+      content = file(coalesce(var.rules_file_path, "${path.module}/../../../firestore.rules"))
+    }
+  }
+
+  depends_on = [google_firestore_database.database]
+}
+
+resource "google_firebaserules_release" "firestore" {
+  project      = var.project_id
+  name         = "cloud.firestore"
+  ruleset_name = "projects/${var.project_id}/rulesets/${google_firebaserules_ruleset.firestore.name}"
+
+  depends_on = [google_firebaserules_ruleset.firestore]
 }
 
 output "database_name" {
