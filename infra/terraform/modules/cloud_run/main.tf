@@ -138,6 +138,11 @@ resource "google_cloud_run_v2_service" "api_service" {
         value = local.resolved_admin
       }
 
+      env {
+        name  = "PUBSUB_TOPIC"
+        value = "dieta-ai-errors-${var.node_env == "production" ? "prd" : "dev"}"
+      }
+
       ports {
         container_port = 8080
       }

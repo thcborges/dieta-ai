@@ -30,7 +30,7 @@ resource "google_logging_project_sink" "error_sink" {
   destination = "pubsub.googleapis.com/${var.pubsub_topic_id}"
 
   # Filtro estrito: apenas ocorrências com severidade ERROR ou CRITICAL do app dieta-ai
-  filter = "severity >= ERROR AND (jsonPayload.targetPubSubTopic = \"dieta-ai-errors-dev\" OR jsonPayload.app = \"dieta-ai\")"
+  filter = "severity >= ERROR AND (jsonPayload.targetPubSubTopic = \"dieta-ai-errors-dev\" OR jsonPayload.targetPubSubTopic = \"dieta-ai-errors-prd\" OR jsonPayload.app = \"dieta-ai\")"
 
   unique_writer_identity = true
 }
