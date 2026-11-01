@@ -29,7 +29,9 @@ export class PubSubConsumerService {
 
     try {
       const rawText = message.data.toString('utf-8');
-      payload = JSON.parse(rawText);
+      const parsed = JSON.parse(rawText);
+      // Suporta payload direto ou envelope padrão do Google Cloud Logging Sink (jsonPayload)
+      payload = (parsed && typeof parsed === 'object' && parsed.jsonPayload) ? parsed.jsonPayload : parsed;
 
       if (!payload.errorId || !payload.message) {
         // Formato incompatível: ack para não reter na fila

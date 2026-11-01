@@ -60,4 +60,30 @@ describe('Error Logging & Pub/Sub Event Dispatch (Self-Healing Pipeline)', () =>
     const body = response.json();
     expect(body.error).toBe('INVALID_TELEMETRY_PAYLOAD');
   });
+
+  it('deve rotear dinamicamente para dieta-ai-errors-prd quando PUBSUB_TOPIC for configurado ou em produção', async () => {
+    const originalTopic = process.env.PUBSUB_TOPIC;
+    try {
+      process.env.PUBSUB_TOPIC = 'dieta-ai-errors-prd';
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/telemetry/errors',
+        payload: {
+          errorMessage: 'Erro crítico de produção',
+          sessionEvents: [],
+        },
+      });
+
+      expect(response.statusCode).toBe(202);
+      const body = response.json();
+      expect(body.topic).toBe('dieta-ai-errors-prd');
+    } finally {
+      if (originalTopic !== undefined) {
+        process.env.PUBSUB_TOPIC = originalTopic;
+      } else {
+        delete process.env.PUBSUB_TOPIC;
+      }
+    }
+  });
 });
