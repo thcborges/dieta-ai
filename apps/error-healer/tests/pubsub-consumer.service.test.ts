@@ -122,6 +122,47 @@ describe('PubSubConsumerService (Consumo de Fila de Erros & Orquestração Dev/P
     expect(invalidSchemaMsg.ack).toHaveBeenCalled();
   });
 
+  it('deve desempacotar envelope jsonPayload do Cloud Logging Sink ao processar mensagem do Pub/Sub', async () => {
+    const notifyErrorSpy = vi.fn().mockResolvedValue(true);
+    const healSpy = vi.fn().mockResolvedValue({ success: false });
+
+    const consumer = new PubSubConsumerService({
+      telegramService: { notifyErrorDetected: notifyErrorSpy, notifyPullRequestCreated: vi.fn() } as any,
+      agyRunnerService: { heal: healSpy } as any,
+      autoHealEnabled: false,
+    });
+
+    // Simula envelope padrão enviado pelo Cloud Logging Sink para o Pub/Sub
+    const cloudLoggingEnvelope = {
+      insertId: 'log-insert-12345',
+      resource: { type: 'cloud_run_revision' },
+      timestamp: '2026-10-30T18:00:00.000Z',
+      jsonPayload: {
+        errorId: 'err-cloud-logging-envelope',
+        message: 'Falha no container Cloud Run capturada pelo Logging Sink',
+        environment: 'production',
+        timestamp: '2026-10-30T18:00:00.000Z',
+        recentEvents: [],
+      },
+    };
+
+    const mockMessage = {
+      data: Buffer.from(JSON.stringify(cloudLoggingEnvelope)),
+      ack: vi.fn(),
+      nack: vi.fn(),
+    };
+
+    await consumer.handleMessage(mockMessage as any);
+
+    expect(notifyErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorId: 'err-cloud-logging-envelope',
+        message: 'Falha no container Cloud Run capturada pelo Logging Sink',
+      })
+    );
+    expect(mockMessage.ack).toHaveBeenCalled();
+  });
+
   it('deve dar nack se ocorrer erro inesperado no processamento', async () => {
     const consumer = new PubSubConsumerService({
       telegramService: {

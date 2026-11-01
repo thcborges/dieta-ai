@@ -28,6 +28,10 @@ export const telemetryRoutes: FastifyPluginAsync = async (app) => {
 
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const targetPubSubTopic =
+      process.env.PUBSUB_TOPIC ||
+      (process.env.NODE_ENV === 'production' ? 'dieta-ai-errors-prd' : 'dieta-ai-errors-dev');
+
     // Estruturação do log no formato esperado pelo Cloud Logging e Pub/Sub
     const structuredLog = {
       severity: 'ERROR',
@@ -38,7 +42,7 @@ export const telemetryRoutes: FastifyPluginAsync = async (app) => {
       sessionContext: last10Events,
       environment: process.env.NODE_ENV || 'development',
       region: 'us-central1',
-      targetPubSubTopic: 'dieta-ai-errors-dev',
+      targetPubSubTopic,
       receivedAt: new Date().toISOString(),
     };
 
@@ -47,7 +51,7 @@ export const telemetryRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.status(202).send({
       status: 'DISPATCHED_TO_PUBSUB',
-      topic: 'dieta-ai-errors-dev',
+      topic: targetPubSubTopic,
       errorId,
       eventCountCaptured: last10Events.length,
     });
