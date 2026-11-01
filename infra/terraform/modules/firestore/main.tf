@@ -36,6 +36,12 @@ variable "rules_file_path" {
   default     = ""
 }
 
+variable "enable_security_rules" {
+  type        = bool
+  description = "Habilitar deploy de regras de segurança via Firebase Rules API (requer permissão roles/firebaserules.admin)"
+  default     = false
+}
+
 locals {
   default_rules_path  = fileexists("${path.module}/../../../../firestore.rules") ? "${path.module}/../../../../firestore.rules" : "${path.module}/firestore.rules"
   resolved_rules_path = var.rules_file_path != "" ? var.rules_file_path : local.default_rules_path
@@ -52,6 +58,7 @@ resource "google_firestore_database" "database" {
 }
 
 resource "google_firebaserules_ruleset" "firestore" {
+  count   = var.enable_security_rules ? 1 : 0
   project = var.project_id
   source {
     files {
@@ -64,9 +71,10 @@ resource "google_firebaserules_ruleset" "firestore" {
 }
 
 resource "google_firebaserules_release" "firestore" {
+  count        = var.enable_security_rules ? 1 : 0
   project      = var.project_id
   name         = "cloud.firestore"
-  ruleset_name = "projects/${var.project_id}/rulesets/${google_firebaserules_ruleset.firestore.name}"
+  ruleset_name = "projects/${var.project_id}/rulesets/${google_firebaserules_ruleset.firestore[0].name}"
 
   depends_on = [google_firebaserules_ruleset.firestore]
 }

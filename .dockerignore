@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+dist
+coverage
+.cache
+.gemini
+android
+docs
+*.log
+.env*
