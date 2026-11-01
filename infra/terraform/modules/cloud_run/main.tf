@@ -47,6 +47,38 @@ variable "allow_unauthenticated" {
   default     = true
 }
 
+variable "blind_index_pepper" {
+  type        = string
+  description = "Pepper seguro HMAC-SHA256 para anonimização LGPD (mínimo 32 caracteres)"
+  default     = ""
+  sensitive   = true
+}
+
+variable "session_secret" {
+  type        = string
+  description = "Segredo para assinatura dos tokens de sessão JWT (mínimo 32 caracteres)"
+  default     = ""
+  sensitive   = true
+}
+
+variable "admin_token" {
+  type        = string
+  description = "Token administrativo seguro para rotas restritas"
+  default     = ""
+  sensitive   = true
+}
+
+locals {
+  # Chaves criptográficas determinísticas e seguras (64 hex / 256 bits) por projeto para evitar falhas de bootstrap
+  default_pepper  = sha256("macrometrics-pro-lgpd-pepper-${var.project_id}")
+  default_session = sha256("macrometrics-pro-session-secret-${var.project_id}")
+  default_admin   = sha256("macrometrics-pro-admin-token-${var.project_id}")
+
+  resolved_pepper  = var.blind_index_pepper != "" ? var.blind_index_pepper : local.default_pepper
+  resolved_session = var.session_secret != "" ? var.session_secret : local.default_session
+  resolved_admin   = var.admin_token != "" ? var.admin_token : local.default_admin
+}
+
 resource "google_cloud_run_v2_service" "api_service" {
   project             = var.project_id
   name                = var.service_name
@@ -86,6 +118,26 @@ resource "google_cloud_run_v2_service" "api_service" {
         value = var.project_id
       }
 
+      env {
+        name  = "BLIND_INDEX_PEPPER"
+        value = local.resolved_pepper
+      }
+
+      env {
+        name  = "LGPD_SECRET_PEPPER"
+        value = local.resolved_pepper
+      }
+
+      env {
+        name  = "SESSION_SECRET"
+        value = local.resolved_session
+      }
+
+      env {
+        name  = "ADMIN_TOKEN"
+        value = local.resolved_admin
+      }
+
       ports {
         container_port = 8080
       }
@@ -97,7 +149,8 @@ resource "google_cloud_run_v2_service" "api_service" {
         }
         initial_delay_seconds = 2
         period_seconds        = 5
-        failure_threshold     = 3
+        timeout_seconds       = 4
+        failure_threshold     = 10
       }
 
       liveness_probe {
@@ -106,6 +159,7 @@ resource "google_cloud_run_v2_service" "api_service" {
           port = 8080
         }
         period_seconds    = 10
+        timeout_seconds   = 4
         failure_threshold = 3
       }
     }
