@@ -227,29 +227,29 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
       aria-labelledby="photo-meal-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-lg bg-m3-surface-container border border-m3-outline-variant/60 rounded-3xl shadow-2xl p-6 text-m3-on-surface overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-lg bg-m3-surface-container border border-m3-outline-variant/60 rounded-3xl shadow-2xl p-4 sm:p-6 text-m3-on-surface overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header do Modal */}
         <div className="flex items-center justify-between pb-4 border-b border-m3-outline-variant/40 shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             {step === 2 && (
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="p-1 rounded-full text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
+                className="p-1 rounded-full text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors shrink-0"
                 title="Voltar para a Foto"
                 aria-label="Voltar para a Foto"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
             )}
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
               <Camera className="w-5 h-5" />
             </div>
-            <div>
-              <h2 id="photo-meal-modal-title" className="text-base font-semibold text-m3-on-surface">
+            <div className="min-w-0 flex-1">
+              <h2 id="photo-meal-modal-title" className="text-base font-semibold text-m3-on-surface truncate">
                 {step === 1 ? 'Foto da Refeição (IA)' : 'Revisão dos Itens Identificados'}
               </h2>
-              <p className="text-xs text-m3-outline">
+              <p className="text-xs text-m3-outline truncate">
                 {step === 1
                   ? 'Envie a foto do seu prato para estimativa precisa'
                   : 'Ajuste as porções em gramas e confirme o lançamento'}
@@ -259,7 +259,7 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="p-1.5 rounded-full text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
+            className="p-1.5 rounded-full text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors shrink-0"
             title="Fechar"
             aria-label="Fechar"
           >
@@ -353,16 +353,16 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
             /* ETAPA 2: REVISÃO DE ITENS, PORÇÕES E MACROS */
             <div className="space-y-3">
               {/* Resumo Consolidado dos Macros do Prato */}
-              <div className="p-3 bg-m3-surface-container-high border border-m3-outline-variant/60 rounded-2xl flex items-center justify-between text-xs">
+              <div className="p-3 bg-m3-surface-container-high border border-m3-outline-variant/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
                 <div>
-                  <span className="text-[11px] font-mono text-m3-outline uppercase block">
+                  <span className="text-xs font-mono text-m3-outline uppercase block">
                     Total Estimado do Prato:
                   </span>
-                  <span className="font-semibold text-sky-400 text-sm">
+                  <span className="font-semibold text-sky-400 text-sm sm:text-base">
                     {totalPlateMacros.calories} kcal
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs font-mono">
                   <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                     {Math.round(totalPlateMacros.protein)}g P
                   </span>

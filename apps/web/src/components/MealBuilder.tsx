@@ -989,21 +989,26 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               className="bg-m3-surface-container rounded-2xl p-4 border border-m3-outline-variant shadow"
             >
               {/* Header da Janela */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-m3-outline-variant/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-m3-surface-container-high text-m3-primary">
-                    <Icon className="w-4 h-4" />
+              <div
+                data-testid={`meal-window-header-${windowKey}`}
+                className="flex items-center justify-between gap-2 pb-3 border-b border-m3-outline-variant/50"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-m3-surface-container-high text-m3-primary shrink-0">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-m3-on-surface">{meta.label}</h4>
-                    <div className="text-[11px] font-mono text-m3-outline">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm sm:text-base font-semibold text-m3-on-surface truncate">
+                      {meta.label}
+                    </h4>
+                    <div className="text-xs font-mono text-m3-outline truncate">
                       {totalCalories} kcal • {totalProtein}g P • {totalCarbs}g C • {totalFat}g G
                     </div>
                   </div>
                 </div>
 
                 {/* Ações da Refeição: Desktop Inline vs. Mobile Menu (MoreVertical) */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {/* Desktop: 3 botões inline lado a lado */}
                   <div className="hidden sm:flex items-center gap-1.5">
                     <button
@@ -1044,53 +1049,60 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                       onClick={() =>
                         setActiveMenuWindow(activeMenuWindow === windowKey ? null : windowKey)
                       }
-                      className="p-1.5 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
+                      className="p-2 rounded-xl text-m3-outline hover:text-m3-on-surface bg-m3-surface-container-high/80 hover:bg-m3-surface-container-highest border border-m3-outline-variant/60 transition-colors"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
 
                     {activeMenuWindow === windowKey && (
-                      <div
-                        role="menu"
-                        className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-m3-surface-container-high border border-m3-outline-variant/60 rounded-2xl shadow-xl py-1 text-xs text-m3-on-surface animate-in fade-in zoom-in-95 duration-100"
-                      >
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setActiveMenuWindow(null);
-                            setPhotoModalWindow(windowKey);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-sky-400 transition-colors"
+                      <>
+                        <div
+                          className="fixed inset-0 z-20"
+                          onClick={() => setActiveMenuWindow(null)}
+                          aria-hidden="true"
+                        />
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-full mt-1.5 z-30 w-52 max-w-[calc(100vw-2rem)] bg-m3-surface-container-high border border-m3-outline-variant/70 rounded-2xl shadow-2xl py-1 text-xs text-m3-on-surface animate-in fade-in zoom-in-95 duration-100"
                         >
-                          <Camera className="w-4 h-4 text-sky-400 shrink-0" />
-                          <span>Foto da Refeição (IA)</span>
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setActiveMenuWindow(null);
-                            setQuickMacroWindow(windowKey);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-amber-400 transition-colors"
-                        >
-                          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span>Lançamento Rápido</span>
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setActiveMenuWindow(null);
-                            setShowCopyModal(windowKey);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface transition-colors"
-                        >
-                          <Copy className="w-4 h-4 text-m3-outline shrink-0" />
-                          <span>Copiar Refeição</span>
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setActiveMenuWindow(null);
+                              setPhotoModalWindow(windowKey);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-sky-400 transition-colors"
+                          >
+                            <Camera className="w-4 h-4 text-sky-400 shrink-0" />
+                            <span className="font-medium">Foto da Refeição (IA)</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setActiveMenuWindow(null);
+                              setQuickMacroWindow(windowKey);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-amber-400 transition-colors"
+                          >
+                            <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span className="font-medium">Lançamento Rápido</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setActiveMenuWindow(null);
+                              setShowCopyModal(windowKey);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-m3-surface-container text-left text-m3-on-surface transition-colors"
+                          >
+                            <Copy className="w-4 h-4 text-m3-outline shrink-0" />
+                            <span className="font-medium">Copiar Refeição</span>
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1098,7 +1110,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
 
               {/* Sugestões Contextuais (Alimentos Frequentes da Janela) */}
               <div className="flex flex-wrap items-center gap-1.5 mt-3 mb-2">
-                <span className="text-[10px] text-m3-outline font-mono uppercase mr-1">
+                <span className="text-xs text-m3-outline font-mono uppercase mr-1">
                   Frequentes:
                 </span>
                 {frequentFoodIds.map(fId => {
@@ -1111,10 +1123,10 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                       key={fId}
                       type="button"
                       onClick={() => handleAddFrequentChip(windowKey, fId)}
-                      className="text-[11px] bg-m3-surface-container-low hover:bg-m3-surface-container-high border border-m3-outline-variant/60 text-m3-on-surface px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
+                      className="text-xs bg-m3-surface-container-low hover:bg-m3-surface-container-high border border-m3-outline-variant/60 text-m3-on-surface px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
                     >
                       <span>+ {food.name.split(' ')[0]}</span>
-                      <span className="text-m3-outline text-[10px] font-mono">
+                      <span className="text-m3-outline text-xs font-mono">
                         ({food.proteinPer100g}g P)
                       </span>
                     </button>
@@ -1175,14 +1187,14 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <div>
-                            <div className="font-medium text-m3-on-surface">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-m3-on-surface truncate">
                               {item.name}{' '}
                               <span className="font-mono text-m3-outline font-normal">
                                 ({item.grams}g)
                               </span>
                             </div>
-                            <div className="font-mono text-[11px] text-m3-outline">
+                            <div className="font-mono text-xs text-m3-outline truncate">
                               {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G
                               • {item.fiber ?? 0}g Fibra
                             </div>

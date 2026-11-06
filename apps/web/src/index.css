@@ -6,6 +6,20 @@
   color-scheme: dark;
 }
 
+html {
+  font-size: 16.5px;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (min-width: 640px) {
+  html {
+    font-size: 17px;
+  }
+}
+
 html, body {
   margin: 0;
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
