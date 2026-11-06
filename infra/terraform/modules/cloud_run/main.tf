@@ -68,6 +68,12 @@ variable "admin_token" {
   sensitive   = true
 }
 
+variable "vertex_ai_model" {
+  type        = string
+  description = "Modelo padrão do Vertex AI Gemini Flash para análise multimodal de fotos"
+  default     = "gemini-1.5-flash"
+}
+
 locals {
   # Chaves criptográficas determinísticas e seguras (64 hex / 256 bits) por projeto para evitar falhas de bootstrap
   default_pepper  = sha256("macrometrics-pro-lgpd-pepper-${var.project_id}")
@@ -143,6 +149,11 @@ resource "google_cloud_run_v2_service" "api_service" {
         value = "dieta-ai-errors-${var.node_env == "production" ? "prd" : "dev"}"
       }
 
+      env {
+        name  = "VERTEX_AI_MODEL"
+        value = var.vertex_ai_model
+      }
+
       ports {
         container_port = 8080
       }
@@ -185,6 +196,17 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   name     = google_cloud_run_v2_service.api_service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# Permissão para o Cloud Run invocar modelos do Vertex AI (Gemini Flash)
+resource "google_project_iam_member" "cloud_run_vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
 output "service_name" {

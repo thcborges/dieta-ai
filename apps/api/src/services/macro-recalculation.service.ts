@@ -11,6 +11,13 @@ export interface RawMealItemInput {
   carbs?: number;
   fat?: number;
   fiber?: number;
+  per100g?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+  };
 }
 
 export function recalculateMealItem(
@@ -40,6 +47,22 @@ export function recalculateMealItem(
       carbs: Math.max(0, Math.round((Number(rawItem.carbs) || 0) * 10) / 10),
       fat: Math.max(0, Math.round((Number(rawItem.fat) || 0) * 10) / 10),
       fiber: Math.max(0, Math.round((Number(rawItem.fiber) || 0) * 10) / 10),
+    };
+  }
+
+  // Caso especial: itens com densidade nutricional por 100g (análise de foto via IA ou custom per100g)
+  if (rawItem.per100g) {
+    const ratio = grams / 100;
+    return {
+      id,
+      foodId,
+      name: rawItem.name?.trim() || 'Alimento por Foto',
+      grams,
+      calories: Math.max(0, Math.round(Number(rawItem.per100g.calories || 0) * ratio)),
+      protein: Math.max(0, Math.round(Number(rawItem.per100g.protein || 0) * ratio * 10) / 10),
+      carbs: Math.max(0, Math.round(Number(rawItem.per100g.carbs || 0) * ratio * 10) / 10),
+      fat: Math.max(0, Math.round(Number(rawItem.per100g.fat || 0) * ratio * 10) / 10),
+      fiber: Math.max(0, Math.round(Number(rawItem.per100g.fiber || 0) * ratio * 10) / 10),
     };
   }
 

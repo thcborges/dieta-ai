@@ -25,6 +25,8 @@ import {
   AlertCircle,
   ScanBarcode,
   ChefHat,
+  Camera,
+  MoreVertical,
 } from 'lucide-react';
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
@@ -34,6 +36,7 @@ import { CopyMealModal } from './CopyMealModal.js';
 import { RecipeListModal } from './RecipeListModal.js';
 import { RecipeBuilderModal } from './RecipeBuilderModal.js';
 import { LogRecipeModal } from './LogRecipeModal.js';
+import { PhotoMealModal } from './PhotoMealModal.js';
 
 export interface LoggedFood {
   id: string;
@@ -110,6 +113,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   const [activeWindow, setActiveWindow] = useState<MealWindow>('lunch');
   const [showCopyModal, setShowCopyModal] = useState<MealWindow | null>(null);
   const [quickMacroWindow, setQuickMacroWindow] = useState<MealWindow | null>(null);
+  const [photoModalWindow, setPhotoModalWindow] = useState<MealWindow | null>(null);
+  const [activeMenuWindow, setActiveMenuWindow] = useState<MealWindow | null>(null);
 
   // Gestão de Receitas Compostas (Módulo 3)
   const [isRecipeListOpen, setIsRecipeListOpen] = useState<boolean>(false);
@@ -942,25 +947,97 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    title="Lançamento Rápido de Macros"
-                    aria-label="Lançamento Rápido de Macros"
-                    onClick={() => setQuickMacroWindow(windowKey)}
-                    className="p-1.5 rounded-lg text-m3-outline hover:text-amber-400 hover:bg-m3-surface-container-high transition-colors"
-                  >
-                    <Zap className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Copiar Refeição"
-                    aria-label="Copiar Refeição"
-                    onClick={() => setShowCopyModal(windowKey)}
-                    className="p-1.5 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
+                {/* Ações da Refeição: Desktop Inline vs. Mobile Menu (MoreVertical) */}
+                <div className="flex items-center gap-1.5">
+                  {/* Desktop: 3 botões inline lado a lado */}
+                  <div className="hidden sm:flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Foto da Refeição (IA)"
+                      aria-label="Foto da Refeição"
+                      onClick={() => setPhotoModalWindow(windowKey)}
+                      className="p-1.5 rounded-lg text-m3-outline hover:text-sky-400 hover:bg-m3-surface-container-high transition-colors"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Lançamento Rápido de Macros"
+                      aria-label="Lançamento Rápido de Macros"
+                      onClick={() => setQuickMacroWindow(windowKey)}
+                      className="p-1.5 rounded-lg text-m3-outline hover:text-amber-400 hover:bg-m3-surface-container-high transition-colors"
+                    >
+                      <Zap className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Copiar Refeição"
+                      aria-label="Copiar Refeição"
+                      onClick={() => setShowCopyModal(windowKey)}
+                      className="p-1.5 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Mobile: Menu suspenso (3 pontos) */}
+                  <div className="sm:hidden relative">
+                    <button
+                      type="button"
+                      title="Ações da Refeição"
+                      aria-label="Ações da Refeição"
+                      onClick={() =>
+                        setActiveMenuWindow(activeMenuWindow === windowKey ? null : windowKey)
+                      }
+                      className="p-1.5 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-container-high transition-colors"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {activeMenuWindow === windowKey && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-m3-surface-container-high border border-m3-outline-variant/60 rounded-2xl shadow-xl py-1 text-xs text-m3-on-surface animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setActiveMenuWindow(null);
+                            setPhotoModalWindow(windowKey);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-sky-400 transition-colors"
+                        >
+                          <Camera className="w-4 h-4 text-sky-400 shrink-0" />
+                          <span>Foto da Refeição (IA)</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setActiveMenuWindow(null);
+                            setQuickMacroWindow(windowKey);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface hover:text-amber-400 transition-colors"
+                        >
+                          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Lançamento Rápido</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setActiveMenuWindow(null);
+                            setShowCopyModal(windowKey);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-m3-surface-container text-left text-m3-on-surface transition-colors"
+                        >
+                          <Copy className="w-4 h-4 text-m3-outline shrink-0" />
+                          <span>Copiar Refeição</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1159,6 +1236,16 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           onAddFood(targetWindow, item);
         }}
       />
+
+      {/* Modal de Lançamento por Foto com IA (Gemini Flash Vertex AI) */}
+      {photoModalWindow && (
+        <PhotoMealModal
+          isOpen={!!photoModalWindow}
+          windowKey={photoModalWindow}
+          onClose={() => setPhotoModalWindow(null)}
+          onAddFood={onAddFood}
+        />
+      )}
     </div>
   );
 };

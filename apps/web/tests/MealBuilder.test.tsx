@@ -924,6 +924,76 @@ describe('MealBuilder (Módulo 3: Construtor de Refeições & Cronometer UX)', (
       expect(added.grams).toBe(150);
     });
   });
+
+  describe('Ações de Refeição Responsivas & Análise por Foto (Mobile Dropdown vs Desktop Inline)', () => {
+    it('deve renderizar botões de Foto da Refeição, Lançamento Rápido e Copiar no desktop', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const photoButtons = screen.getAllByRole('button', { name: /Foto da Refeição/i });
+      expect(photoButtons.length).toBeGreaterThan(0);
+
+      const quickMacroButtons = screen.getAllByRole('button', { name: /Lançamento Rápido de Macros/i });
+      expect(quickMacroButtons.length).toBeGreaterThan(0);
+
+      const copyButtons = screen.getAllByRole('button', { name: /Copiar Refeição/i });
+      expect(copyButtons.length).toBeGreaterThan(0);
+    });
+
+    it('deve abrir menu suspenso no mobile com as opções Foto da Refeição, Lançamento Rápido e Copiar Refeição', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const menuButtons = screen.getAllByRole('button', { name: /Ações da Refeição/i });
+      expect(menuButtons.length).toBeGreaterThan(0);
+
+      // Clica no primeiro menu mobile
+      fireEvent.click(menuButtons[0]);
+
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Foto da Refeição \(IA\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Lançamento Rápido/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Copiar Refeição/i })).toBeInTheDocument();
+    });
+
+    it('deve abrir o modal PhotoMealModal ao acionar Foto da Refeição', () => {
+      render(
+        <MealBuilder
+          meals={mockMeals}
+          onAddFood={vi.fn()}
+          onRemoveFood={vi.fn()}
+          onCopyMeal={vi.fn()}
+          onAutoCompleteProtein={vi.fn()}
+          missingProtein={20}
+          remainingCalories={400}
+        />
+      );
+
+      const photoButton = screen.getAllByRole('button', { name: /Foto da Refeição/i })[0];
+      fireEvent.click(photoButton);
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText(/Foto da Refeição \(IA\)/i)).toBeInTheDocument();
+    });
+  });
 });
 
 

@@ -14,6 +14,7 @@ import { telemetryRoutes } from './routes/telemetry.route.js';
 import { diaryRoutes as singleDiaryRoutes } from './routes/diary.route.js';
 import { diaryRoutes as dateDiaryRoutes } from './routes/diaries.route.js';
 import { recipeRoutes } from './routes/recipes.route.js';
+import { photoAnalysisRoutes } from './routes/photo-analysis.route.js';
 
 export function resolveStaticPath(): string | null {
   if (process.env.STATIC_PATH && fs.existsSync(process.env.STATIC_PATH)) {
@@ -58,6 +59,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(singleDiaryRoutes);
   await app.register(dateDiaryRoutes);
   await app.register(recipeRoutes);
+  await app.register(photoAnalysisRoutes);
 
   // Servir SPA estático se diretório existir
   const staticPath = resolveStaticPath();
