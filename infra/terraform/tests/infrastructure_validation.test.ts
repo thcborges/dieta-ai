@@ -155,9 +155,32 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(devHcl).toContain('"aiplatform.googleapis.com"');
     expect(prdHcl).toContain('"aiplatform.googleapis.com"');
 
-    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL e possuir permissão roles/aiplatform.user
+    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL e documentar conformidade com roles/aiplatform.user
     expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
     expect(cloudRunHcl).toContain('roles/aiplatform.user');
+  });
+
+  it('deve prevenir regressão de falha no terraform plan por dependência indevida da Cloud Resource Manager API', () => {
+    const cloudRunHcl = readFileSync(cloudRunModule, 'utf-8');
+    const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
+    const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
+
+    // Regressão do bug 403 SERVICE_DISABLED:
+    // data "google_project" e google_project_iam_member invocam cloudresourcemanager.googleapis.com
+    // que não está habilitada nos projetos Dev/Prd do Free Tier.
+    // Nenhum módulo deve declarar data "google_project" ou recursos google_project_iam_member.
+    expect(cloudRunHcl).not.toContain('data "google_project"');
+    expect(cloudRunHcl).not.toContain('resource "google_project_iam_member"');
+    expect(devHcl).not.toContain('data "google_project"');
+    expect(prdHcl).not.toContain('data "google_project"');
+  });
+
+  it('deve garantir que os workflows de CI/CD utilizam terraform_wrapper: false no setup-terraform', () => {
+    const ciDevHcl = readFileSync(resolve(terraformRoot, '../../.github/workflows/ci-dev.yml'), 'utf-8');
+    const cdPrdHcl = readFileSync(resolve(terraformRoot, '../../.github/workflows/cd-prd.yml'), 'utf-8');
+
+    expect(ciDevHcl).toContain('terraform_wrapper: false');
+    expect(cdPrdHcl).toContain('terraform_wrapper: false');
   });
 
   it('deve garantir suporte a Continuous Deployment no Cloud Run de produção com image_tag dinâmica', () => {
