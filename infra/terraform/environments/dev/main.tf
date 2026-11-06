@@ -65,6 +65,13 @@ module "cloud_run" {
   allow_unauthenticated = true
 }
 
+# 6. Habilitação da API Vertex AI para análise multimodal de fotos com Gemini Flash
+resource "google_project_service" "aiplatform" {
+  project            = var.project_id
+  service            = "aiplatform.googleapis.com"
+  disable_on_destroy = false
+}
+
 output "dev_cloud_run_uri" {
   value       = module.cloud_run.service_uri
   description = "URI pública do ambiente de desenvolvimento"

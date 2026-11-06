@@ -3,5 +3,6 @@ packages:
   - 'apps/*'
   - 'infra/terraform'
 allowBuilds:
+  '@google/genai': true
   esbuild: true
   protobufjs: true

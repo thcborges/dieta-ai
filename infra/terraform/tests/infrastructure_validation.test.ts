@@ -146,6 +146,20 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(prdValidate).toContain('The configuration is valid');
   }, 60000);
 
+  it('deve auditar provisionamento IaC do Vertex AI para análise de fotos com Gemini Flash', () => {
+    const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
+    const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
+    const cloudRunHcl = readFileSync(cloudRunModule, 'utf-8');
+
+    // Regra: API aiplatform.googleapis.com deve estar declarada nos ambientes dev e prd
+    expect(devHcl).toContain('"aiplatform.googleapis.com"');
+    expect(prdHcl).toContain('"aiplatform.googleapis.com"');
+
+    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL e possuir permissão roles/aiplatform.user
+    expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
+    expect(cloudRunHcl).toContain('roles/aiplatform.user');
+  });
+
   it('deve garantir suporte a Continuous Deployment no Cloud Run de produção com image_tag dinâmica', () => {
     const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
     const cdWorkflowPath = resolve(terraformRoot, '../../.github/workflows/cd-prd.yml');
