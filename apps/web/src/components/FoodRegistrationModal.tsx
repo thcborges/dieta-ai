@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { FoodItem } from '@dieta-ai/core';
-import { X, PlusCircle, AlertCircle } from 'lucide-react';
+import { X, PlusCircle, AlertCircle, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
 
 export interface FoodRegistrationModalProps {
   isOpen: boolean;
@@ -26,6 +26,8 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
   const [fiberPer100g, setFiberPer100g] = useState<string>('');
   const [barcode, setBarcode] = useState<string>(initialBarcode);
   const [error, setError] = useState<string | null>(null);
+  const [isEstimating, setIsEstimating] = useState<boolean>(false);
+  const [estimateFeedback, setEstimateFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -38,10 +40,79 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
       setFatPer100g('');
       setFiberPer100g('');
       setError(null);
+      setIsEstimating(false);
+      setEstimateFeedback(null);
     }
   }, [isOpen, initialName, initialBarcode]);
 
   if (!isOpen) return null;
+
+  const handleEstimateAI = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Informe o nome do alimento antes de solicitar a estimativa por IA.');
+      return;
+    }
+
+    setError(null);
+    setIsEstimating(true);
+    setEstimateFeedback(null);
+
+    try {
+      let token = '';
+      try {
+        const stored = localStorage.getItem('macrometrics_auth_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          token = parsed.sessionToken || '';
+        }
+      } catch {
+        // fallback
+      }
+
+      const res = await fetch('/api/v1/foods/estimate-ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          foodName: trimmed,
+          portionGrams: servingSizeGrams !== '' ? Number(servingSizeGrams) || 100 : 100,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Falha ao estimar macros.');
+      }
+
+      const data = await res.json();
+      if (data.proteinPer100g !== undefined) {
+        setProteinPer100g(String(data.proteinPer100g));
+      }
+      if (data.carbsPer100g !== undefined) {
+        setCarbsPer100g(String(data.carbsPer100g));
+      }
+      if (data.fatPer100g !== undefined) {
+        setFatPer100g(String(data.fatPer100g));
+      }
+      if (data.fiberPer100g !== undefined) {
+        setFiberPer100g(String(data.fiberPer100g));
+      }
+      if (data.caloriesPer100g !== undefined) {
+        setCaloriesPer100g(String(data.caloriesPer100g));
+      }
+      if (data.servingSizeGrams !== undefined) {
+        setServingSizeGrams(Number(data.servingSizeGrams) || 100);
+      }
+      setEstimateFeedback('Valores nutricionais estimados com base nas referências da IA.');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível estimar os macronutrientes via IA no momento.');
+    } finally {
+      setIsEstimating(false);
+    }
+  };
 
   const updateCalories = (pStr: string, cStr: string, fStr: string) => {
     const p = pStr === '' ? 0 : Number(pStr) || 0;
@@ -135,10 +206,39 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
             </div>
           )}
 
+          {estimateFeedback && (
+            <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{estimateFeedback}</span>
+            </div>
+          )}
+
           <div>
-            <label htmlFor="food-name" className="block text-xs font-medium text-m3-on-surface mb-1">
-              Nome do Alimento *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="food-name" className="text-xs font-medium text-m3-on-surface">
+                Nome do Alimento *
+              </label>
+              <button
+                type="button"
+                onClick={handleEstimateAI}
+                disabled={isEstimating}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-m3-primary/15 hover:bg-m3-primary/25 text-m3-primary border border-m3-primary/30 text-[11px] font-medium transition-all disabled:opacity-50"
+                aria-label="Estimar com IA"
+                title="Estimar calorias e macronutrientes deste alimento via inteligência artificial"
+              >
+                {isEstimating ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Estimando macros com IA...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    <span>Estimar com IA</span>
+                  </>
+                )}
+              </button>
+            </div>
             <input
               id="food-name"
               type="text"

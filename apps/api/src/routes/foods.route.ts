@@ -1,12 +1,25 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { foodCacheService } from '../services/food-cache.service.js';
-import { optionalAuth } from '../middleware/auth.middleware.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
+import {
+  VertexFoodEstimateService,
+  vertexFoodEstimateService,
+} from '../services/vertex-food-estimate.service.js';
+
+export interface FoodRoutesOptions {
+  foodEstimateService?: VertexFoodEstimateService;
+}
 
 function isAuthorizedAdmin(token: unknown): boolean {
   const expectedToken = process.env.ADMIN_TOKEN;
   return Boolean(expectedToken && token === expectedToken);
 }
+
+const estimateFoodSchema = z.object({
+  foodName: z.string().trim().min(1, 'Nome do alimento é obrigatório'),
+  portionGrams: z.number().positive().max(5000).optional(),
+});
 
 const customFoodSchema = z.object({
   name: z.string().min(1),
@@ -20,7 +33,36 @@ const customFoodSchema = z.object({
   userId: z.string().optional(),
 });
 
-export const foodRoutes: FastifyPluginAsync = async (app) => {
+export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opts) => {
+  const estimateService = opts.foodEstimateService || vertexFoodEstimateService;
+
+  // Estimativa de macronutrientes via IA (Vertex AI / Gemini)
+  app.post(
+    '/api/v1/foods/estimate-ai',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const parseResult = estimateFoodSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'INVALID_PAYLOAD',
+          message: 'Payload inválido para estimativa nutricional por IA.',
+          details: parseResult.error.format(),
+        });
+      }
+
+      try {
+        const result = await estimateService.estimateFoodNutrition(parseResult.data);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        req.log.error(err, 'Erro durante estimativa nutricional no Vertex AI');
+        return reply.status(500).send({
+          error: 'VERTEX_AI_ESTIMATE_FAILED',
+          message: 'Não foi possível estimar os macronutrientes no momento.',
+          details: err.message,
+        });
+      }
+    }
+  );
   // Consulta alimento por código de barras
   app.get<{ Params: { barcode: string } }>('/api/v1/foods/barcode/:barcode', { preHandler: [optionalAuth] }, async (req, reply) => {
     const { barcode } = req.params;

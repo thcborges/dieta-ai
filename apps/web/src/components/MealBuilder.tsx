@@ -27,6 +27,9 @@ import {
   ChefHat,
   Camera,
   MoreVertical,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { FoodRegistrationModal } from './FoodRegistrationModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
@@ -58,8 +61,9 @@ interface MealBuilderProps {
   recipes?: RecipeInput[];
   onAddFood: (window: MealWindow, item: LoggedFood) => void;
   onRemoveFood: (window: MealWindow, itemId: string) => void;
+  onUpdateFood?: (window: MealWindow, item: LoggedFood) => void;
   onCopyMeal: (fromWindow: MealWindow, toWindow: MealWindow, copiedItems?: LoggedFood[]) => void;
-  onAutoCompleteProtein: (source: 'sassami' | 'whey_growth') => void;
+  onAutoCompleteProtein?: (source: 'sassami' | 'whey_growth') => void;
   onRegisterFood?: (food: FoodItem) => void;
   onSaveRecipe?: (recipe: RecipeInput) => void;
   onDeleteRecipe?: (recipeId: string) => void;
@@ -93,6 +97,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   recipes = [],
   onAddFood,
   onRemoveFood,
+  onUpdateFood,
   onCopyMeal,
   onAutoCompleteProtein,
   onRegisterFood,
@@ -135,6 +140,56 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
   const [isProteinModalOpen, setIsProteinModalOpen] = useState<boolean>(false);
   const [prefillBarcode, setPrefillBarcode] = useState<string>('');
+
+  // Edição de porção de itens já lançados
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingGrams, setEditingGrams] = useState<string>('');
+
+  const handleStartEditItem = (item: LoggedFood) => {
+    setEditingItemId(item.id);
+    setEditingGrams(String(item.grams));
+  };
+
+  const handleCancelEditItem = () => {
+    setEditingItemId(null);
+    setEditingGrams('');
+  };
+
+  const handleSaveEditItem = (windowKey: MealWindow, item: LoggedFood) => {
+    const newGrams = Math.max(1, Number(editingGrams) || item.grams);
+    const food =
+      internalFoods.find(f => f.id === item.foodId) ||
+      PREPOPULATED_FOODS.find(f => f.id === item.foodId);
+
+    let updatedFood: LoggedFood;
+    if (food) {
+      const factor = newGrams / 100;
+      updatedFood = {
+        ...item,
+        grams: newGrams,
+        calories: Math.round(food.caloriesPer100g * factor),
+        protein: Math.round(food.proteinPer100g * factor * 10) / 10,
+        carbs: Math.round(food.carbsPer100g * factor * 10) / 10,
+        fat: Math.round(food.fatPer100g * factor * 10) / 10,
+        fiber: Math.round((food.fiberPer100g ?? 0) * factor * 10) / 10,
+      };
+    } else {
+      const ratio = item.grams > 0 ? newGrams / item.grams : 1;
+      updatedFood = {
+        ...item,
+        grams: newGrams,
+        calories: Math.round(item.calories * ratio),
+        protein: Math.round(item.protein * ratio * 10) / 10,
+        carbs: Math.round(item.carbs * ratio * 10) / 10,
+        fat: Math.round(item.fat * ratio * 10) / 10,
+        fiber: Math.round((item.fiber ?? 0) * ratio * 10) / 10,
+      };
+    }
+
+    onUpdateFood?.(windowKey, updatedFood);
+    setEditingItemId(null);
+    setEditingGrams('');
+  };
 
   useEffect(() => {
     if (availableFoods && availableFoods.length > 0) {
@@ -1074,34 +1129,91 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
                 </p>
               ) : (
                 <div className="divide-y divide-m3-outline-variant/30">
-                  {items.map(item => (
-                    <div
-                      key={item.id}
-                      className="py-2.5 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div>
-                        <div className="font-medium text-m3-on-surface">
-                          {item.name}{' '}
-                          <span className="font-mono text-m3-outline font-normal">
-                            ({item.grams}g)
-                          </span>
-                        </div>
-                        <div className="font-mono text-[11px] text-m3-outline">
-                          {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G
-                          • {item.fiber ?? 0}g Fibra
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => onRemoveFood(windowKey, item.id)}
-                        className="text-m3-outline hover:text-m3-error p-1 rounded-lg transition-colors"
-                        title="Remover Item"
+                  {items.map(item => {
+                    const isEditing = editingItemId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        className="py-2.5 flex items-center justify-between gap-3 text-xs"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        {isEditing ? (
+                          <div className="flex-1 flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-m3-on-surface truncate max-w-[140px] sm:max-w-[200px]">
+                              {item.name}:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                max="5000"
+                                autoFocus
+                                aria-label="Editar gramas"
+                                value={editingGrams}
+                                onFocus={e => e.currentTarget.select()}
+                                onChange={e => setEditingGrams(e.target.value)}
+                                className="w-20 bg-m3-surface border border-m3-primary rounded-lg px-2 py-1 text-xs font-mono text-m3-on-surface focus:outline-none"
+                              />
+                              <span className="text-[11px] text-m3-outline font-mono">g</span>
+                              <button
+                                type="button"
+                                aria-label="Salvar porção"
+                                title="Salvar porção"
+                                onClick={() => handleSaveEditItem(windowKey, item)}
+                                className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Cancelar edição"
+                                title="Cancelar edição"
+                                onClick={handleCancelEditItem}
+                                className="p-1 rounded-lg text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-variant transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-medium text-m3-on-surface">
+                              {item.name}{' '}
+                              <span className="font-mono text-m3-outline font-normal">
+                                ({item.grams}g)
+                              </span>
+                            </div>
+                            <div className="font-mono text-[11px] text-m3-outline">
+                              {item.calories} kcal • {item.protein}g P • {item.carbs}g C • {item.fat}g G
+                              • {item.fiber ?? 0}g Fibra
+                            </div>
+                          </div>
+                        )}
+
+                        {!isEditing && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditItem(item)}
+                              className="text-m3-outline hover:text-m3-primary p-1 rounded-lg transition-colors"
+                              title="Editar Porção"
+                              aria-label={`Editar item ${item.name}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onRemoveFood(windowKey, item.id)}
+                              className="text-m3-outline hover:text-m3-error p-1 rounded-lg transition-colors"
+                              title="Remover Item"
+                              aria-label={`Remover ${item.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1181,7 +1293,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
               fiber: item.fiber,
             });
           });
-          onAutoCompleteProtein?.('sassami');
+          const primarySource = items[0]?.sourceId === 'whey_growth' ? 'whey_growth' : 'sassami';
+          onAutoCompleteProtein?.(primarySource);
         }}
       />
 

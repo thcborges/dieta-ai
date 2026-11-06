@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   auditDailyIntake,
-  solveProteinDeficit,
   calculateBMR,
   calculateTDEE,
   PREPOPULATED_FOODS,
@@ -690,6 +689,18 @@ export default function App() {
     });
   };
 
+  const handleUpdateFood = (window: MealWindow, updatedItem: LoggedFood) => {
+    setMeals(prev => {
+      const current = prev[window] || [];
+      const updated: MealMap = {
+        ...prev,
+        [window]: current.map(item => (item.id === updatedItem.id ? updatedItem : item)),
+      };
+      persistMeals(updated, selectedDateRef.current);
+      return updated;
+    });
+  };
+
   const handleCopyMeal = (
     fromWindow: MealWindow,
     toWindow: MealWindow,
@@ -757,29 +768,8 @@ export default function App() {
     return EMPTY_MEALS;
   };
 
-  const handleAutoCompleteProtein = (source: 'sassami' | 'whey_growth') => {
-    if (missingProtein <= 0) return;
-
-    const solution = solveProteinDeficit({
-      missingProteinGrams: missingProtein,
-      remainingCalories,
-      preferredSource: source,
-    });
-
-    const targetWindow: MealWindow = 'dinner_event';
-    const newFood: LoggedFood = {
-      id: `autocomplete_${Date.now()}`,
-      foodId: source,
-      name: `${solution.sourceName} (Auto-Completar)`,
-      grams: solution.gramsNeeded,
-      calories: solution.caloriesAdded,
-      protein: solution.proteinProvided,
-      carbs: solution.carbsAdded,
-      fat: solution.fatAdded,
-      fiber: 0,
-    };
-
-    handleAddFood(targetWindow, newFood);
+  const handleAutoCompleteProtein = (_source: 'sassami' | 'whey_growth') => {
+    // Inserção realizada exclusivamente via onConfirm do ProteinAutocompleteModal através de onAddFood
   };
 
   return (
@@ -910,6 +900,7 @@ export default function App() {
           recipes={recipes}
           onAddFood={handleAddFood}
           onRemoveFood={handleRemoveFood}
+          onUpdateFood={handleUpdateFood}
           onCopyMeal={handleCopyMeal}
           onAutoCompleteProtein={handleAutoCompleteProtein}
           onRegisterFood={handleRegisterFood}

@@ -363,7 +363,8 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
                     <button
                       type="button"
                       onClick={() => handleCompleteRemaining(source)}
-                      title="Calcular gramas para completar o restante necessário com esta fonte"
+                      aria-label={`Completar restante de proteína para ${source.name}`}
+                      title="Calcular gramas para completar o restante de proteína necessário com esta fonte (não lança no diário)"
                       className="px-2.5 py-1.5 rounded-xl bg-m3-primary/10 hover:bg-m3-primary/20 text-m3-primary border border-m3-primary/30 text-[11px] font-medium transition-colors"
                     >
                       Completar restante
