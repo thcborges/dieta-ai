@@ -28,6 +28,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.5
+          terraform_wrapper: false
 
       - name: Instalar pnpm
         uses: pnpm/action-setup@v3
@@ -73,6 +74,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.5
+          terraform_wrapper: false
 
       - name: Verificar Formatação HCL (terraform fmt)
         run: terraform -chdir=infra/terraform fmt -check -recursive
