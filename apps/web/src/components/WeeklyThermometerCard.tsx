@@ -107,7 +107,7 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
   const gaugePercent = Math.min(100, Math.max(0, report.thermalRatioPercent));
 
   return (
-    <div className="bg-m3-surface-container rounded-2xl p-5 border border-m3-outline-variant shadow-lg mb-6 transition-all">
+    <div className="bg-m3-surface-container rounded-2xl p-4 sm:p-5 border border-m3-outline-variant shadow-lg mb-6 transition-all">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-m3-outline-variant/60 gap-3">
         <div className="flex items-center gap-3">
@@ -129,11 +129,11 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-bold text-m3-on-surface">
                 Termômetro do Banco Semanal ({report.daysCount} dias)
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-m3-surface-container-high text-m3-outline border border-m3-outline-variant/50 uppercase">
+              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-m3-surface-container-high text-m3-outline border border-m3-outline-variant/50 uppercase">
                 {goal === 'weight_loss'
                   ? 'Perda de Peso'
                   : goal === 'weight_gain'
@@ -222,7 +222,7 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
 
       {/* Barra Gauge do Termômetro */}
       <div className="mt-4 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
-        <div className="flex justify-between items-center text-xs mb-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 text-xs mb-2">
           <span className="font-semibold text-m3-on-surface flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-m3-tertiary" />
             Pressão Térmica Semanal

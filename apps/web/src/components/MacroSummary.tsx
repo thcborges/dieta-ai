@@ -65,16 +65,16 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
         </div>
       </div>
 
-      {/* Grid de Macros */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3.5 mt-4">
-        {/* Calorias */}
-        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+      {/* Grid de Macros Responsivo (2 colunas no mobile, 5 no desktop) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3.5 mt-4">
+        {/* Calorias (Ocupa 2 colunas no mobile para destaque hero, 1 no desktop) */}
+        <div className="col-span-2 sm:col-span-1 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5 gap-1.5">
             <span className="font-semibold text-m3-on-surface flex items-center gap-1.5 shrink-0">
               <Flame className="w-3.5 h-3.5 text-m3-metric-calories shrink-0" />
               <span>Calorias</span>
             </span>
-            <span className="font-mono text-m3-outline text-[11px] whitespace-nowrap shrink-0">
+            <span className="font-mono text-m3-outline text-xs whitespace-nowrap shrink-0">
               {isSurplus ? (
                 <span className="text-red-400 font-bold">+{Math.abs(remainingKcal)} kcal</span>
               ) : (
@@ -97,13 +97,13 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
         </div>
 
         {/* Proteínas */}
-        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+        <div className="col-span-1 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5 gap-1.5">
             <span className="font-semibold text-m3-on-surface flex items-center gap-1.5 shrink-0">
               <ShieldCheck className="w-3.5 h-3.5 text-m3-metric-protein shrink-0" />
               <span>Proteínas</span>
             </span>
-            <span className="font-mono text-m3-outline text-[11px] whitespace-nowrap shrink-0">
+            <span className="font-mono text-m3-outline text-xs whitespace-nowrap shrink-0">
               {remainingProtein}g rest.
             </span>
           </div>
@@ -120,10 +120,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
         </div>
 
         {/* Carboidratos */}
-        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+        <div className="col-span-1 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5 gap-1.5">
             <span className="font-semibold text-m3-on-surface shrink-0">Carboidratos</span>
-            <span className="font-mono text-m3-outline text-[11px] whitespace-nowrap shrink-0">
+            <span className="font-mono text-m3-outline text-xs whitespace-nowrap shrink-0">
               {remainingCarbs}g rest.
             </span>
           </div>
@@ -140,10 +140,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
         </div>
 
         {/* Gorduras */}
-        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+        <div className="col-span-1 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5 gap-1.5">
             <span className="font-semibold text-m3-on-surface shrink-0">Gorduras</span>
-            <span className="font-mono text-m3-outline text-[11px] whitespace-nowrap shrink-0">
+            <span className="font-mono text-m3-outline text-xs whitespace-nowrap shrink-0">
               {remainingFat}g rest.
             </span>
           </div>
@@ -160,13 +160,13 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({
         </div>
 
         {/* Fibras (Macro Essencial & Meta por Idade) */}
-        <div className="bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
+        <div className="col-span-1 bg-m3-surface-container-low p-3.5 rounded-xl border border-m3-outline-variant/40">
           <div className="flex justify-between items-center text-xs mb-1.5 gap-1.5">
             <span className="font-semibold text-m3-on-surface flex items-center gap-1.5 shrink-0">
               <Leaf className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Fibras</span>
             </span>
-            <span className="font-mono text-m3-outline text-[11px] whitespace-nowrap shrink-0">
+            <span className="font-mono text-m3-outline text-xs whitespace-nowrap shrink-0">
               {remainingFiber}g rest.
             </span>
           </div>

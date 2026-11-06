@@ -38,8 +38,8 @@ export const AuditorBanner: React.FC<AuditorBannerProps> = ({ report }) => {
               )}
             </div>
 
-            <div className="flex-1 text-sm">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="flex-1 text-sm sm:text-base">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 <span className="font-semibold tracking-wide uppercase text-xs font-mono px-2 py-0.5 rounded bg-black/40">
                   {isCritical ? 'CRÍTICO' : 'ALERTA DE RISCO'}
                 </span>

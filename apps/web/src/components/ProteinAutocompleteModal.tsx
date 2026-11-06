@@ -177,18 +177,18 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
       aria-labelledby="protein-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
     >
-      <div className="bg-m3-surface-container-high border border-m3-outline-variant rounded-3xl w-full max-w-2xl my-auto p-5 sm:p-6 shadow-2xl space-y-5 animate-in fade-in-50 zoom-in-95">
+      <div className="bg-m3-surface-container-high border border-m3-outline-variant rounded-3xl w-full max-w-2xl my-auto p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in-50 zoom-in-95">
         {/* Top Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-m3-outline-variant/60 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-m3-primary/10 border border-m3-primary/30 flex items-center justify-center text-m3-primary">
+        <div className="flex items-center justify-between gap-3 border-b border-m3-outline-variant/60 pb-3">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-xl bg-m3-primary/10 border border-m3-primary/30 flex items-center justify-center text-m3-primary shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
-            <div>
-              <h2 id="protein-modal-title" className="text-base sm:text-lg font-bold text-m3-on-surface">
+            <div className="min-w-0 flex-1">
+              <h2 id="protein-modal-title" className="text-base sm:text-lg font-bold text-m3-on-surface truncate">
                 Auto-Completar Proteína
               </h2>
-              <p className="text-xs text-m3-on-surface-variant">
+              <p className="text-xs text-m3-on-surface-variant truncate">
                 Simule e distribua as gramas de cada fonte proteica para zerar o déficit.
               </p>
             </div>
@@ -197,7 +197,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="text-m3-outline hover:text-m3-on-surface p-1.5 rounded-full hover:bg-m3-surface-variant transition-colors"
+            className="text-m3-outline hover:text-m3-on-surface p-1.5 rounded-full hover:bg-m3-surface-variant transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -207,7 +207,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
         <div className="bg-m3-surface-container rounded-2xl p-4 border border-m3-outline-variant space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div className="bg-m3-surface-container-low p-2.5 rounded-xl border border-m3-outline-variant/50">
-              <span className="text-[10px] uppercase font-semibold text-m3-outline block">
+              <span className="text-xs font-mono uppercase font-semibold text-m3-outline block">
                 Meta Faltante
               </span>
               <span className="text-sm sm:text-base font-bold font-mono text-m3-on-surface">
@@ -216,7 +216,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
             </div>
 
             <div className="bg-m3-surface-container-low p-2.5 rounded-xl border border-m3-outline-variant/50">
-              <span className="text-[10px] uppercase font-semibold text-m3-outline block">
+              <span className="text-xs font-mono uppercase font-semibold text-m3-outline block">
                 Planejada
               </span>
               <span className="text-sm sm:text-base font-bold font-mono text-m3-primary">
@@ -225,7 +225,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
             </div>
 
             <div className="bg-m3-surface-container-low p-2.5 rounded-xl border border-m3-outline-variant/50">
-              <span className="text-[10px] uppercase font-semibold text-m3-outline block">
+              <span className="text-xs font-mono uppercase font-semibold text-m3-outline block">
                 Calorias
               </span>
               <span className="text-sm sm:text-base font-bold font-mono text-m3-on-surface">
@@ -234,7 +234,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
             </div>
 
             <div className="bg-m3-surface-container-low p-2.5 rounded-xl border border-m3-outline-variant/50">
-              <span className="text-[10px] uppercase font-semibold text-m3-outline block">
+              <span className="text-xs font-mono uppercase font-semibold text-m3-outline block">
                 Disponível
               </span>
               <span className="text-sm sm:text-base font-bold font-mono text-m3-outline">
@@ -343,7 +343,7 @@ export const ProteinAutocompleteModal: React.FC<ProteinAutocompleteModalProps> =
                   </div>
 
                   {/* Campo de Gramas e Ações Rápidas */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
                       <input
                         type="number"

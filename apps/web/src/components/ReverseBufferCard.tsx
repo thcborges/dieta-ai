@@ -21,10 +21,10 @@ export const ReverseBufferCard: React.FC<ReverseBufferCardProps> = ({
   const calculation = activeEvent ? calculateEventBuffer(dailyTarget, activeEvent) : null;
 
   return (
-    <div className="bg-m3-surface-container rounded-2xl p-5 border border-m3-outline-variant shadow-lg mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-m3-surface-container rounded-2xl p-4 sm:p-5 border border-m3-outline-variant shadow-lg mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
         <div>
-          <h2 className="text-base font-semibold text-m3-on-surface flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-semibold text-m3-on-surface flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-m3-tertiary"></span>
             Simulador de Buffer de Evento Social (Engenharia Reversa)
           </h2>
@@ -36,7 +36,7 @@ export const ReverseBufferCard: React.FC<ReverseBufferCardProps> = ({
         {activeEvent && (
           <button
             onClick={() => onSelectEvent(null)}
-            className="flex items-center gap-1.5 text-xs text-m3-error hover:text-red-300 bg-m3-surface-container-high px-2.5 py-1 rounded-lg border border-m3-outline-variant transition-colors"
+            className="flex items-center gap-1.5 text-xs text-m3-error hover:text-red-300 bg-m3-surface-container-high px-2.5 py-1.5 rounded-xl border border-m3-outline-variant transition-colors self-start sm:self-auto"
           >
             <X className="w-3.5 h-3.5" />
             Remover Reserva
@@ -57,8 +57,8 @@ export const ReverseBufferCard: React.FC<ReverseBufferCardProps> = ({
         >
           <Pizza className="w-5 h-5 text-amber-400 shrink-0" />
           <div className="text-xs">
-            <div className="font-medium">Noite da Pizza</div>
-            <div className="text-m3-outline text-[11px] font-mono">~1100 kcal • 38g P</div>
+            <div className="font-medium text-sm">Noite da Pizza</div>
+            <div className="text-m3-outline text-xs font-mono">~1100 kcal • 38g P</div>
           </div>
         </button>
 
@@ -73,8 +73,8 @@ export const ReverseBufferCard: React.FC<ReverseBufferCardProps> = ({
         >
           <PartyPopper className="w-5 h-5 text-purple-400 shrink-0" />
           <div className="text-xs">
-            <div className="font-medium">Festa Infantil</div>
-            <div className="text-m3-outline text-[11px] font-mono">~950 kcal • 18g P</div>
+            <div className="font-medium text-sm">Festa Infantil</div>
+            <div className="text-m3-outline text-xs font-mono">~950 kcal • 18g P</div>
           </div>
         </button>
 
@@ -89,8 +89,8 @@ export const ReverseBufferCard: React.FC<ReverseBufferCardProps> = ({
         >
           <Flame className="w-5 h-5 text-red-400 shrink-0" />
           <div className="text-xs">
-            <div className="font-medium">Churrasco em Família</div>
-            <div className="text-m3-outline text-[11px] font-mono">~1350 kcal • 75g P</div>
+            <div className="font-medium text-sm">Churrasco em Família</div>
+            <div className="text-m3-outline text-xs font-mono">~1350 kcal • 75g P</div>
           </div>
         </button>
       </div>
