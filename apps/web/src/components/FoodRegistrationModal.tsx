@@ -177,28 +177,28 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-m3-surface-container rounded-3xl max-w-lg w-full border border-m3-outline-variant shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header Material Design 3 */}
-        <div className="px-6 py-4 border-b border-m3-outline-variant/60 flex items-center justify-between bg-m3-surface-container-high">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-m3-primary/10 text-m3-primary border border-m3-primary/20">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-m3-outline-variant/60 flex items-center justify-between bg-m3-surface-container-high">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="p-2 rounded-xl bg-m3-primary/10 text-m3-primary border border-m3-primary/20 shrink-0">
               <PlusCircle className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-semibold text-base text-m3-on-surface">Cadastrar Novo Alimento</h3>
-              <p className="text-xs text-m3-outline">Formulário rápido para inclusão no diário e banco</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-base text-m3-on-surface truncate">Cadastrar Novo Alimento</h3>
+              <p className="text-xs text-m3-outline truncate">Formulário rápido para inclusão no diário e banco</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="p-1.5 rounded-full hover:bg-m3-surface-variant text-m3-outline hover:text-m3-on-surface transition-colors"
+            className="p-1.5 rounded-full hover:bg-m3-surface-variant text-m3-outline hover:text-m3-on-surface transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {error && (
             <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-red-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />

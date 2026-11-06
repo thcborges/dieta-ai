@@ -784,14 +784,14 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight text-sm text-m3-on-surface whitespace-nowrap">
+                <span className="font-bold tracking-tight text-sm sm:text-base text-m3-on-surface whitespace-nowrap">
                   MacroMetrics Pro
                 </span>
-                <span className="text-[10px] font-mono bg-m3-surface-container-highest text-m3-tertiary px-1.5 py-0.5 rounded border border-m3-outline-variant/50 shrink-0">
+                <span className="text-xs font-mono bg-m3-surface-container-highest text-m3-tertiary px-1.5 py-0.5 rounded border border-m3-outline-variant/50 shrink-0">
                   v0.1.0-dev
                 </span>
               </div>
-              <p className="text-[11px] text-m3-outline font-mono hidden sm:block">
+              <p className="text-xs text-m3-outline font-mono hidden sm:block">
                 Engenharia Reversa • Auditoria Matemática
               </p>
             </div>
@@ -841,7 +841,7 @@ export default function App() {
             <div className="flex items-center justify-between md:justify-start gap-1.5 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2.5 py-1 rounded-xl text-xs text-m3-on-surface w-full md:w-auto">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-m3-primary shrink-0" />
-                <span className="text-[11px] text-m3-outline font-mono md:hidden">Data do Diário:</span>
+                <span className="text-xs text-m3-outline font-mono md:hidden">Data do Diário:</span>
               </div>
               <label htmlFor="diary-date-picker" className="sr-only">
                 Data do Diário
@@ -863,7 +863,7 @@ export default function App() {
       </header>
 
       {/* Conteúdo Principal do Dashboard */}
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Auditoria Lógica Implacável */}
         <AuditorBanner report={auditReport} />
 
