@@ -28,7 +28,10 @@ export const photoAnalysisRoutes: FastifyPluginAsync<PhotoAnalysisRouteOptions> 
 
   app.post(
     '/api/v1/meals/analyze-photo',
-    { preHandler: [authenticate] },
+    {
+      bodyLimit: 15 * 1024 * 1024, // 15MB
+      preHandler: [authenticate],
+    },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const parseResult = analyzePhotoBodySchema.safeParse(req.body);
 

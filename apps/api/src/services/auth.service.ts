@@ -75,8 +75,11 @@ export class AuthService {
       throw new Error('Token do Google inválido ou expirado.');
     }
 
-    // Modo teste para execuções herméticas
-    if (process.env.NODE_ENV === 'test' && idToken.startsWith('valid-mock-')) {
+    // Modo teste e desenvolvimento para execuções herméticas ou simulação sem GIS
+    if (
+      (process.env.NODE_ENV === 'test' && idToken.startsWith('valid-mock-')) ||
+      (process.env.NODE_ENV !== 'production' && idToken.startsWith('mock-google-id-token'))
+    ) {
       const email = expectedEmail || 'techlead@dataeng.io';
       return {
         sub: `goog_${crypto.createHash('sha256').update(email).digest('hex').substring(0, 21)}`,
