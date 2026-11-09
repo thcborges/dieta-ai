@@ -1,4 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
+import crypto from 'node:crypto';
 import { generateBlindIndex } from '@dieta-ai/core';
 
 export type MealWindow = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner_event';
@@ -129,48 +130,85 @@ export class FirestoreDiaryService {
     return generateBlindIndex(userId, this.pepper);
   }
 
+  public getCandidateBlindUserIds(userId: string): string[] {
+    const candidates: string[] = [];
+
+    // 1. Se já for um hash hexadecimal de 64 caracteres (blindUserId direto)
+    if (userId.length === 64 && /^[0-9a-fA-F]{64}$/.test(userId)) {
+      candidates.push(userId);
+    }
+
+    // 2. Hash padrão do identificador fornecido
+    candidates.push(this.getBlindUserId(userId));
+
+    // 3. Se for no formato usr_<email_sanitizado>
+    if (userId.startsWith('usr_')) {
+      const sanitized = userId.replace(/^usr_/, '');
+      const possibleEmail = sanitized.replace(/_/g, '.');
+      candidates.push(this.getBlindUserId(possibleEmail));
+      const googSub = `goog_${crypto.createHash('sha256').update(possibleEmail).digest('hex').substring(0, 21)}`;
+      candidates.push(this.getBlindUserId(googSub));
+    }
+
+    // 4. Se for um e-mail direto
+    if (userId.includes('@')) {
+      const usrFormat = `usr_${userId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      candidates.push(this.getBlindUserId(usrFormat));
+      const googSub = `goog_${crypto.createHash('sha256').update(userId).digest('hex').substring(0, 21)}`;
+      candidates.push(this.getBlindUserId(googSub));
+    }
+
+    return Array.from(new Set(candidates));
+  }
+
   private getDocId(blindUserId: string, date: string): string {
     return `${blindUserId}_${date}`;
   }
 
   public async getDiary(userId: string, date: string): Promise<DailyDiaryDoc> {
-    const blindUserId = this.getBlindUserId(userId);
-    const docId = this.getDocId(blindUserId, date);
+    const primaryBlindUserId = this.getBlindUserId(userId);
+    const candidateBlindIds = this.getCandidateBlindUserIds(userId);
     const db = this.getFirestore();
 
     if (db) {
       try {
-        const docRef = db.collection('diaries').doc(docId);
-        const snapshot = await withTimeout(docRef.get());
+        for (const blindId of candidateBlindIds) {
+          const docId = this.getDocId(blindId, date);
+          const docRef = db.collection('diaries').doc(docId);
+          const snapshot = await withTimeout(docRef.get());
 
-        if (snapshot.exists) {
-          const data = snapshot.data() as DailyDiaryDoc;
-          return {
-            blindUserId,
-            date,
-            meals: {
-              breakfast: data.meals?.breakfast || [],
-              lunch: data.meals?.lunch || [],
-              afternoon_snack: data.meals?.afternoon_snack || [],
-              dinner_event: data.meals?.dinner_event || [],
-            },
-            totals: data.totals || calculateDiaryTotals(data.meals || getEmptyMeals()),
-            updatedAt: data.updatedAt || new Date().toISOString(),
-            createdAt: data.createdAt || new Date().toISOString(),
-          };
+          if (snapshot.exists) {
+            const data = snapshot.data() as DailyDiaryDoc;
+            return {
+              blindUserId: primaryBlindUserId,
+              date,
+              meals: {
+                breakfast: data.meals?.breakfast || [],
+                lunch: data.meals?.lunch || [],
+                afternoon_snack: data.meals?.afternoon_snack || [],
+                dinner_event: data.meals?.dinner_event || [],
+              },
+              totals: data.totals || calculateDiaryTotals(data.meals || getEmptyMeals()),
+              updatedAt: data.updatedAt || new Date().toISOString(),
+              createdAt: data.createdAt || new Date().toISOString(),
+            };
+          }
         }
       } catch {
         // Fallback para memória se o Firestore falhar
       }
     }
 
-    const cached = this.inMemoryFallback.get(docId);
-    if (cached) return cached;
+    for (const blindId of candidateBlindIds) {
+      const docId = this.getDocId(blindId, date);
+      const cached = this.inMemoryFallback.get(docId);
+      if (cached) return cached;
+    }
 
     // Se não existir, retorna um diário padrão vazio para aquela data
     const emptyMeals = getEmptyMeals();
     return {
-      blindUserId,
+      blindUserId: primaryBlindUserId,
       date,
       meals: emptyMeals,
       totals: calculateDiaryTotals(emptyMeals),
@@ -252,23 +290,25 @@ export class FirestoreDiaryService {
   }
 
   public async purgeUserDiaries(userId: string): Promise<number> {
-    const blindUserId = this.getBlindUserId(userId);
+    const candidateBlindIds = this.getCandidateBlindUserIds(userId);
     let deletedCount = 0;
     const db = this.getFirestore();
 
     if (db) {
       try {
-        const snapshot = await withTimeout(
-          db.collection('diaries').where('blindUserId', '==', blindUserId).get()
-        );
+        for (const blindUserId of candidateBlindIds) {
+          const snapshot = await withTimeout(
+            db.collection('diaries').where('blindUserId', '==', blindUserId).get()
+          );
 
-        const batch = db.batch();
-        for (const doc of snapshot.docs) {
-          batch.delete(doc.ref);
-          deletedCount++;
-        }
-        if (deletedCount > 0) {
-          await withTimeout(batch.commit());
+          const batch = db.batch();
+          for (const doc of snapshot.docs) {
+            batch.delete(doc.ref);
+            deletedCount++;
+          }
+          if (deletedCount > 0) {
+            await withTimeout(batch.commit());
+          }
         }
       } catch {
         // Ignora erro de rede e limpa fallback
@@ -277,7 +317,7 @@ export class FirestoreDiaryService {
 
     // Limpa do fallback in-memory
     for (const [key, val] of this.inMemoryFallback.entries()) {
-      if (val.blindUserId === blindUserId) {
+      if (candidateBlindIds.includes(val.blindUserId)) {
         this.inMemoryFallback.delete(key);
         deletedCount++;
       }
