@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   avatarUrl?: string;
   isAdmin?: boolean;
+  sessionToken?: string;
 }
 
 interface LoginPageProps {
@@ -68,23 +69,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           email: data.user?.email || trimmedEmail,
           name: data.user?.name || name.trim() || 'Usuário MacroMetrics',
           isAdmin: Boolean(data.user?.isAdmin),
+          sessionToken: data.sessionToken || '',
         };
         onLogin(authenticatedUser);
       } else {
         // Fallback offline-first para manter a aplicação funcional sem rede
+        const fallbackId = `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const fallbackUser: AuthUser = {
-          id: `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          id: fallbackId,
           email: trimmedEmail,
           name: name.trim() || 'Usuário MacroMetrics',
+          sessionToken: `offline_session_${fallbackId}`,
         };
         onLogin(fallbackUser);
       }
     } catch {
       // Em caso de falha de conexão com a API, ativa fallback offline-first
+      const fallbackId = `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const offlineUser: AuthUser = {
-        id: `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        id: fallbackId,
         email: trimmedEmail,
         name: name.trim() || 'Usuário MacroMetrics',
+        sessionToken: `offline_session_${fallbackId}`,
       };
       onLogin(offlineUser);
     } finally {

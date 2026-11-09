@@ -34,9 +34,14 @@ export function resolveStaticPath(): string | null {
   return null;
 }
 
-export async function buildApp(): Promise<FastifyInstance> {
+export interface BuildAppOptions {
+  bodyLimit?: number;
+}
+
+export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = fastify({
     logger: process.env.NODE_ENV === 'test' ? false : true,
+    bodyLimit: options.bodyLimit ?? 15 * 1024 * 1024, // 15MB para upload de fotos de refeições
   });
 
   // Segurança e CORS

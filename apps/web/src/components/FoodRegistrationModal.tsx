@@ -60,14 +60,20 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
 
     try {
       let token = '';
+      let userId = '';
       try {
         const stored = localStorage.getItem('macrometrics_auth_user');
         if (stored) {
           const parsed = JSON.parse(stored);
-          token = parsed.sessionToken || '';
+          token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
+          userId = parsed.id || '';
         }
       } catch {
         // fallback
+      }
+
+      if (!token) {
+        token = localStorage.getItem('auth_token') || '';
       }
 
       const res = await fetch('/api/v1/foods/estimate-ai', {
@@ -75,6 +81,7 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(userId ? { 'x-user-id': userId } : {}),
         },
         body: JSON.stringify({
           foodName: trimmed,
