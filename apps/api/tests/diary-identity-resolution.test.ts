@@ -42,8 +42,8 @@ describe('Regression: Recuperação de Relacionamentos e Identidade de Usuário 
     expect(payload.blindUserId).toBe(generateBlindIndex(canonicalUserId, pepper));
   });
 
-  it('deve recuperar diário gravado com usr_<email> mesmo quando consultado via blindUserId diretamente ou com identificador alternativo', async () => {
-    // 1. Grava previamente um diário com o ID canônico histórico do usuário
+  it('deve salvar e recuperar diário diretamente com o ID canônico sem code smells ou workarounds', async () => {
+    // 1. Grava um diário com o ID canônico do usuário
     const sampleMeals = {
       breakfast: [
         {
@@ -63,18 +63,15 @@ describe('Regression: Recuperação de Relacionamentos e Identidade de Usuário 
       dinner_event: [],
     };
 
-    await firestoreDiaryService.saveDiary(canonicalUserId, testDate, sampleMeals);
+    const saved = await firestoreDiaryService.saveDiary(canonicalUserId, testDate, sampleMeals);
+    const expectedBlindUserId = generateBlindIndex(canonicalUserId, pepper);
+    expect(saved.blindUserId).toBe(expectedBlindUserId);
 
-    // 2. Consulta usando o blindUserId diretamente (caso o cliente passe a chave pública / hash)
-    const blindUserId = firestoreDiaryService.getBlindUserId(canonicalUserId);
-    const diaryByBlind = await firestoreDiaryService.getDiary(blindUserId, testDate);
-    expect(diaryByBlind.meals.breakfast).toHaveLength(1);
-    expect(diaryByBlind.meals.breakfast[0].name).toBe('Sassami Grelhado');
-
-    // 3. Consulta usando o e-mail em texto puro
-    const diaryByEmail = await firestoreDiaryService.getDiary(testEmail, testDate);
-    expect(diaryByEmail.meals.breakfast).toHaveLength(1);
-    expect(diaryByEmail.meals.breakfast[0].name).toBe('Sassami Grelhado');
+    // 2. Consulta direta pelo canonicalUserId encontra o registro com exatidão
+    const diary = await firestoreDiaryService.getDiary(canonicalUserId, testDate);
+    expect(diary.blindUserId).toBe(expectedBlindUserId);
+    expect(diary.meals.breakfast).toHaveLength(1);
+    expect(diary.meals.breakfast[0].name).toBe('Sassami Grelhado');
   });
 
   it('GET /api/v1/diaries/:date com Bearer sessionToken e x-user-id canônico deve retornar 200 com os dados do diário sem 403', async () => {

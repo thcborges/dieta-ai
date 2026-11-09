@@ -49,7 +49,7 @@ describe('Frontend Regression: Recuperação de Dados do Usuário (Receitas, Di�
       expect(loggedUser).not.toBeNull();
     });
 
-    expect(loggedUser!.id).toBe(corruptedHashId);
+    expect(loggedUser!.id).toBe(canonicalUserId);
   });
 
   it('App: deve recuperar e migrar automaticamente receitas e diário caso o user.id tenha sido corrompido para blindIndex ou goog_*', async () => {

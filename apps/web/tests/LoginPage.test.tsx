@@ -26,6 +26,7 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
           sessionId: 'sess_123',
           blindIndex: 'blind_idx_abc',
           user: {
+            id: 'usr_thcborges_example_com',
             email: 'thcborges@example.com',
             name: 'Líder Técnico',
           },
@@ -45,7 +46,7 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
 
     expect(onLogin).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'blind_idx_abc',
+        id: 'usr_thcborges_example_com',
         email: 'thcborges@example.com',
         name: 'Líder Técnico',
       })
@@ -67,6 +68,7 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
           sessionId: 'sess_456',
           blindIndex: 'blind_idx_outro',
           user: {
+            id: 'usr_outro_usuario_gmail_com',
             email: 'outro.usuario@gmail.com',
             name: 'Outro Usuário',
           },
@@ -86,7 +88,7 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
     await waitFor(() => {
       expect(onLogin).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'blind_idx_outro',
+          id: 'usr_outro_usuario_gmail_com',
           email: 'outro.usuario@gmail.com',
         })
       );
