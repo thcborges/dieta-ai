@@ -34,6 +34,92 @@ export interface AnalyzedItem {
   per100g: NutritionalDensity;
 }
 
+export async function resizeAndCompressImage(
+  file: File,
+  maxDimension = 1280,
+  quality = 0.85
+): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve) => {
+    if (typeof FileReader === 'undefined') {
+      resolve({ base64: '', mimeType: file.type || 'image/jpeg' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      resolve({ base64: '', mimeType: file.type || 'image/jpeg' });
+    };
+    reader.onload = (e) => {
+      const rawDataUrl = (e.target?.result as string) || '';
+      if (typeof Image === 'undefined' || typeof document === 'undefined') {
+        resolve({ base64: rawDataUrl, mimeType: file.type || 'image/jpeg' });
+        return;
+      }
+
+      const img = new Image();
+      let resolved = false;
+
+      const finish = (base64: string, mimeType: string) => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ base64, mimeType });
+        }
+      };
+
+      // In JSDOM or environments without full image rendering, resolve with rawDataUrl after a short delay
+      const timer = setTimeout(() => {
+        finish(rawDataUrl, file.type || 'image/jpeg');
+      }, 100);
+
+      img.onerror = () => {
+        clearTimeout(timer);
+        finish(rawDataUrl, file.type || 'image/jpeg');
+      };
+
+      img.onload = () => {
+        clearTimeout(timer);
+        try {
+          let { width, height } = img;
+          if (!width || !height) {
+            finish(rawDataUrl, file.type || 'image/jpeg');
+            return;
+          }
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx || typeof canvas.toDataURL !== 'function') {
+            finish(rawDataUrl, file.type || 'image/jpeg');
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const mimeType = 'image/jpeg';
+          const base64 = canvas.toDataURL(mimeType, quality);
+          finish(base64, mimeType);
+        } catch {
+          finish(rawDataUrl, file.type || 'image/jpeg');
+        }
+      };
+
+      img.src = rawDataUrl;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 interface PhotoMealModalProps {
   isOpen: boolean;
   windowKey: MealWindow;
@@ -50,16 +136,18 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedMimeType, setSelectedMimeType] = useState<string>('image/jpeg');
   const [description, setDescription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [items, setItems] = useState<AnalyzedItem[]>([]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -69,17 +157,24 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage('A imagem selecionada é muito grande. O limite máximo é 5MB.');
+    if (file.size > 20 * 1024 * 1024) {
+      setErrorMessage('A imagem selecionada é muito grande. O limite máximo é 20MB.');
       return;
     }
 
     setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { base64, mimeType } = await resizeAndCompressImage(file, 1280, 0.85);
+      setImagePreview(base64);
+      setSelectedMimeType(mimeType);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+        setSelectedMimeType(file.type || 'image/jpeg');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAnalyzePhoto = async () => {
@@ -92,17 +187,33 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
     setErrorMessage(null);
 
     try {
+      let token = '';
+      let userId = '';
+      try {
+        const stored = localStorage.getItem('macrometrics_auth_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
+          userId = parsed.id || '';
+        }
+      } catch {
+        // fallback
+      }
+
+      if (!token) {
+        token = localStorage.getItem('auth_token') || '';
+      }
+
       const response = await fetch('/api/v1/meals/analyze-photo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('auth_token')
-            ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-            : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(userId ? { 'x-user-id': userId } : {}),
         },
         body: JSON.stringify({
           imageBase64: imagePreview || '',
-          mimeType: selectedFile?.type || 'image/jpeg',
+          mimeType: selectedMimeType || selectedFile?.type || 'image/jpeg',
           description: description.trim() || undefined,
         }),
       });
@@ -214,9 +325,12 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
     setStep(1);
     setSelectedFile(null);
     setImagePreview(null);
+    setSelectedMimeType('image/jpeg');
     setDescription('');
     setErrorMessage(null);
     setItems([]);
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
     onClose();
   };
 
@@ -281,12 +395,19 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
           {step === 1 ? (
             /* ETAPA 1: CAPTURA DE FOTO E DESCRIÇÃO */
             <div className="space-y-4">
-              {/* Área de Seleção da Imagem / Preview */}
+              {/* Inputs Ocultos de Câmera e Galeria */}
               <input
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -298,33 +419,63 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
                     alt="Prato selecionado"
                     className="w-full h-auto object-contain max-h-56"
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-medium"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Trocar Imagem
-                  </button>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 p-2">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-m3-surface-container-high/90 hover:bg-m3-surface-container border border-m3-outline-variant text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-sky-400" />
+                      Tirar Foto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-m3-surface-container-high/90 hover:bg-m3-surface-container border border-m3-outline-variant text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-sky-400" />
+                      Escolher da Galeria
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-10 px-4 rounded-2xl border-2 border-dashed border-m3-outline-variant/60 hover:border-sky-500/50 bg-m3-surface-container-high/50 hover:bg-m3-surface-container-high transition-all flex flex-col items-center justify-center gap-2.5 text-m3-outline hover:text-m3-on-surface group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-m3-surface-variant flex items-center justify-center group-hover:scale-105 transition-transform text-sky-400">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <div className="text-center">
-                    <span className="text-xs font-semibold block text-m3-on-surface">
-                      Tirar foto ou carregar da galeria
-                    </span>
-                    <span className="text-[11px] text-m3-outline">
-                      Formatos JPEG, PNG ou WebP (máx. 5MB)
-                    </span>
-                  </div>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="py-6 px-4 rounded-2xl border-2 border-dashed border-m3-outline-variant/60 hover:border-sky-500/50 bg-m3-surface-container-high/50 hover:bg-m3-surface-container-high transition-all flex flex-col items-center justify-center gap-2 text-m3-outline hover:text-m3-on-surface group"
+                  >
+                    <div className="w-11 h-11 rounded-full bg-m3-surface-variant flex items-center justify-center group-hover:scale-105 transition-transform text-sky-400">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-semibold block text-m3-on-surface">
+                        Tirar Foto
+                      </span>
+                      <span className="text-[11px] text-m3-outline">
+                        Câmera instantânea
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="py-6 px-4 rounded-2xl border-2 border-dashed border-m3-outline-variant/60 hover:border-indigo-500/50 bg-m3-surface-container-high/50 hover:bg-m3-surface-container-high transition-all flex flex-col items-center justify-center gap-2 text-m3-outline hover:text-m3-on-surface group"
+                  >
+                    <div className="w-11 h-11 rounded-full bg-m3-surface-variant flex items-center justify-center group-hover:scale-105 transition-transform text-indigo-400">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-semibold block text-m3-on-surface">
+                        Escolher da Galeria
+                      </span>
+                      <span className="text-[11px] text-m3-outline">
+                        JPEG, PNG ou WebP
+                      </span>
+                    </div>
+                  </button>
+                </div>
               )}
 
               {/* Descrição Opcional do Prato */}
@@ -488,7 +639,7 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Analisar Foto</span>
+                    <span>Analisar Foto com IA</span>
                   </>
                 )}
               </button>
