@@ -81,8 +81,9 @@ export class AuthService {
       idToken.startsWith('mock-google-id-token')
     ) {
       const email = expectedEmail || 'techlead@dataeng.io';
+      const canonicalUserId = `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
       return {
-        sub: `goog_${crypto.createHash('sha256').update(email).digest('hex').substring(0, 21)}`,
+        sub: canonicalUserId,
         email,
         name: email.split('@')[0],
       };
