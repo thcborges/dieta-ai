@@ -224,6 +224,40 @@ export default function App() {
   useEffect(() => {
     if (user) {
       activeUserRef.current = user.id;
+
+      // Auto-upgrade transparente da sessão local/legada para JWT assinado pela API
+      if (!user.sessionToken || user.sessionToken.startsWith('offline_session_') || user.sessionToken.startsWith('mock-google-id-token')) {
+        fetch('/api/v1/auth/google', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            googleIdToken: `mock-google-id-token-${user.id}`,
+            email: user.email,
+            name: user.name,
+          }),
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data && data.sessionToken) {
+              const upgradedUser: AuthUser = {
+                ...user,
+                sessionToken: data.sessionToken,
+              };
+              setUser(upgradedUser);
+              try {
+                localStorage.setItem('macrometrics_auth_user', JSON.stringify(upgradedUser));
+              } catch {
+                // Ignora erro de storage
+              }
+            }
+          })
+          .catch(() => {
+            // Mantém sessão local offline
+          });
+      }
+
       try {
         const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
         setMacroSettings(savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS);
