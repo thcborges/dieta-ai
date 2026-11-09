@@ -46,21 +46,12 @@ function checkUserAccess(req: FastifyRequest, reply: FastifyReply): string | nul
   const authUserId = req.user?.id;
   const clientUserId = req.headers['x-user-id'] as string | undefined;
 
-  if (authUserId && clientUserId) {
-    const isExactMatch = authUserId === clientUserId;
-    const isEmailMatch = req.user?.email && (
-      clientUserId === `usr_${req.user.email.replace(/[^a-zA-Z0-9]/g, '_')}` ||
-      clientUserId === req.user.email ||
-      clientUserId === req.user.blindUserId
-    );
-
-    if (!isExactMatch && !isEmailMatch) {
-      reply.status(403).send({
-        error: 'FORBIDDEN',
-        message: 'Acesso negado: Tentativa de acesso a dados de outro usuário.',
-      });
-      return null;
-    }
+  if (authUserId && clientUserId && clientUserId !== authUserId) {
+    reply.status(403).send({
+      error: 'FORBIDDEN',
+      message: 'Acesso negado: Tentativa de acesso a dados de outro usuário.',
+    });
+    return null;
   }
 
   const effectiveUserId = authUserId || clientUserId;

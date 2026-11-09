@@ -66,7 +66,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         const data = await response.json();
         const fallbackId = `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const authenticatedUser: AuthUser = {
-          id: data.blindIndex || fallbackId,
+          id: data.user?.id || fallbackId,
           email: data.user?.email || trimmedEmail,
           name: data.user?.name || name.trim() || 'Usuário MacroMetrics',
           isAdmin: Boolean(data.user?.isAdmin),

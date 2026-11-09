@@ -88,50 +88,6 @@ function getInitialUserFromStorage(): AuthUser | null {
   return null;
 }
 
-function getUserStorageKeys(prefix: string, user: AuthUser | null, suffix?: string): string[] {
-  if (!user) return [];
-  const keys: string[] = [];
-  const suffixPart = suffix ? `_${suffix}` : '';
-
-  // 1. Chave direta do user.id
-  keys.push(`${prefix}_${user.id}${suffixPart}`);
-
-  // 2. Chave canônica baseada no e-mail do usuário (para recuperar dados criados antes da migração de ID)
-  if (user.email) {
-    const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '_');
-    keys.push(`${prefix}_usr_${sanitizedEmail}${suffixPart}`);
-    keys.push(`${prefix}_${user.email}${suffixPart}`);
-  }
-
-  // 3. Se user.id começa com usr_, também tenta sem o prefixo
-  if (user.id.startsWith('usr_')) {
-    const withoutUsr = user.id.replace(/^usr_/, '');
-    keys.push(`${prefix}_${withoutUsr}${suffixPart}`);
-  }
-
-  return Array.from(new Set(keys));
-}
-
-function getStoredUserData(prefix: string, user: AuthUser | null, suffix?: string): string | null {
-  if (!user) return null;
-  const candidateKeys = getUserStorageKeys(prefix, user, suffix);
-  for (const k of candidateKeys) {
-    const val = localStorage.getItem(k);
-    if (val && val !== '[]' && val !== '{}') {
-      const primaryKey = candidateKeys[0];
-      if (k !== primaryKey) {
-        try {
-          localStorage.setItem(primaryKey, val);
-        } catch {
-          // Ignora erro de storage
-        }
-      }
-      return val;
-    }
-  }
-  return null;
-}
-
 export default function App() {
   const activeUserRef = useRef<string | null>(null);
 
@@ -149,7 +105,8 @@ export default function App() {
   const [macroSettings, setMacroSettings] = useState<UserMacroSettings>(() => {
     try {
       const parsedUser = getInitialUserFromStorage();
-      const savedProfile = getStoredUserData('macrometrics_profile', parsedUser);
+      const userId = parsedUser ? parsedUser.id : 'default';
+      const savedProfile = localStorage.getItem(`macrometrics_profile_${userId}`);
       return savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;
@@ -169,9 +126,9 @@ export default function App() {
       const parsedUser = getInitialUserFromStorage();
       if (parsedUser) {
         const today = getLocalDateString();
-        const savedByDate = getStoredUserData('macrometrics_meals', parsedUser, today);
+        const savedByDate = localStorage.getItem(`macrometrics_meals_${parsedUser.id}_${today}`);
         if (savedByDate) return normalizeMeals(JSON.parse(savedByDate));
-        const saved = getStoredUserData('macrometrics_meals', parsedUser);
+        const saved = localStorage.getItem(`macrometrics_meals_${parsedUser.id}`);
         return saved ? normalizeMeals(JSON.parse(saved)) : EMPTY_MEALS;
       }
       return EMPTY_MEALS;
@@ -184,7 +141,8 @@ export default function App() {
   const [availableFoods, setAvailableFoods] = useState<FoodItem[]>(() => {
     try {
       const parsedUser = getInitialUserFromStorage();
-      const savedFoods = getStoredUserData('macrometrics_custom_foods', parsedUser);
+      const userId = parsedUser ? parsedUser.id : 'default';
+      const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${userId}`);
       if (savedFoods) {
         const parsed = JSON.parse(savedFoods) as FoodItem[];
         const map = new Map<string, FoodItem>();
@@ -208,7 +166,7 @@ export default function App() {
     try {
       const parsedUser = getInitialUserFromStorage();
       if (!parsedUser) return [];
-      const savedRecipes = getStoredUserData('macrometrics_recipes', parsedUser);
+      const savedRecipes = localStorage.getItem(`macrometrics_recipes_${parsedUser.id}`);
       return savedRecipes ? (JSON.parse(savedRecipes) as RecipeInput[]) : [];
     } catch {
       return [];
@@ -268,7 +226,7 @@ export default function App() {
     let nextMeals: MealMap = EMPTY_MEALS;
     if (user) {
       try {
-        const savedMealsByDate = getStoredUserData('macrometrics_meals', user, newDate);
+        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${newDate}`);
         if (savedMealsByDate) {
           nextMeals = normalizeMeals(JSON.parse(savedMealsByDate));
         }
@@ -282,7 +240,6 @@ export default function App() {
   // Sincroniza persistência de perfil e alimentos customizados ao trocar usuário
   useEffect(() => {
     if (user) {
-      const canonicalId = user.email ? `usr_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}` : user.id;
       activeUserRef.current = user.id;
 
       // Auto-upgrade transparente da sessão local/legada para JWT assinado pela API
@@ -293,7 +250,7 @@ export default function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            googleIdToken: `mock-google-id-token-${canonicalId}`,
+            googleIdToken: `mock-google-id-token-${user.id}`,
             email: user.email,
             name: user.name,
           }),
@@ -319,10 +276,10 @@ export default function App() {
       }
 
       try {
-        const savedProfile = getStoredUserData('macrometrics_profile', user);
+        const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
         setMacroSettings(savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS);
 
-        const savedFoods = getStoredUserData('macrometrics_custom_foods', user);
+        const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${user.id}`);
         if (savedFoods) {
           const parsed = JSON.parse(savedFoods) as FoodItem[];
           const map = new Map<string, FoodItem>();
@@ -334,7 +291,7 @@ export default function App() {
         }
 
         // Sincroniza receitas do usuário
-        const savedRecipes = getStoredUserData('macrometrics_recipes', user);
+        const savedRecipes = localStorage.getItem(`macrometrics_recipes_${user.id}`);
         if (savedRecipes) {
           setRecipes(JSON.parse(savedRecipes));
         } else {
@@ -361,8 +318,8 @@ export default function App() {
 
         // Sincroniza com /api/v1/diary na autenticação inicial da sessão
         const today = getLocalDateString();
-        const savedMealsByDate = getStoredUserData('macrometrics_meals', user, today);
-        const savedMeals = getStoredUserData('macrometrics_meals', user);
+        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${today}`);
+        const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
 
         fetch('/api/v1/diary', {
           headers: {
@@ -404,7 +361,7 @@ export default function App() {
 
     // Carrega do localStorage para a data ativa (garante que dias vazios fiquem vazios)
     try {
-      const savedMealsByDate = getStoredUserData('macrometrics_meals', user, selectedDate);
+      const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${selectedDate}`);
       if (savedMealsByDate) {
         setMeals(normalizeMeals(JSON.parse(savedMealsByDate)));
       } else {
@@ -583,7 +540,6 @@ export default function App() {
   const handleSaveRecipe = async (newOrUpdatedRecipe: RecipeInput) => {
     const recipeId = newOrUpdatedRecipe.id || `recipe_${Date.now()}`;
     const recipeWithId: RecipeInput = { ...newOrUpdatedRecipe, id: recipeId };
-    const canonicalId = user?.email ? `usr_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}` : user?.id;
 
     setRecipes(prev => {
       const exists = prev.some(r => r.id === recipeId);
@@ -591,9 +547,9 @@ export default function App() {
         ? prev.map(r => (r.id === recipeId ? recipeWithId : r))
         : [recipeWithId, ...prev];
 
-      if (canonicalId) {
+      if (user) {
         try {
-          localStorage.setItem(`macrometrics_recipes_${canonicalId}`, JSON.stringify(next));
+          localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(next));
         } catch {
           // Ignora erro de storage
         }
@@ -601,14 +557,14 @@ export default function App() {
       return next;
     });
 
-    if (canonicalId) {
+    if (user) {
       try {
         await fetch(`/api/v1/recipes/${recipeId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': canonicalId,
-            ...(user?.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
           },
           body: JSON.stringify(recipeWithId),
         });
@@ -619,12 +575,11 @@ export default function App() {
   };
 
   const handleDeleteRecipe = async (recipeId: string) => {
-    const canonicalId = user?.email ? `usr_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}` : user?.id;
     setRecipes(prev => {
       const next = prev.filter(r => r.id !== recipeId);
-      if (canonicalId) {
+      if (user) {
         try {
-          localStorage.setItem(`macrometrics_recipes_${canonicalId}`, JSON.stringify(next));
+          localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(next));
         } catch {
           // Ignora erro de storage
         }
@@ -632,13 +587,13 @@ export default function App() {
       return next;
     });
 
-    if (canonicalId) {
+    if (user) {
       try {
         await fetch(`/api/v1/recipes/${recipeId}`, {
           method: 'DELETE',
           headers: {
-            'x-user-id': canonicalId,
-            ...(user?.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
           },
         });
       } catch {
