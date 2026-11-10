@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { firestoreDiaryService } from '../services/firestore-diary.service.js';
+import { userGoalsService } from '../services/user-goals.service.js';
+import { recipeService } from '../services/recipe.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 
 function getAdminToken(): string | undefined {
@@ -26,6 +28,8 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
       // Remove registros do Firestore permanentemente em conformidade com a LGPD
       const deletedCount = await firestoreDiaryService.purgeUserDiaries(userId);
+      await userGoalsService.purgeUserGoals(userId);
+      await recipeService.purgeUserRecipes(userId);
 
       return reply.status(200).send({
         success: true,

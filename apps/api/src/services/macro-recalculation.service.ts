@@ -67,11 +67,11 @@ export function recalculateMealItem(
   }
 
   // Busca o alimento no banco de dados oficial de alimentos (prepopulados, customizados, receitas, cache)
-  let food: CachedFood | null = foodCacheService.getById(foodId);
+  let food: CachedFood | null = foodCacheService.getByIdSync(foodId);
 
   // Se não encontrar pelo foodId direto e tiver formato de código de barras numérico
   if (!food && /^\d+$/.test(foodId)) {
-    food = foodCacheService.getById(`custom_${foodId}`) || foodCacheService.getById(`off_${foodId}`);
+    food = foodCacheService.getByIdSync(`custom_${foodId}`) || foodCacheService.getByIdSync(`off_${foodId}`);
   }
 
   if (food) {

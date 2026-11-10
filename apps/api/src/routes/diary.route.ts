@@ -62,7 +62,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
     const meals = diaryService.getDiary(cleanUserId);
     const totals = calculateDiaryTotals(meals);
-    const goals = userGoalsService.getGoals(cleanUserId);
+    const goals = await userGoalsService.getGoals(cleanUserId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,
@@ -109,7 +109,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     );
     const savedMeals = diaryService.saveDiary(cleanUserId, recalculatedMeals);
     const totals = calculateDiaryTotals(savedMeals);
-    const goals = userGoalsService.getGoals(cleanUserId);
+    const goals = await userGoalsService.getGoals(cleanUserId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,

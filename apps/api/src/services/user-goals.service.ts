@@ -1,3 +1,4 @@
+import { Firestore } from '@google-cloud/firestore';
 import {
   calculateBMR,
   calculateTDEE,
@@ -45,11 +46,22 @@ export interface SaveGoalsInput {
   manualBmr?: number;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 export class UserGoalsService {
   private inMemoryGoals: Map<string, UserBiometricGoals> = new Map();
   private readonly pepper: string;
+  private firestore: Firestore | null = null;
 
-  constructor(options?: { pepper?: string }) {
+  constructor(options?: { firestore?: Firestore; pepper?: string }) {
     const configuredPepper =
       options?.pepper || process.env.BLIND_INDEX_PEPPER || process.env.LGPD_SECRET_PEPPER;
     if (!configuredPepper) {
@@ -61,6 +73,30 @@ export class UserGoalsService {
     } else {
       this.pepper = configuredPepper;
     }
+    if (options?.firestore) {
+      this.firestore = options.firestore;
+    }
+  }
+
+  public getFirestore(): Firestore | null {
+    if (!this.firestore) {
+      const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+      const projectId =
+        process.env.FIRESTORE_PROJECT_ID || process.env.GCP_PROJECT_ID || 'thcborges-dieta-ai-dev';
+
+      try {
+        if (emulatorHost) {
+          this.firestore = new Firestore({ projectId });
+        } else if (process.env.NODE_ENV === 'test' && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          return null;
+        } else {
+          this.firestore = new Firestore({ projectId });
+        }
+      } catch {
+        this.firestore = null;
+      }
+    }
+    return this.firestore;
   }
 
   public getBlindUserId(userId: string): string {
@@ -108,8 +144,24 @@ export class UserGoalsService {
     };
   }
 
-  public getGoals(userId: string): UserBiometricGoals {
+  public async getGoals(userId: string): Promise<UserBiometricGoals> {
     const blindUserId = this.getBlindUserId(userId);
+    const db = this.getFirestore();
+
+    if (db) {
+      try {
+        const docRef = db.collection('user_goals').doc(blindUserId);
+        const snapshot = await withTimeout(docRef.get());
+        if (snapshot.exists) {
+          const data = snapshot.data() as UserBiometricGoals;
+          this.inMemoryGoals.set(blindUserId, data);
+          return data;
+        }
+      } catch {
+        // Fallback para memória em caso de falha de conexão
+      }
+    }
+
     const existing = this.inMemoryGoals.get(blindUserId);
     if (existing) {
       return existing;
@@ -117,7 +169,7 @@ export class UserGoalsService {
     return this.getDefaultGoals();
   }
 
-  public saveGoals(userId: string, input: SaveGoalsInput): UserBiometricGoals {
+  public async saveGoals(userId: string, input: SaveGoalsInput): Promise<UserBiometricGoals> {
     const blindUserId = this.getBlindUserId(userId);
     const goal = input.goal || 'weight_loss';
     const deficit = Math.max(0, input.dailyDeficitKcal ?? 500);
@@ -172,8 +224,33 @@ export class UserGoalsService {
       updatedAt: new Date().toISOString(),
     };
 
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const docRef = db.collection('user_goals').doc(blindUserId);
+        await withTimeout(docRef.set(goalsDoc, { merge: true }));
+      } catch {
+        // Fallback em memória
+      }
+    }
+
     this.inMemoryGoals.set(blindUserId, goalsDoc);
     return goalsDoc;
+  }
+
+  public async purgeUserGoals(userId: string): Promise<boolean> {
+    const blindUserId = this.getBlindUserId(userId);
+    this.inMemoryGoals.delete(blindUserId);
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        await withTimeout(db.collection('user_goals').doc(blindUserId).delete());
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

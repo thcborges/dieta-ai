@@ -81,7 +81,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const diary = await firestoreDiaryService.getDiary(userId, date);
-    const goals = userGoalsService.getGoals(userId);
+    const goals = await userGoalsService.getGoals(userId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,
@@ -130,7 +130,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
       recalculatedMeals
     );
 
-    const goals = userGoalsService.getGoals(userId);
+    const goals = await userGoalsService.getGoals(userId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,
