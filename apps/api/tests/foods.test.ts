@@ -321,6 +321,11 @@ describe('Foods & Open Food Facts Cache API', () => {
 
   describe('Visibilidade Restrita e Moderação de Alimentos Cadastrados', () => {
     it('deve permitir que o autor visualize seu alimento customizado, mas não outro usuário, até aprovação do admin', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ products: [] }),
+      } as any);
+
       // 1. Usuário A cadastra um alimento customizado
       const payloadA = {
         name: 'Muffin de Banana do Usuário A',
@@ -400,6 +405,7 @@ describe('Foods & Open Food Facts Cache API', () => {
       });
       expect(barcodeResBAfter.statusCode).toBe(200);
       expect(barcodeResBAfter.json().food.name).toBe(payloadA.name);
+      fetchSpy.mockRestore();
     });
 
     it('deve retornar 403 se o token de admin não for informado ou for inválido', async () => {

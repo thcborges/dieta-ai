@@ -179,6 +179,7 @@ export class FoodCacheService {
         headers: {
           'User-Agent': 'MacroMetricsPro - DietEngineeringApp - Version 0.1.0',
         },
+        signal: AbortSignal.timeout(2000),
       });
 
       if (response.ok) {
@@ -298,6 +299,7 @@ export class FoodCacheService {
         headers: {
           'User-Agent': 'MacroMetricsPro - DietEngineeringApp - Version 0.1.0',
         },
+        signal: AbortSignal.timeout(2000),
       });
 
       if (!response.ok) {
