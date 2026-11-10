@@ -5,6 +5,28 @@ import type { FastifyInstance } from 'fastify';
 describe('Auth Resolution & Production Token Fallback Regression Suite', () => {
   let app: FastifyInstance;
 
+  const mockEstimateService = {
+    estimateFoodNutrition: vi.fn().mockResolvedValue({
+      foodName: 'Ovo cozido',
+      servingSizeGrams: 100,
+      caloriesPer100g: 155,
+      proteinPer100g: 13,
+      carbsPer100g: 1.1,
+      fatPer100g: 11,
+      fiberPer100g: 0,
+      confidence: 'high',
+      sourceNote: 'Mock estimate',
+    }),
+  } as any;
+
+  const mockPhotoService = {
+    analyzeMealPhoto: vi.fn().mockResolvedValue({
+      isFoodIdentified: true,
+      feedbackMessage: 'Mock ok',
+      items: [],
+    }),
+  } as any;
+
   beforeEach(async () => {
     vi.restoreAllMocks();
   });
@@ -13,7 +35,10 @@ describe('Auth Resolution & Production Token Fallback Regression Suite', () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
-    app = await buildApp();
+    app = await buildApp({
+      foodEstimateService: mockEstimateService,
+      photoAnalysisService: mockPhotoService,
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -38,7 +63,10 @@ describe('Auth Resolution & Production Token Fallback Regression Suite', () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
-    app = await buildApp();
+    app = await buildApp({
+      foodEstimateService: mockEstimateService,
+      photoAnalysisService: mockPhotoService,
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -61,7 +89,10 @@ describe('Auth Resolution & Production Token Fallback Regression Suite', () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
-    app = await buildApp();
+    app = await buildApp({
+      foodEstimateService: mockEstimateService,
+      photoAnalysisService: mockPhotoService,
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -83,7 +114,10 @@ describe('Auth Resolution & Production Token Fallback Regression Suite', () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
-    app = await buildApp();
+    app = await buildApp({
+      foodEstimateService: mockEstimateService,
+      photoAnalysisService: mockPhotoService,
+    });
 
     const res = await app.inject({
       method: 'POST',

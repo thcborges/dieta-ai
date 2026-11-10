@@ -36,6 +36,8 @@ export function resolveStaticPath(): string | null {
 
 export interface BuildAppOptions {
   bodyLimit?: number;
+  foodEstimateService?: import('./services/vertex-food-estimate.service.js').VertexFoodEstimateService;
+  photoAnalysisService?: import('./services/vertex-photo-analysis.service.js').VertexPhotoAnalysisService;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -56,7 +58,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   // Registro das rotas de API
   await app.register(healthRoutes);
-  await app.register(foodRoutes);
+  await app.register(foodRoutes, {
+    foodEstimateService: options.foodEstimateService,
+  });
   await app.register(authRoutes);
   await app.register(userRoutes);
   await app.register(adminRoutes);
@@ -64,7 +68,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(singleDiaryRoutes);
   await app.register(dateDiaryRoutes);
   await app.register(recipeRoutes);
-  await app.register(photoAnalysisRoutes);
+  await app.register(photoAnalysisRoutes, {
+    photoAnalysisService: options.photoAnalysisService,
+  });
 
   // Servir SPA estático se diretório existir
   const staticPath = resolveStaticPath();
