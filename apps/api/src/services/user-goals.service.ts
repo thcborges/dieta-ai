@@ -13,6 +13,9 @@ import {
 } from '@dieta-ai/core';
 
 export interface UserBiometricGoals {
+  userId?: string;
+  user_id?: string;
+  blindUserId?: string;
   ageYears: number;
   gender: Gender;
   heightCm: number;
@@ -150,32 +153,55 @@ export class UserGoalsService {
   }
 
   public async getGoals(userId: string): Promise<UserBiometricGoals> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     const db = this.getFirestore();
 
     if (db) {
       try {
-        const docRef = db.collection('user_goals').doc(blindUserId);
-        const snapshot = await withTimeout(docRef.get());
+        let docRef = db.collection('user_goals').doc(canonicalId);
+        let snapshot = await withTimeout(docRef.get());
+        if (!snapshot.exists) {
+          docRef = db.collection('user_goals').doc(blindUserId);
+          snapshot = await withTimeout(docRef.get());
+        }
         if (snapshot.exists) {
           const data = snapshot.data() as UserBiometricGoals;
-          this.inMemoryGoals.set(blindUserId, data);
-          return data;
+          const fullData = {
+            ...data,
+            userId: canonicalId,
+            user_id: canonicalId,
+            blindUserId,
+          };
+          this.inMemoryGoals.set(canonicalId, fullData);
+          this.inMemoryGoals.set(blindUserId, fullData);
+          return fullData;
         }
       } catch {
         // Fallback para memória em caso de falha de conexão
       }
     }
 
-    const existing = this.inMemoryGoals.get(blindUserId);
+    const existing = this.inMemoryGoals.get(canonicalId) || this.inMemoryGoals.get(blindUserId);
     if (existing) {
-      return existing;
+      return {
+        ...existing,
+        userId: canonicalId,
+        user_id: canonicalId,
+        blindUserId,
+      };
     }
-    return this.getDefaultGoals();
+    return {
+      ...this.getDefaultGoals(),
+      userId: canonicalId,
+      user_id: canonicalId,
+      blindUserId,
+    };
   }
 
   public async saveGoals(userId: string, input: SaveGoalsInput): Promise<UserBiometricGoals> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     const goal = input.goal || 'weight_loss';
     const deficit = Math.max(0, input.dailyDeficitKcal ?? 500);
 
@@ -210,6 +236,9 @@ export class UserGoalsService {
     });
 
     const goalsDoc: UserBiometricGoals = {
+      userId: canonicalId,
+      user_id: canonicalId,
+      blindUserId,
       ageYears: input.ageYears,
       gender: input.gender,
       heightCm: input.heightCm,
@@ -232,24 +261,32 @@ export class UserGoalsService {
     const db = this.getFirestore();
     if (db) {
       try {
-        const docRef = db.collection('user_goals').doc(blindUserId);
-        await withTimeout(docRef.set(goalsDoc, { merge: true }));
+        await Promise.all([
+          withTimeout(db.collection('user_goals').doc(canonicalId).set(goalsDoc, { merge: true })),
+          withTimeout(db.collection('user_goals').doc(blindUserId).set(goalsDoc, { merge: true })),
+        ]);
       } catch {
         // Fallback em memória
       }
     }
 
+    this.inMemoryGoals.set(canonicalId, goalsDoc);
     this.inMemoryGoals.set(blindUserId, goalsDoc);
     return goalsDoc;
   }
 
   public async purgeUserGoals(userId: string): Promise<boolean> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
+    this.inMemoryGoals.delete(canonicalId);
     this.inMemoryGoals.delete(blindUserId);
     const db = this.getFirestore();
     if (db) {
       try {
-        await withTimeout(db.collection('user_goals').doc(blindUserId).delete());
+        await Promise.all([
+          withTimeout(db.collection('user_goals').doc(canonicalId).delete()),
+          withTimeout(db.collection('user_goals').doc(blindUserId).delete()),
+        ]);
         return true;
       } catch {
         return false;

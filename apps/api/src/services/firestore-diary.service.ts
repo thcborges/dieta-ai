@@ -26,6 +26,8 @@ export interface DiaryTotals {
 }
 
 export interface DailyDiaryDoc {
+  userId: string;
+  user_id?: string;
   blindUserId: string;
   date: string;
   meals: MealMap;
@@ -138,7 +140,8 @@ export class FirestoreDiaryService {
   }
 
   public async getDiary(userId: string, date: string): Promise<DailyDiaryDoc> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     const docId = this.getDocId(blindUserId, date);
     const db = this.getFirestore();
 
@@ -150,6 +153,8 @@ export class FirestoreDiaryService {
         if (snapshot.exists) {
           const data = snapshot.data() as DailyDiaryDoc;
           return {
+            userId: data.userId || canonicalId,
+            user_id: data.user_id || canonicalId,
             blindUserId,
             date,
             meals: {
@@ -169,11 +174,19 @@ export class FirestoreDiaryService {
     }
 
     const cached = this.inMemoryFallback.get(docId);
-    if (cached) return cached;
+    if (cached) {
+      return {
+        ...cached,
+        userId: cached.userId || canonicalId,
+        user_id: cached.user_id || canonicalId,
+      };
+    }
 
     // Se não existir, retorna um diário padrão vazio para aquela data
     const emptyMeals = getEmptyMeals();
     return {
+      userId: canonicalId,
+      user_id: canonicalId,
       blindUserId,
       date,
       meals: emptyMeals,
@@ -184,7 +197,8 @@ export class FirestoreDiaryService {
   }
 
   public async saveDiary(userId: string, date: string, meals: MealMap): Promise<DailyDiaryDoc> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     const docId = this.getDocId(blindUserId, date);
     const totals = calculateDiaryTotals(meals);
     const now = new Date().toISOString();
@@ -197,6 +211,8 @@ export class FirestoreDiaryService {
     };
 
     const diaryDoc: DailyDiaryDoc = {
+      userId: canonicalId,
+      user_id: canonicalId,
       blindUserId,
       date,
       meals: normalizedMeals,
@@ -256,19 +272,25 @@ export class FirestoreDiaryService {
   }
 
   public async purgeUserDiaries(userId: string): Promise<number> {
-    const blindUserId = this.getBlindUserId(userId);
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     let deletedCount = 0;
     const db = this.getFirestore();
 
     if (db) {
       try {
-        const snapshot = await withTimeout(
-          db.collection('diaries').where('blindUserId', '==', blindUserId).get()
-        );
+        const [blindSnapshot, userSnapshot] = await Promise.all([
+          withTimeout(db.collection('diaries').where('blindUserId', '==', blindUserId).get()),
+          withTimeout(db.collection('diaries').where('userId', '==', canonicalId).get()),
+        ]);
+
+        const docsToDelete = new Map<string, FirebaseFirestore.DocumentReference>();
+        for (const doc of blindSnapshot.docs) docsToDelete.set(doc.id, doc.ref);
+        for (const doc of userSnapshot.docs) docsToDelete.set(doc.id, doc.ref);
 
         const batch = db.batch();
-        for (const doc of snapshot.docs) {
-          batch.delete(doc.ref);
+        for (const ref of docsToDelete.values()) {
+          batch.delete(ref);
           deletedCount++;
         }
         if (deletedCount > 0) {
@@ -281,7 +303,7 @@ export class FirestoreDiaryService {
 
     // Limpa do fallback in-memory
     for (const [key, val] of this.inMemoryFallback.entries()) {
-      if (val.blindUserId === blindUserId) {
+      if (val.blindUserId === blindUserId || val.userId === canonicalId || val.user_id === canonicalId) {
         this.inMemoryFallback.delete(key);
         deletedCount++;
       }
@@ -291,7 +313,8 @@ export class FirestoreDiaryService {
   }
 
   public async migrateDiariesToUser(targetUserId: string): Promise<{ migratedCount: number; totalScanned: number }> {
-    const targetBlindUserId = this.getBlindUserId(targetUserId);
+    const canonicalTargetId = canonicalizeUserId(targetUserId);
+    const targetBlindUserId = this.getBlindUserId(canonicalTargetId);
     let migratedCount = 0;
     let totalScanned = 0;
     const db = this.getFirestore();
@@ -303,18 +326,22 @@ export class FirestoreDiaryService {
 
         for (const doc of snapshot.docs) {
           const data = doc.data() as DailyDiaryDoc;
-          if (data.blindUserId !== targetBlindUserId) {
+          if (data.blindUserId !== targetBlindUserId || data.userId !== canonicalTargetId) {
             const targetDocId = this.getDocId(targetBlindUserId, data.date);
             const targetDocRef = db.collection('diaries').doc(targetDocId);
 
             const updatedDoc: DailyDiaryDoc = {
               ...data,
+              userId: canonicalTargetId,
+              user_id: canonicalTargetId,
               blindUserId: targetBlindUserId,
               updatedAt: new Date().toISOString(),
             };
 
             await withTimeout(targetDocRef.set(updatedDoc, { merge: true }));
-            await withTimeout(doc.ref.delete());
+            if (doc.id !== targetDocId) {
+              await withTimeout(doc.ref.delete());
+            }
             migratedCount++;
           }
         }
@@ -326,14 +353,18 @@ export class FirestoreDiaryService {
     // Migra também entradas no fallback em memória
     for (const [key, val] of Array.from(this.inMemoryFallback.entries())) {
       totalScanned++;
-      if (val.blindUserId !== targetBlindUserId) {
+      if (val.blindUserId !== targetBlindUserId || val.userId !== canonicalTargetId) {
         const targetDocId = this.getDocId(targetBlindUserId, val.date);
         this.inMemoryFallback.set(targetDocId, {
           ...val,
+          userId: canonicalTargetId,
+          user_id: canonicalTargetId,
           blindUserId: targetBlindUserId,
           updatedAt: new Date().toISOString(),
         });
-        this.inMemoryFallback.delete(key);
+        if (key !== targetDocId) {
+          this.inMemoryFallback.delete(key);
+        }
         migratedCount++;
       }
     }
