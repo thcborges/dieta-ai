@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { auditDailyIntake } from '@dieta-ai/core';
+import { auditDailyIntake, canonicalizeUserId } from '@dieta-ai/core';
 import {
   firestoreDiaryService,
   type MealWindow,
@@ -43,8 +43,10 @@ function isValidDate(dateStr: string): boolean {
 }
 
 function checkUserAccess(req: FastifyRequest, reply: FastifyReply): string | null {
-  const authUserId = req.user?.id;
-  const clientUserId = req.headers['x-user-id'] as string | undefined;
+  const authUserId = req.user?.id ? canonicalizeUserId(req.user.id) : undefined;
+  const clientUserId = req.headers['x-user-id']
+    ? canonicalizeUserId(req.headers['x-user-id'] as string)
+    : undefined;
 
   if (authUserId && clientUserId && clientUserId !== authUserId) {
     reply.status(403).send({
