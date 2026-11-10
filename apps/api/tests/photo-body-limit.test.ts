@@ -26,7 +26,7 @@ describe('API Photo Analysis Body Limit & Auth Regression', () => {
     process.env.SESSION_SECRET = 'test-session-secret-key-32chars!!';
     process.env.LGPD_SECRET_PEPPER = 'test-blind-index-pepper-32chars!!';
 
-    app = await buildApp();
+    app = await buildApp({ photoAnalysisService: mockPhotoService });
   });
 
   afterAll(async () => {
