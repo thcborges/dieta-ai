@@ -3,6 +3,7 @@ import {
   calculateRecipeMacros,
   recipeToFoodItem,
   generateBlindIndex,
+  canonicalizeUserId,
   type RecipeInput,
   type RecipeCalculationResult,
 } from '@dieta-ai/core';
@@ -78,7 +79,11 @@ export class RecipeService {
   }
 
   public getBlindUserId(userId: string): string {
-    return generateBlindIndex(userId, this.pepper);
+    const canonical = canonicalizeUserId(userId);
+    if (/^[a-f0-9]{64}$/i.test(canonical)) {
+      return canonical;
+    }
+    return generateBlindIndex(canonical, this.pepper);
   }
 
   async createRecipe(input: RecipeInput, userId?: string): Promise<StoredRecipe> {

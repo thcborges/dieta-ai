@@ -115,6 +115,18 @@ function sha256Bytes(ascii: Uint8Array): Uint8Array {
 }
 
 /**
+ * Canonicaliza identificadores de usuário (e-mail, formato legado ou blind index) para o formato canônico usr_<email_sanitizado>.
+ */
+export function canonicalizeUserId(userId: string): string {
+  if (!userId || typeof userId !== 'string') return '';
+  const clean = userId.replace(/^Bearer\s+/i, '').trim();
+  if (clean.includes('@')) {
+    return `usr_${clean.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
+  }
+  return clean;
+}
+
+/**
  * Calcula a data limite de exclusão irreversível conforme o prazo legal da LGPD (Art. 18 e 19).
  */
 export function calculateLgpdDeletionDeadline(requestDate: Date): Date {

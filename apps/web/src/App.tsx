@@ -6,6 +6,7 @@ import {
   PREPOPULATED_FOODS,
   getLocalDateString,
   getRollingDays,
+  canonicalizeUserId,
   type EventBufferInput,
   type MealWindow,
   type FoodItem,
@@ -72,12 +73,15 @@ function getInitialUserFromStorage(): AuthUser | null {
     const savedUser = localStorage.getItem('macrometrics_auth_user');
     if (savedUser) {
       const parsed = JSON.parse(savedUser) as AuthUser;
-      if (parsed.email && (parsed.id.length === 64 || parsed.id.startsWith('goog_'))) {
-        parsed.id = `usr_${parsed.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        try {
-          localStorage.setItem('macrometrics_auth_user', JSON.stringify(parsed));
-        } catch {
-          // Ignora erro de storage
+      if (parsed.email) {
+        const canonical = canonicalizeUserId(parsed.email);
+        if (parsed.id !== canonical) {
+          parsed.id = canonical;
+          try {
+            localStorage.setItem('macrometrics_auth_user', JSON.stringify(parsed));
+          } catch {
+            // Ignora erro de storage
+          }
         }
       }
       return parsed;
@@ -876,7 +880,10 @@ export default function App() {
 
       try {
         const res = await fetch(`/api/v1/diaries/${dateStr}`, {
-          headers: { 'x-user-id': user.id },
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
         });
         if (res.ok) {
           const data = await res.json();

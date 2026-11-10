@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import { generateBlindIndex } from '@dieta-ai/core';
+import { generateBlindIndex, canonicalizeUserId } from '@dieta-ai/core';
 
 export type MealWindow = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner_event';
 
@@ -126,7 +126,11 @@ export class FirestoreDiaryService {
   }
 
   public getBlindUserId(userId: string): string {
-    return generateBlindIndex(userId, this.pepper);
+    const canonical = canonicalizeUserId(userId);
+    if (/^[a-f0-9]{64}$/i.test(canonical)) {
+      return canonical;
+    }
+    return generateBlindIndex(canonical, this.pepper);
   }
 
   private getDocId(blindUserId: string, date: string): string {
