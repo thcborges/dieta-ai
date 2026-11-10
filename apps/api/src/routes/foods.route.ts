@@ -90,7 +90,7 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
     const userId = req.user?.id || (req.headers['x-user-id'] as string | undefined);
     const isAdmin = Boolean(req.user?.isAdmin) || isAuthorizedAdmin(req.headers['x-admin-token']);
 
-    const foods = foodCacheService.getAllFoods(userId, isAdmin);
+    const foods = await foodCacheService.getAllFoods(userId, isAdmin);
     return {
       foods,
       total: foods.length,

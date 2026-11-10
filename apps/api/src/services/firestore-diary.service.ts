@@ -285,6 +285,57 @@ export class FirestoreDiaryService {
 
     return deletedCount;
   }
+
+  public async migrateDiariesToUser(targetUserId: string): Promise<{ migratedCount: number; totalScanned: number }> {
+    const targetBlindUserId = this.getBlindUserId(targetUserId);
+    let migratedCount = 0;
+    let totalScanned = 0;
+    const db = this.getFirestore();
+
+    if (db) {
+      try {
+        const snapshot = await withTimeout(db.collection('diaries').get());
+        totalScanned += snapshot.docs.length;
+
+        for (const doc of snapshot.docs) {
+          const data = doc.data() as DailyDiaryDoc;
+          if (data.blindUserId !== targetBlindUserId) {
+            const targetDocId = this.getDocId(targetBlindUserId, data.date);
+            const targetDocRef = db.collection('diaries').doc(targetDocId);
+
+            const updatedDoc: DailyDiaryDoc = {
+              ...data,
+              blindUserId: targetBlindUserId,
+              updatedAt: new Date().toISOString(),
+            };
+
+            await withTimeout(targetDocRef.set(updatedDoc, { merge: true }));
+            await withTimeout(doc.ref.delete());
+            migratedCount++;
+          }
+        }
+      } catch {
+        // Ignora erro de conexão externa e migra in-memory
+      }
+    }
+
+    // Migra também entradas no fallback em memória
+    for (const [key, val] of Array.from(this.inMemoryFallback.entries())) {
+      totalScanned++;
+      if (val.blindUserId !== targetBlindUserId) {
+        const targetDocId = this.getDocId(targetBlindUserId, val.date);
+        this.inMemoryFallback.set(targetDocId, {
+          ...val,
+          blindUserId: targetBlindUserId,
+          updatedAt: new Date().toISOString(),
+        });
+        this.inMemoryFallback.delete(key);
+        migratedCount++;
+      }
+    }
+
+    return { migratedCount, totalScanned };
+  }
 }
 
 export const firestoreDiaryService = new FirestoreDiaryService();

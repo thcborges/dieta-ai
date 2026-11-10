@@ -67,29 +67,45 @@ const DEFAULT_SETTINGS: UserMacroSettings = {
   fiberGrams: 38,
 };
 
+function getInitialUserFromStorage(): AuthUser | null {
+  try {
+    const savedUser = localStorage.getItem('macrometrics_auth_user');
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser) as AuthUser;
+      if (parsed.email && (parsed.id.length === 64 || parsed.id.startsWith('goog_'))) {
+        parsed.id = `usr_${parsed.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        try {
+          localStorage.setItem('macrometrics_auth_user', JSON.stringify(parsed));
+        } catch {
+          // Ignora erro de storage
+        }
+      }
+      return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
 export default function App() {
   const activeUserRef = useRef<string | null>(null);
 
   // Estado de Autenticação (Obrigatório para lançar alimentos)
   const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const savedUser = localStorage.getItem('macrometrics_auth_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser) as AuthUser;
-        activeUserRef.current = parsed.id;
-        return parsed;
-      }
-      return null;
-    } catch {
-      return null;
+    const parsedUser = getInitialUserFromStorage();
+    if (parsedUser) {
+      activeUserRef.current = parsedUser.id;
+      return parsedUser;
     }
+    return null;
   });
 
   // Configurações de Macros controladas por usuário
   const [macroSettings, setMacroSettings] = useState<UserMacroSettings>(() => {
     try {
-      const savedUser = localStorage.getItem('macrometrics_auth_user');
-      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const parsedUser = getInitialUserFromStorage();
+      const userId = parsedUser ? parsedUser.id : 'default';
       const savedProfile = localStorage.getItem(`macrometrics_profile_${userId}`);
       return savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS;
     } catch {
@@ -107,13 +123,12 @@ export default function App() {
   // Refeições isoladas por usuário (inicia vazio para novos usuários ou carrega do storage da conta)
   const [meals, setMeals] = useState<MealMap>(() => {
     try {
-      const savedUser = localStorage.getItem('macrometrics_auth_user');
-      if (savedUser) {
-        const userId = (JSON.parse(savedUser) as AuthUser).id;
+      const parsedUser = getInitialUserFromStorage();
+      if (parsedUser) {
         const today = getLocalDateString();
-        const savedByDate = localStorage.getItem(`macrometrics_meals_${userId}_${today}`);
+        const savedByDate = localStorage.getItem(`macrometrics_meals_${parsedUser.id}_${today}`);
         if (savedByDate) return normalizeMeals(JSON.parse(savedByDate));
-        const saved = localStorage.getItem(`macrometrics_meals_${userId}`);
+        const saved = localStorage.getItem(`macrometrics_meals_${parsedUser.id}`);
         return saved ? normalizeMeals(JSON.parse(saved)) : EMPTY_MEALS;
       }
       return EMPTY_MEALS;
@@ -125,8 +140,8 @@ export default function App() {
   // Banco de Alimentos do usuário (Cache offline-first + pré-populado)
   const [availableFoods, setAvailableFoods] = useState<FoodItem[]>(() => {
     try {
-      const savedUser = localStorage.getItem('macrometrics_auth_user');
-      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
+      const parsedUser = getInitialUserFromStorage();
+      const userId = parsedUser ? parsedUser.id : 'default';
       const savedFoods = localStorage.getItem(`macrometrics_custom_foods_${userId}`);
       if (savedFoods) {
         const parsed = JSON.parse(savedFoods) as FoodItem[];
@@ -149,9 +164,9 @@ export default function App() {
   // Receitas compostas do usuário (Módulo 3)
   const [recipes, setRecipes] = useState<RecipeInput[]>(() => {
     try {
-      const savedUser = localStorage.getItem('macrometrics_auth_user');
-      const userId = savedUser ? (JSON.parse(savedUser) as AuthUser).id : 'default';
-      const savedRecipes = localStorage.getItem(`macrometrics_recipes_${userId}`);
+      const parsedUser = getInitialUserFromStorage();
+      if (!parsedUser) return [];
+      const savedRecipes = localStorage.getItem(`macrometrics_recipes_${parsedUser.id}`);
       return savedRecipes ? (JSON.parse(savedRecipes) as RecipeInput[]) : [];
     } catch {
       return [];
@@ -178,6 +193,7 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': user.id,
+          ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
         },
         body: JSON.stringify({ meals: mealsToSave }),
       }).catch(() => {
@@ -192,6 +208,7 @@ export default function App() {
       headers: {
         'Content-Type': 'application/json',
         'x-user-id': user.id,
+        ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
       },
       body: JSON.stringify({ meals: mealsToSave }),
     }).catch(() => {
@@ -224,6 +241,40 @@ export default function App() {
   useEffect(() => {
     if (user) {
       activeUserRef.current = user.id;
+
+      // Auto-upgrade transparente da sessão local/legada para JWT assinado pela API
+      if (!user.sessionToken || user.sessionToken.startsWith('offline_session_') || user.sessionToken.startsWith('mock-google-id-token')) {
+        fetch('/api/v1/auth/google', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            googleIdToken: `mock-google-id-token-${user.id}`,
+            email: user.email,
+            name: user.name,
+          }),
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data && data.sessionToken) {
+              const upgradedUser: AuthUser = {
+                ...user,
+                sessionToken: data.sessionToken,
+              };
+              setUser(upgradedUser);
+              try {
+                localStorage.setItem('macrometrics_auth_user', JSON.stringify(upgradedUser));
+              } catch {
+                // Ignora erro de storage
+              }
+            }
+          })
+          .catch(() => {
+            // Mantém sessão local offline
+          });
+      }
+
       try {
         const savedProfile = localStorage.getItem(`macrometrics_profile_${user.id}`);
         setMacroSettings(savedProfile ? JSON.parse(savedProfile) : DEFAULT_SETTINGS);
@@ -239,7 +290,76 @@ export default function App() {
           setAvailableFoods(PREPOPULATED_FOODS);
         }
 
-        // Sincroniza receitas do usuário
+        // Sincroniza Metas Biométricas da nuvem (Firestore)
+        fetch('/api/v1/users/me/goals', {
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data?.goals && activeUserRef.current === user.id) {
+              const cg = data.goals;
+              setMacroSettings(prev => {
+                const next: UserMacroSettings = {
+                  ...prev,
+                  ageYears: cg.ageYears ?? prev.ageYears,
+                  gender: cg.gender ?? prev.gender,
+                  heightCm: cg.heightCm ?? prev.heightCm,
+                  weightKg: cg.weightKg ?? prev.weightKg,
+                  activityLevel: cg.activityLevel ?? prev.activityLevel,
+                  bmrSource: cg.bmrSource ?? prev.bmrSource,
+                  manualBmr: cg.manualBmr ?? prev.manualBmr,
+                  goal: cg.goal ?? prev.goal,
+                  dailyDeficitKcal: cg.dailyDeficitKcal ?? prev.dailyDeficitKcal,
+                  calories: cg.calories ?? prev.calories,
+                  proteinGrams: cg.proteinGrams ?? prev.proteinGrams,
+                  carbGrams: cg.carbGrams ?? prev.carbGrams,
+                  fatGrams: cg.fatGrams ?? prev.fatGrams,
+                  fiberGrams: cg.fiberGrams ?? prev.fiberGrams,
+                };
+                try {
+                  localStorage.setItem(`macrometrics_profile_${user.id}`, JSON.stringify(next));
+                } catch {
+                  // Ignora erro de storage
+                }
+                return next;
+              });
+            }
+          })
+          .catch(() => {});
+
+        // Sincroniza Alimentos customizados e de cache da nuvem (Firestore)
+        fetch('/api/v1/foods', {
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            const list = Array.isArray(data) ? data : data?.foods;
+            if (Array.isArray(list) && list.length > 0 && activeUserRef.current === user.id) {
+              setAvailableFoods(prev => {
+                const map = new Map<string, FoodItem>();
+                for (const f of PREPOPULATED_FOODS) map.set(f.id, f);
+                for (const f of prev) map.set(f.id, f);
+                for (const f of list) map.set(f.id, f);
+                const merged = Array.from(map.values());
+                try {
+                  const customOnly = merged.filter(f => f.isCustom);
+                  localStorage.setItem(`macrometrics_custom_foods_${user.id}`, JSON.stringify(customOnly));
+                } catch {
+                  // Ignora erro de storage
+                }
+                return merged;
+              });
+            }
+          })
+          .catch(() => {});
+
+        // Sincroniza receitas do usuário da nuvem (Firestore)
         const savedRecipes = localStorage.getItem(`macrometrics_recipes_${user.id}`);
         if (savedRecipes) {
           setRecipes(JSON.parse(savedRecipes));
@@ -248,13 +368,21 @@ export default function App() {
         }
 
         fetch('/api/v1/recipes', {
-          headers: { 'x-user-id': user.id },
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
         })
           .then(res => (res.ok ? res.json() : null))
           .then(data => {
-            if (Array.isArray(data) && activeUserRef.current === user.id) {
-              setRecipes(data);
-              localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(data));
+            const list = Array.isArray(data) ? data : data?.recipes;
+            if (Array.isArray(list) && activeUserRef.current === user.id) {
+              setRecipes(list);
+              try {
+                localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(list));
+              } catch {
+                // Ignora erro de storage
+              }
             }
           })
           .catch(() => {
@@ -269,6 +397,7 @@ export default function App() {
         fetch('/api/v1/diary', {
           headers: {
             'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
           },
         })
           .then(res => (res.ok ? res.json() : null))
@@ -318,6 +447,7 @@ export default function App() {
     fetch(`/api/v1/diaries/${selectedDate}`, {
       headers: {
         'x-user-id': user.id,
+        ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
       },
     })
       .then(res => {
@@ -507,6 +637,7 @@ export default function App() {
           headers: {
             'Content-Type': 'application/json',
             'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
           },
           body: JSON.stringify(recipeWithId),
         });
@@ -535,6 +666,7 @@ export default function App() {
           method: 'DELETE',
           headers: {
             'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
           },
         });
       } catch {

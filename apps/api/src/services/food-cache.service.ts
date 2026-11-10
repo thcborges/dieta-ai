@@ -1,3 +1,4 @@
+import { Firestore } from '@google-cloud/firestore';
 import { PREPOPULATED_FOODS, filterVisibleFoods, normalizeSearchText, type FoodItem } from '@dieta-ai/core';
 
 export interface CachedFood extends FoodItem {
@@ -6,11 +7,46 @@ export interface CachedFood extends FoodItem {
   updatedAt: string;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 export class FoodCacheService {
   private inMemoryCache: Map<string, CachedFood> = new Map();
+  private firestore: Firestore | null = null;
 
-  constructor() {
+  constructor(options?: { firestore?: Firestore }) {
     this.seedPrepopulatedFoods();
+    if (options?.firestore) {
+      this.firestore = options.firestore;
+    }
+  }
+
+  public getFirestore(): Firestore | null {
+    if (!this.firestore) {
+      const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+      const projectId =
+        process.env.FIRESTORE_PROJECT_ID || process.env.GCP_PROJECT_ID || 'thcborges-dieta-ai-dev';
+
+      try {
+        if (emulatorHost) {
+          this.firestore = new Firestore({ projectId });
+        } else if (process.env.NODE_ENV === 'test' && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          return null;
+        } else {
+          this.firestore = new Firestore({ projectId });
+        }
+      } catch {
+        this.firestore = null;
+      }
+    }
+    return this.firestore;
   }
 
   private seedPrepopulatedFoods() {
@@ -25,11 +61,61 @@ export class FoodCacheService {
     }
   }
 
-  getById(id: string): CachedFood | null {
+  getByIdSync(id: string): CachedFood | null {
     return this.inMemoryCache.get(id) || null;
   }
 
-  getAllFoods(userId?: string, isAdmin: boolean = false): CachedFood[] {
+  async getById(id: string): Promise<CachedFood | null> {
+    const cached = this.inMemoryCache.get(id);
+    if (cached) return cached;
+
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const docRef = db.collection('foods_cache').doc(id);
+        const snapshot = await withTimeout(docRef.get());
+        if (snapshot.exists) {
+          const food = snapshot.data() as CachedFood;
+          this.inMemoryCache.set(food.id, food);
+          if (food.barcode) {
+            this.inMemoryCache.set(food.barcode, food);
+          }
+          return food;
+        }
+      } catch {
+        // Fallback em memória
+      }
+    }
+
+    return null;
+  }
+
+  getFoodsSync(userId?: string, isAdmin: boolean = false): CachedFood[] {
+    const map = new Map<string, CachedFood>();
+    for (const food of this.inMemoryCache.values()) {
+      map.set(food.id, food);
+    }
+    const all = Array.from(map.values());
+    return filterVisibleFoods(all, userId, isAdmin) as CachedFood[];
+  }
+
+  async getAllFoods(userId?: string, isAdmin: boolean = false): Promise<CachedFood[]> {
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const snapshot = await withTimeout(db.collection('foods_cache').get());
+        for (const doc of snapshot.docs) {
+          const food = doc.data() as CachedFood;
+          this.inMemoryCache.set(food.id, food);
+          if (food.barcode) {
+            this.inMemoryCache.set(food.barcode, food);
+          }
+        }
+      } catch {
+        // Fallback em memória
+      }
+    }
+
     const map = new Map<string, CachedFood>();
     for (const food of this.inMemoryCache.values()) {
       map.set(food.id, food);
@@ -46,8 +132,12 @@ export class FoodCacheService {
   ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' | 'combined' }> {
     const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) {
-      return { foods: this.getAllFoods(userId, isAdmin), source: 'cache' };
+      const all = await this.getAllFoods(userId, isAdmin);
+      return { foods: all, source: 'cache' };
     }
+
+    // Carrega do Firestore para garantir integridade
+    await this.getAllFoods(userId, isAdmin);
 
     const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
 
@@ -89,6 +179,7 @@ export class FoodCacheService {
         headers: {
           'User-Agent': 'MacroMetricsPro - DietEngineeringApp - Version 0.1.0',
         },
+        signal: AbortSignal.timeout(2000),
       });
 
       if (response.ok) {
@@ -124,10 +215,18 @@ export class FoodCacheService {
               updatedAt: new Date().toISOString(),
             };
 
-            // Salva no banco de dados (cache)
+            // Salva no banco de dados (cache em memória e Firestore)
             this.inMemoryCache.set(food.id, food);
             if (food.barcode) {
               this.inMemoryCache.set(food.barcode, food);
+            }
+            const db = this.getFirestore();
+            if (db) {
+              try {
+                await withTimeout(db.collection('foods_cache').doc(food.id).set(food, { merge: true }));
+              } catch {
+                // Fallback em memória
+              }
             }
             offResults.push(food);
           }
@@ -164,8 +263,27 @@ export class FoodCacheService {
     userId?: string,
     isAdmin: boolean = false
   ): Promise<CachedFood | null> {
-    // 1. Consulta cache em memória / Firestore
-    const cached = this.inMemoryCache.get(barcode);
+    // 1. Consulta cache em memória
+    let cached = this.inMemoryCache.get(barcode);
+    if (!cached) {
+      // Tenta carregar do Firestore
+      const db = this.getFirestore();
+      if (db) {
+        try {
+          const snapshot = await withTimeout(
+            db.collection('foods_cache').where('barcode', '==', barcode).get()
+          );
+          if (!snapshot.empty) {
+            cached = snapshot.docs[0].data() as CachedFood;
+            this.inMemoryCache.set(cached.id, cached);
+            this.inMemoryCache.set(barcode, cached);
+          }
+        } catch {
+          // Fallback em memória
+        }
+      }
+    }
+
     if (cached) {
       const visible = filterVisibleFoods([cached], userId, isAdmin);
       if (visible.length === 0) {
@@ -181,6 +299,7 @@ export class FoodCacheService {
         headers: {
           'User-Agent': 'MacroMetricsPro - DietEngineeringApp - Version 0.1.0',
         },
+        signal: AbortSignal.timeout(2000),
       });
 
       if (!response.ok) {
@@ -219,8 +338,17 @@ export class FoodCacheService {
         updatedAt: new Date().toISOString(),
       };
 
-      // Salva no cache
+      // Salva no cache em memória e no Firestore
       this.inMemoryCache.set(barcode, food);
+      this.inMemoryCache.set(food.id, food);
+      const db = this.getFirestore();
+      if (db) {
+        try {
+          await withTimeout(db.collection('foods_cache').doc(food.id).set(food, { merge: true }));
+        } catch {
+          // Fallback
+        }
+      }
       return food;
     } catch {
       return null;
@@ -262,20 +390,50 @@ export class FoodCacheService {
     }
     this.inMemoryCache.set(id, cachedFood);
 
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const docRef = db.collection('foods_cache').doc(id);
+        await withTimeout(docRef.set(cachedFood, { merge: true }));
+      } catch {
+        // Fallback em memória
+      }
+    }
+
     return cachedFood;
   }
 
-  saveFoodItem(food: FoodItem): CachedFood {
+  async saveFoodItem(food: FoodItem): Promise<CachedFood> {
     const cached: CachedFood = {
       ...food,
       source: 'manual',
       updatedAt: new Date().toISOString(),
     };
     this.inMemoryCache.set(food.id, cached);
+
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const docRef = db.collection('foods_cache').doc(food.id);
+        await withTimeout(docRef.set(cached, { merge: true }));
+      } catch {
+        // Fallback em memória
+      }
+    }
+
     return cached;
   }
 
-  deleteFoodItem(foodId: string): boolean {
+  async deleteFoodItem(foodId: string): Promise<boolean> {
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const docRef = db.collection('foods_cache').doc(foodId);
+        await withTimeout(docRef.delete());
+      } catch {
+        // Fallback em memória
+      }
+    }
     return this.inMemoryCache.delete(foodId);
   }
 
@@ -293,6 +451,16 @@ export class FoodCacheService {
         barcodeFood.updatedAt = food.updatedAt;
       }
     }
+
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        db.collection('foods_cache').doc(foodId).set(food, { merge: true });
+      } catch {
+        // Fallback
+      }
+    }
+
     return food;
   }
 }
