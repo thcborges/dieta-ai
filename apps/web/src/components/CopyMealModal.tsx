@@ -34,6 +34,7 @@ export interface CopyMealModalProps {
   onConfirm: (targetWindow: MealWindow, copiedItems: LoggedFood[]) => void;
   onLoadMealsForDate?: (date: string) => Promise<MealMap> | MealMap;
   currentUser?: { id: string } | null;
+  availableHistoryDates?: string[];
 }
 
 interface EditableCopyItem extends LoggedFood {
@@ -71,6 +72,7 @@ export const CopyMealModal: React.FC<CopyMealModalProps> = ({
   onConfirm,
   onLoadMealsForDate,
   currentUser,
+  availableHistoryDates,
 }) => {
   const [sourceDate, setSourceDate] = useState<string>(currentDate);
   const [sourceWindow, setSourceWindow] = useState<MealWindow>(initialSourceWindow);
@@ -347,6 +349,27 @@ export const CopyMealModal: React.FC<CopyMealModalProps> = ({
                 >
                   Ontem
                 </button>
+                {availableHistoryDates
+                  ?.filter(d => d !== currentDate && d !== yesterday)
+                  .slice(0, 2)
+                  .map(dateStr => {
+                    const [, m, d] = dateStr.split('-');
+                    return (
+                      <button
+                        key={dateStr}
+                        type="button"
+                        onClick={() => setSourceDate(dateStr)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-mono transition-colors ${
+                          sourceDate === dateStr
+                            ? 'bg-m3-primary text-m3-on-primary font-bold'
+                            : 'bg-m3-surface-container text-m3-outline hover:text-m3-on-surface'
+                        }`}
+                        title={`Carregar refeições de ${dateStr}`}
+                      >
+                        {d}/{m}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
             <input

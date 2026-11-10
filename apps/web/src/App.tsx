@@ -22,7 +22,13 @@ import { MealBuilder, type LoggedFood, type MealMap } from './components/MealBui
 import { AccountManagementModal } from './components/AccountManagementModal.js';
 import { LoginPage, type AuthUser } from './components/LoginPage.js';
 import { MacroSettingsModal, type UserMacroSettings } from './components/MacroSettingsModal.js';
-import { User, Sliders, LogOut, Calendar } from 'lucide-react';
+import { User, Sliders, LogOut, Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+
+function stepDate(dateStr: string, offset: number): string {
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const d = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr) + offset, 0, 0, 0, 0);
+  return getLocalDateString(d);
+}
 
 const EMPTY_MEALS: MealMap = {
   breakfast: [],
@@ -186,6 +192,11 @@ export default function App() {
 
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
+
+  // Histórico de datas preenchidas e resumo semanal vindo do Firestore
+  const [recordedDates, setRecordedDates] = useState<string[]>([]);
+  const [weeklyHistoryMap, setWeeklyHistoryMap] = useState<Record<string, { calories: number; proteinGrams: number }>>({});
+  const [isLoadingMeals, setIsLoadingMeals] = useState<boolean>(false);
 
   // Função para persistir refeições de uma data específica sem poluir outras datas
   const persistMeals = (mealsToSave: MealMap, date: string) => {
@@ -420,6 +431,7 @@ export default function App() {
       setMeals(EMPTY_MEALS);
     }
 
+    setIsLoadingMeals(true);
     fetch(`/api/v1/diaries/${selectedDate}`, {
       headers: {
         'x-user-id': user.id,
@@ -449,7 +461,73 @@ export default function App() {
       })
       .catch(() => {
         // Offline-first: mantém dados locais
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingMeals(false);
+        }
       });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, selectedDate]);
+
+  // Busca datas com refeições salvas para descoberta e atalhos rápidos
+  useEffect(() => {
+    if (!user) {
+      setRecordedDates([]);
+      return;
+    }
+
+    let isCancelled = false;
+    fetch('/api/v1/diaries/dates', {
+      headers: {
+        'x-user-id': user.id,
+        ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+      },
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!isCancelled && data && Array.isArray(data.dates)) {
+          setRecordedDates(data.dates);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, selectedDate]);
+
+  // Hidrata a janela móvel de 7 dias do Termômetro Semanal diretamente do Firestore
+  useEffect(() => {
+    if (!user) {
+      setWeeklyHistoryMap({});
+      return;
+    }
+
+    let isCancelled = false;
+    fetch(`/api/v1/diaries/history?days=7&endDate=${selectedDate}`, {
+      headers: {
+        'x-user-id': user.id,
+        ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+      },
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!isCancelled && data && Array.isArray(data.history)) {
+          const map: Record<string, { calories: number; proteinGrams: number }> = {};
+          for (const item of data.history) {
+            map[item.date] = {
+              calories: item.calories || 0,
+              proteinGrams: item.proteinGrams || 0,
+            };
+          }
+          setWeeklyHistoryMap(map);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       isCancelled = true;
@@ -748,6 +826,12 @@ export default function App() {
           calories: currentTotals.calories,
           proteinGrams: currentTotals.proteinGrams,
         });
+      } else if (weeklyHistoryMap[dateStr]) {
+        list.push({
+          date: dateStr,
+          calories: weeklyHistoryMap[dateStr].calories,
+          proteinGrams: weeklyHistoryMap[dateStr].proteinGrams,
+        });
       } else if (user) {
         try {
           const savedMealsStr = localStorage.getItem(`macrometrics_meals_${user.id}_${dateStr}`);
@@ -950,28 +1034,88 @@ export default function App() {
             </button>
           </div>
 
-          {/* Seletor de Data do Diário (Ocupa linha dedicada no mobile e alinha-se no desktop) */}
-          <div className="w-full md:w-auto order-3 md:order-2 flex items-center">
-            <div className="flex items-center justify-between md:justify-start gap-1.5 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2.5 py-1 rounded-xl text-xs text-m3-on-surface w-full md:w-auto">
-              <div className="flex items-center gap-1.5">
+          {/* Seletor de Data do Diário com Navegação Rápida (Dia Anterior, Hoje, Próximo Dia) e Atalhos de Histórico */}
+          <div className="w-full md:w-auto order-3 md:order-2 flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2 py-1 rounded-xl text-xs text-m3-on-surface">
+              <button
+                type="button"
+                aria-label="Dia Anterior"
+                onClick={() => handleDateChange(stepDate(selectedDate, -1))}
+                className="p-1 rounded-lg hover:bg-m3-surface-variant text-m3-outline hover:text-m3-on-surface transition-colors"
+                title="Dia Anterior"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                aria-label="Hoje"
+                onClick={() => handleDateChange(getLocalDateString(new Date()))}
+                className={`text-[11px] font-mono px-2 py-0.5 rounded-md transition-colors ${
+                  selectedDate === getLocalDateString(new Date())
+                    ? 'bg-m3-primary text-m3-on-primary font-bold'
+                    : 'text-m3-outline hover:text-m3-on-surface hover:bg-m3-surface-variant'
+                }`}
+                title="Voltar para Hoje"
+              >
+                Hoje
+              </button>
+
+              <button
+                type="button"
+                aria-label="Próximo Dia"
+                onClick={() => handleDateChange(stepDate(selectedDate, 1))}
+                className="p-1 rounded-lg hover:bg-m3-surface-variant text-m3-outline hover:text-m3-on-surface transition-colors"
+                title="Próximo Dia"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="h-3.5 w-px bg-m3-outline-variant/40 mx-0.5" />
+
+              <div className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-m3-primary shrink-0" />
-                <span className="text-xs text-m3-outline font-mono md:hidden">Data do Diário:</span>
+                <label htmlFor="diary-date-picker" className="sr-only">
+                  Data do Diário
+                </label>
+                <input
+                  id="diary-date-picker"
+                  type="date"
+                  value={selectedDate}
+                  onChange={e => {
+                    if (e.target.value) {
+                      handleDateChange(e.target.value);
+                    }
+                  }}
+                  className="bg-transparent text-m3-on-surface text-xs focus:outline-none cursor-pointer font-mono"
+                />
               </div>
-              <label htmlFor="diary-date-picker" className="sr-only">
-                Data do Diário
-              </label>
-              <input
-                id="diary-date-picker"
-                type="date"
-                value={selectedDate}
-                onChange={e => {
-                  if (e.target.value) {
-                    handleDateChange(e.target.value);
-                  }
-                }}
-                className="bg-transparent text-m3-on-surface text-xs focus:outline-none cursor-pointer font-mono"
-              />
+
+              {isLoadingMeals && (
+                <Loader2 className="w-3.5 h-3.5 text-m3-primary animate-spin shrink-0 ml-0.5" />
+              )}
             </div>
+
+            {/* Atalhos Rápidos para Datas Anteriores com Refeições Gravadas */}
+            {recordedDates
+              .filter(d => d !== selectedDate)
+              .slice(0, 3)
+              .map(dateStr => {
+                const [, m, d] = dateStr.split('-');
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    aria-label={`${d}/${m}`}
+                    onClick={() => handleDateChange(dateStr)}
+                    className="inline-flex items-center gap-1 text-[11px] font-mono bg-m3-surface-container border border-m3-outline-variant/50 text-m3-outline hover:text-m3-primary hover:border-m3-primary/60 px-2 py-1 rounded-lg transition-colors"
+                    title={`Ir para diário de ${dateStr}`}
+                  >
+                    <Calendar className="w-3 h-3 text-m3-primary/70" />
+                    <span>{d}/{m}</span>
+                  </button>
+                );
+              })}
           </div>
         </div>
       </header>
@@ -1025,6 +1169,7 @@ export default function App() {
           currentUser={user}
           selectedDate={selectedDate}
           onLoadMealsForDate={handleLoadMealsForDate}
+          availableHistoryDates={recordedDates}
         />
       </main>
 

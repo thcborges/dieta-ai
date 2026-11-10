@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import { generateBlindIndex, canonicalizeUserId } from '@dieta-ai/core';
+import { generateBlindIndex, canonicalizeUserId, getRollingDays } from '@dieta-ai/core';
 
 export type MealWindow = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner_event';
 
@@ -262,6 +262,90 @@ export class FirestoreDiaryService {
     };
 
     return this.saveDiary(userId, date, updatedMeals);
+  }
+
+  public async getUserDiaryDates(userIdOrBlindId: string): Promise<string[]> {
+    const canonicalId = canonicalizeUserId(userIdOrBlindId);
+    const blindUserId = this.getBlindUserId(canonicalId);
+    const dateSet = new Set<string>();
+
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const snapshot = await withTimeout(
+          db.collection('diaries').where('blindUserId', '==', blindUserId).get()
+        );
+        for (const doc of snapshot.docs) {
+          const data = doc.data() as DailyDiaryDoc;
+          if (data.date && data.meals) {
+            const hasMeals = Object.values(data.meals).some(
+              items => Array.isArray(items) && items.length > 0
+            );
+            if (hasMeals) {
+              dateSet.add(data.date);
+            }
+          }
+        }
+      } catch {
+        // Fallback para memória em caso de falha transitória
+      }
+    }
+
+    for (const val of this.inMemoryFallback.values()) {
+      if (val.blindUserId === blindUserId && val.date && val.meals) {
+        const hasMeals = Object.values(val.meals).some(
+          items => Array.isArray(items) && items.length > 0
+        );
+        if (hasMeals) {
+          dateSet.add(val.date);
+        }
+      }
+    }
+
+    return Array.from(dateSet).sort().reverse();
+  }
+
+  public async getDiariesHistory(
+    userIdOrBlindId: string,
+    days: number = 7,
+    endDateStr?: string
+  ): Promise<
+    Array<{
+      date: string;
+      calories: number;
+      proteinGrams: number;
+      carbsGrams: number;
+      fatGrams: number;
+      fiberGrams: number;
+    }>
+  > {
+    const canonicalId = canonicalizeUserId(userIdOrBlindId);
+    const blindUserId = this.getBlindUserId(canonicalId);
+    const resolvedEndDate = endDateStr || new Date().toISOString().slice(0, 10);
+    const rollingDates = getRollingDays(resolvedEndDate, days);
+
+    const historyList: Array<{
+      date: string;
+      calories: number;
+      proteinGrams: number;
+      carbsGrams: number;
+      fatGrams: number;
+      fiberGrams: number;
+    }> = [];
+
+    for (const date of rollingDates) {
+      const diary = await this.getDiary(blindUserId, date);
+      historyList.push({
+        date,
+        calories: diary.totals.calories,
+        proteinGrams: diary.totals.protein,
+        carbsGrams: diary.totals.carbs,
+        fatGrams: diary.totals.fat,
+        fiberGrams: diary.totals.fiber,
+      });
+    }
+
+    return historyList;
   }
 
   public async purgeUserDiaries(userId: string): Promise<number> {

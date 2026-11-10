@@ -69,6 +69,46 @@ function checkUserAccess(req: FastifyRequest, reply: FastifyReply): string | nul
 }
 
 export const diaryRoutes: FastifyPluginAsync = async (app) => {
+  // Lista todas as datas que possuem diários com refeições registradas para o usuário
+  app.get('/api/v1/diaries/dates', { preHandler: [requireAuth] }, async (req, reply) => {
+    const userId = checkUserAccess(req, reply);
+    if (!userId) return;
+
+    const dates = await firestoreDiaryService.getUserDiaryDates(userId);
+    return reply.status(200).send({
+      dates,
+      count: dates.length,
+    });
+  });
+
+  // Retorna o histórico consolidado de macronutrientes dos últimos N dias (janela móvel)
+  app.get<{ Querystring: { days?: string; endDate?: string } }>(
+    '/api/v1/diaries/history',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const userId = checkUserAccess(req, reply);
+      if (!userId) return;
+
+      const days = req.query.days
+        ? Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 90)
+        : 7;
+      const endDate = req.query.endDate;
+      if (endDate && !isValidDate(endDate)) {
+        return reply.status(400).send({
+          error: 'INVALID_DATE_FORMAT',
+          message: 'endDate deve estar no formato YYYY-MM-DD.',
+        });
+      }
+
+      const history = await firestoreDiaryService.getDiariesHistory(userId, days, endDate);
+      return reply.status(200).send({
+        history,
+        days,
+        endDate: endDate || (history.length > 0 ? history[history.length - 1].date : ''),
+      });
+    }
+  );
+
   // Consulta o diário de refeições de uma data específica
   app.get<{ Params: { date: string } }>('/api/v1/diaries/:date', { preHandler: [requireAuth] }, async (req, reply) => {
     const userId = checkUserAccess(req, reply);
