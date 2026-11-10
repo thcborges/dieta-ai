@@ -255,8 +255,7 @@ describe('Users Collection & Relational Linking Suite (BDD / TDD)', () => {
       expect((await foodCacheService.getAllFoods(canonicalUserId)).some((f) => f.id === 'custom_purge_food_123')).toBe(true);
 
       // 2. Executa exclusão administrativa com token de admin
-      const adminToken = 'test-admin-secret-token';
-      process.env.ADMIN_TOKEN = adminToken;
+      const adminToken = process.env.ADMIN_TOKEN || 'admin-secret-token-key-us-central1';
 
       const deleteRes = await app.inject({
         method: 'DELETE',
