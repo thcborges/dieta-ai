@@ -75,6 +75,7 @@ export function getEmptyMeals(): MealMap {
 
 async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
   let timeoutId: NodeJS.Timeout;
+  promise.catch(() => {});
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
   });

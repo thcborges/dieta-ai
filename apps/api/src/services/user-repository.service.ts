@@ -27,6 +27,7 @@ export interface UpsertUserInput {
 
 async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
   let timeoutId: NodeJS.Timeout;
+  promise.catch(() => {});
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
   });
@@ -51,10 +52,19 @@ export class UserRepositoryService {
       const projectId =
         process.env.FIRESTORE_PROJECT_ID || process.env.GCP_PROJECT_ID || 'thcborges-dieta-ai-dev';
 
+      const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+      const hasExplicitCreds = Boolean(
+        process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+        process.env.K_SERVICE ||
+        process.env.GAE_ENV
+      );
+
       try {
         if (emulatorHost) {
           this.firestore = new Firestore({ projectId });
-        } else if (process.env.NODE_ENV === 'test' && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        } else if (isTestEnv && !hasExplicitCreds) {
+          return null;
+        } else if (!hasExplicitCreds && !process.env.GOOGLE_CLOUD_PROJECT && !process.env.GCP_PROJECT_ID) {
           return null;
         } else {
           this.firestore = new Firestore({ projectId });
