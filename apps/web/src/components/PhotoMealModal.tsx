@@ -125,6 +125,8 @@ interface PhotoMealModalProps {
   windowKey: MealWindow;
   onClose: () => void;
   onAddFood: (window: MealWindow, item: LoggedFood) => void;
+  token?: string;
+  userId?: string;
 }
 
 export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
@@ -132,6 +134,8 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
   windowKey,
   onClose,
   onAddFood,
+  token: propsToken,
+  userId: propsUserId,
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -187,17 +191,19 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
     setErrorMessage(null);
 
     try {
-      let token = '';
-      let userId = '';
-      try {
-        const stored = localStorage.getItem('macrometrics_auth_user');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
-          userId = parsed.id || '';
+      let token = propsToken || '';
+      let userId = propsUserId || '';
+      if (!token || !userId) {
+        try {
+          const stored = localStorage.getItem('macrometrics_auth_user');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (!token) token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
+            if (!userId) userId = parsed.id || '';
+          }
+        } catch {
+          // fallback
         }
-      } catch {
-        // fallback
       }
 
       if (!token) {

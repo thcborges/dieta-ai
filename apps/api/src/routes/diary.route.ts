@@ -1,8 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { auditDailyIntake } from '@dieta-ai/core';
-import { diaryService } from '../services/diary.service.js';
-import { calculateDiaryTotals } from '../services/firestore-diary.service.js';
+import { firestoreDiaryService } from '../services/firestore-diary.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {
   recalculateMealMap,
@@ -60,22 +59,22 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
 
     const userId = (authUserId || clientUserId)!;
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
-    const meals = diaryService.getDiary(cleanUserId);
-    const totals = calculateDiaryTotals(meals);
+    const today = new Date().toISOString().split('T')[0];
+    const diary = await firestoreDiaryService.getDiary(cleanUserId, today);
     const goals = await userGoalsService.getGoals(cleanUserId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,
       targetCalories: goals.calories,
       targetProteinGrams: goals.proteinGrams,
-      currentCalories: totals.calories,
-      currentProteinGrams: totals.protein,
+      currentCalories: diary.totals.calories,
+      currentProteinGrams: diary.totals.protein,
     });
 
     return reply.status(200).send({
       userId: cleanUserId,
-      meals,
-      totals,
+      meals: diary.meals,
+      totals: diary.totals,
       goals,
       auditReport,
     });
@@ -103,27 +102,27 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const cleanUserId = userId.replace(/^Bearer\s+/i, '').trim();
+    const today = new Date().toISOString().split('T')[0];
     const recalculatedMeals = recalculateMealMap(
       parseResult.data.meals as Record<string, RawMealItemInput[]>,
       cleanUserId
     );
-    const savedMeals = diaryService.saveDiary(cleanUserId, recalculatedMeals);
-    const totals = calculateDiaryTotals(savedMeals);
+    const saved = await firestoreDiaryService.saveDiary(cleanUserId, today, recalculatedMeals);
     const goals = await userGoalsService.getGoals(cleanUserId);
     const auditReport = auditDailyIntake({
       weightKg: goals.weightKg,
       plannedDailyDeficitKcal: goals.dailyDeficitKcal,
       targetCalories: goals.calories,
       targetProteinGrams: goals.proteinGrams,
-      currentCalories: totals.calories,
-      currentProteinGrams: totals.protein,
+      currentCalories: saved.totals.calories,
+      currentProteinGrams: saved.totals.protein,
     });
 
     return reply.status(200).send({
       success: true,
       userId: cleanUserId,
-      meals: savedMeals,
-      totals,
+      meals: saved.meals,
+      totals: saved.totals,
       goals,
       auditReport,
     });

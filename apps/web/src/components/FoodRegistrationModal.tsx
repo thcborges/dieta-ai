@@ -8,6 +8,8 @@ export interface FoodRegistrationModalProps {
   onSave: (food: FoodItem) => void;
   initialName?: string;
   initialBarcode?: string;
+  token?: string;
+  userId?: string;
 }
 
 export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
@@ -16,6 +18,8 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
   onSave,
   initialName = '',
   initialBarcode = '',
+  token: propsToken,
+  userId: propsUserId,
 }) => {
   const [name, setName] = useState(initialName);
   const [servingSizeGrams, setServingSizeGrams] = useState<number | ''>(100);
@@ -59,17 +63,19 @@ export const FoodRegistrationModal: React.FC<FoodRegistrationModalProps> = ({
     setEstimateFeedback(null);
 
     try {
-      let token = '';
-      let userId = '';
-      try {
-        const stored = localStorage.getItem('macrometrics_auth_user');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
-          userId = parsed.id || '';
+      let token = propsToken || '';
+      let userId = propsUserId || '';
+      if (!token || !userId) {
+        try {
+          const stored = localStorage.getItem('macrometrics_auth_user');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (!token) token = parsed.sessionToken || (parsed.id ? `mock-google-id-token-${parsed.id}` : '');
+            if (!userId) userId = parsed.id || '';
+          }
+        } catch {
+          // fallback
         }
-      } catch {
-        // fallback
       }
 
       if (!token) {

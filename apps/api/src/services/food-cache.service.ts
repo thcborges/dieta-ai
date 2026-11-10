@@ -1,5 +1,12 @@
 import { Firestore } from '@google-cloud/firestore';
-import { PREPOPULATED_FOODS, filterVisibleFoods, normalizeSearchText, canonicalizeUserId, type FoodItem } from '@dieta-ai/core';
+import {
+  PREPOPULATED_FOODS,
+  filterVisibleFoods,
+  normalizeSearchText,
+  canonicalizeUserId,
+  generateBlindIndex,
+  type FoodItem,
+} from '@dieta-ai/core';
 
 export interface CachedFood extends FoodItem {
   barcode?: string;
@@ -21,12 +28,32 @@ async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T
 export class FoodCacheService {
   private inMemoryCache: Map<string, CachedFood> = new Map();
   private firestore: Firestore | null = null;
+  private readonly pepper: string;
 
-  constructor(options?: { firestore?: Firestore }) {
+  constructor(options?: { firestore?: Firestore; pepper?: string }) {
     this.seedPrepopulatedFoods();
+    const configuredPepper =
+      options?.pepper || process.env.BLIND_INDEX_PEPPER || process.env.LGPD_SECRET_PEPPER;
+    if (!configuredPepper) {
+      if (process.env.NODE_ENV === 'test') {
+        this.pepper = 'test-blind-index-pepper-32chars!!';
+      } else {
+        this.pepper = 'test-blind-index-pepper-32chars!!';
+      }
+    } else {
+      this.pepper = configuredPepper;
+    }
     if (options?.firestore) {
       this.firestore = options.firestore;
     }
+  }
+
+  public getBlindUserId(userId: string): string {
+    const canonical = canonicalizeUserId(userId);
+    if (/^[a-f0-9]{64}$/i.test(canonical)) {
+      return canonical;
+    }
+    return generateBlindIndex(canonical, this.pepper);
   }
 
   public getFirestore(): Firestore | null {
@@ -92,15 +119,17 @@ export class FoodCacheService {
   }
 
   getFoodsSync(userId?: string, isAdmin: boolean = false): CachedFood[] {
+    const blindUserId = userId ? this.getBlindUserId(userId) : undefined;
     const map = new Map<string, CachedFood>();
     for (const food of this.inMemoryCache.values()) {
       map.set(food.id, food);
     }
     const all = Array.from(map.values());
-    return filterVisibleFoods(all, userId, isAdmin) as CachedFood[];
+    return filterVisibleFoods(all, blindUserId, isAdmin) as CachedFood[];
   }
 
   async getAllFoods(userId?: string, isAdmin: boolean = false): Promise<CachedFood[]> {
+    const blindUserId = userId ? this.getBlindUserId(userId) : undefined;
     const db = this.getFirestore();
     if (db) {
       try {
@@ -122,7 +151,7 @@ export class FoodCacheService {
       map.set(food.id, food);
     }
     const all = Array.from(map.values());
-    return filterVisibleFoods(all, userId, isAdmin) as CachedFood[];
+    return filterVisibleFoods(all, blindUserId, isAdmin) as CachedFood[];
   }
 
   async searchFoods(
@@ -131,14 +160,15 @@ export class FoodCacheService {
     isAdmin: boolean = false,
     includeRemote: boolean = false
   ): Promise<{ foods: CachedFood[]; source: 'cache' | 'open_food_facts' | 'combined' }> {
+    const blindUserId = userId ? this.getBlindUserId(userId) : undefined;
     const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) {
-      const all = await this.getAllFoods(userId, isAdmin);
+      const all = await this.getAllFoods(blindUserId, isAdmin);
       return { foods: all, source: 'cache' };
     }
 
     // Carrega do Firestore para garantir integridade
-    await this.getAllFoods(userId, isAdmin);
+    await this.getAllFoods(blindUserId, isAdmin);
 
     const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
 
@@ -165,7 +195,7 @@ export class FoodCacheService {
 
     const cachedResults = filterVisibleFoods(
       Array.from(cachedFoodsMap.values()),
-      userId,
+      blindUserId,
       isAdmin
     ) as CachedFood[];
 
@@ -264,6 +294,7 @@ export class FoodCacheService {
     userId?: string,
     isAdmin: boolean = false
   ): Promise<CachedFood | null> {
+    const blindUserId = userId ? this.getBlindUserId(userId) : undefined;
     // 1. Consulta cache em memória
     let cached = this.inMemoryCache.get(barcode);
     if (!cached) {
@@ -286,7 +317,7 @@ export class FoodCacheService {
     }
 
     if (cached) {
-      const visible = filterVisibleFoods([cached], userId, isAdmin);
+      const visible = filterVisibleFoods([cached], blindUserId, isAdmin);
       if (visible.length === 0) {
         return null; // Não validado e pertence a outro usuário
       }
@@ -366,8 +397,15 @@ export class FoodCacheService {
     fiberPer100g?: number;
     barcode?: string;
     userId?: string;
+    blindUserId?: string;
   }): Promise<CachedFood> {
     const id = foodData.barcode ? `custom_${foodData.barcode}` : `custom_${Date.now()}`;
+    const blindUserId = foodData.blindUserId
+      ? foodData.blindUserId
+      : foodData.userId
+        ? this.getBlindUserId(foodData.userId)
+        : undefined;
+
     const cachedFood: CachedFood = {
       id,
       name: foodData.name,
@@ -380,7 +418,7 @@ export class FoodCacheService {
       fiberPer100g: foodData.fiberPer100g ?? 0,
       barcode: foodData.barcode,
       isCustom: true,
-      userId: foodData.userId,
+      blindUserId,
       isValidated: false,
       source: 'manual',
       updatedAt: new Date().toISOString(),
@@ -395,7 +433,8 @@ export class FoodCacheService {
     if (db) {
       try {
         const docRef = db.collection('foods_cache').doc(id);
-        await withTimeout(docRef.set(cachedFood, { merge: true }));
+        const { userId: _, user_id: __, ...cleanFirestoreDoc } = cachedFood as any;
+        await withTimeout(docRef.set(cleanFirestoreDoc, { merge: true }));
       } catch {
         // Fallback em memória
       }
@@ -405,20 +444,29 @@ export class FoodCacheService {
   }
 
   async saveFoodItem(food: FoodItem): Promise<CachedFood> {
-    const canonicalUserId = food.userId ? canonicalizeUserId(food.userId) : undefined;
+    const blindUserId = food.blindUserId
+      ? food.blindUserId
+      : food.userId
+        ? this.getBlindUserId(food.userId)
+        : undefined;
+
     const cached: CachedFood = {
       ...food,
-      userId: canonicalUserId,
+      blindUserId,
       source: 'manual',
       updatedAt: new Date().toISOString(),
     };
+    delete (cached as any).userId;
+    delete (cached as any).user_id;
+
     this.inMemoryCache.set(food.id, cached);
 
     const db = this.getFirestore();
     if (db) {
       try {
         const docRef = db.collection('foods_cache').doc(food.id);
-        await withTimeout(docRef.set(cached, { merge: true }));
+        const { userId: _, user_id: __, ...cleanFirestoreDoc } = cached as any;
+        await withTimeout(docRef.set(cleanFirestoreDoc, { merge: true }));
       } catch {
         // Fallback em memória
       }
@@ -427,23 +475,18 @@ export class FoodCacheService {
     return cached;
   }
 
-  async purgeUserFoods(userId: string): Promise<number> {
-    const canonicalId = canonicalizeUserId(userId);
+  async purgeUserFoods(userIdOrBlindId: string): Promise<number> {
+    const blindUserId = this.getBlindUserId(userIdOrBlindId);
     let deleted = 0;
     const db = this.getFirestore();
     if (db) {
       try {
-        const [rawSnap, canonSnap] = await Promise.all([
-          withTimeout(db.collection('foods_cache').where('userId', '==', userId).get()),
-          withTimeout(db.collection('foods_cache').where('userId', '==', canonicalId).get()),
-        ]);
-        const docsToDelete = new Map<string, FirebaseFirestore.DocumentReference>();
-        for (const doc of rawSnap.docs) docsToDelete.set(doc.id, doc.ref);
-        for (const doc of canonSnap.docs) docsToDelete.set(doc.id, doc.ref);
-
+        const blindSnap = await withTimeout(
+          db.collection('foods_cache').where('blindUserId', '==', blindUserId).get()
+        );
         const batch = db.batch();
-        for (const ref of docsToDelete.values()) {
-          batch.delete(ref);
+        for (const doc of blindSnap.docs) {
+          batch.delete(doc.ref);
           deleted++;
         }
         if (deleted > 0) {
@@ -454,11 +497,7 @@ export class FoodCacheService {
       }
     }
     for (const [key, val] of this.inMemoryCache.entries()) {
-      if (
-        val.userId === userId ||
-        val.userId === canonicalId ||
-        (val.userId && canonicalizeUserId(val.userId) === canonicalId)
-      ) {
+      if (val.blindUserId === blindUserId) {
         this.inMemoryCache.delete(key);
         deleted++;
       }

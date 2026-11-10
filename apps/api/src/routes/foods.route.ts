@@ -66,7 +66,7 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
   // Consulta alimento por código de barras
   app.get<{ Params: { barcode: string } }>('/api/v1/foods/barcode/:barcode', { preHandler: [optionalAuth] }, async (req, reply) => {
     const { barcode } = req.params;
-    const userId = req.user?.id || (req.headers['x-user-id'] as string | undefined);
+    const userId = req.user?.blindUserId || req.user?.id || (req.headers['x-user-id'] as string | undefined);
     const isAdmin = Boolean(req.user?.isAdmin) || isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const food = await foodCacheService.getByBarcode(barcode, userId, isAdmin);
@@ -87,7 +87,7 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
 
   // Listagem de alimentos no banco de dados / cache (respeita isolamento de alimentos não-validados)
   app.get('/api/v1/foods', { preHandler: [optionalAuth] }, async (req) => {
-    const userId = req.user?.id || (req.headers['x-user-id'] as string | undefined);
+    const userId = req.user?.blindUserId || req.user?.id || (req.headers['x-user-id'] as string | undefined);
     const isAdmin = Boolean(req.user?.isAdmin) || isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const foods = await foodCacheService.getAllFoods(userId, isAdmin);
@@ -101,7 +101,7 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
   app.get<{ Querystring: { q?: string; include_remote?: string } }>('/api/v1/foods/search', { preHandler: [optionalAuth] }, async (req) => {
     const query = req.query.q || '';
     const includeRemote = req.query.include_remote === 'true';
-    const userId = req.user?.id || (req.headers['x-user-id'] as string | undefined);
+    const userId = req.user?.blindUserId || req.user?.id || (req.headers['x-user-id'] as string | undefined);
     const isAdmin = Boolean(req.user?.isAdmin) || isAuthorizedAdmin(req.headers['x-admin-token']);
 
     const result = await foodCacheService.searchFoods(query, userId, isAdmin, includeRemote);
@@ -123,7 +123,7 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
       });
     }
 
-    const userId = req.user?.id || (req.headers['x-user-id'] as string | undefined) || parseResult.data.userId;
+    const userId = req.user?.blindUserId || req.user?.id || (req.headers['x-user-id'] as string | undefined) || parseResult.data.userId;
     const saved = await foodCacheService.saveCustomFood({
       ...parseResult.data,
       userId,

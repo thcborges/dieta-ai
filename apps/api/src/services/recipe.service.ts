@@ -19,8 +19,6 @@ export interface StoredRecipe {
   totalMacros: RecipeCalculationResult['totalMacros'];
   perServing: RecipeCalculationResult['perServing'];
   proteinDensity: number;
-  userId?: string;
-  user_id?: string;
   blindUserId?: string;
   createdAt: string;
   updatedAt: string;
@@ -88,16 +86,22 @@ export class RecipeService {
     return generateBlindIndex(canonical, this.pepper);
   }
 
-  async createRecipe(input: RecipeInput, userId?: string): Promise<StoredRecipe> {
+  async createRecipe(input: RecipeInput, userIdOrBlindId?: string): Promise<StoredRecipe> {
+    if (!input.ingredients || !Array.isArray(input.ingredients) || input.ingredients.length === 0) {
+      throw new Error('A receita deve conter pelo menos um ingrediente.');
+    }
+
     const id = input.id || `recipe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    const canonicalId = userId ? canonicalizeUserId(userId) : (input.userId ? canonicalizeUserId(input.userId) : undefined);
-    const availableFoods = await foodCacheService.getAllFoods(canonicalId, true);
-    const calculation = calculateRecipeMacros(input, availableFoods);
+    const blindUserId = userIdOrBlindId
+      ? this.getBlindUserId(userIdOrBlindId)
+      : input.userId
+        ? this.getBlindUserId(input.userId)
+        : undefined;
 
-    const blindUserId = canonicalId ? this.getBlindUserId(canonicalId) : undefined;
-    const finalUserId = canonicalId;
+    const availableFoods = await foodCacheService.getAllFoods(blindUserId, true);
+    const calculation = calculateRecipeMacros(input, availableFoods);
 
     const storedRecipe: StoredRecipe = {
       id,
@@ -109,8 +113,6 @@ export class RecipeService {
       totalMacros: calculation.totalMacros,
       perServing: calculation.perServing,
       proteinDensity: calculation.proteinDensity,
-      userId: finalUserId,
-      user_id: finalUserId,
       blindUserId,
       createdAt: now,
       updatedAt: now,
@@ -120,7 +122,8 @@ export class RecipeService {
     if (db) {
       try {
         const docRef = db.collection('recipes').doc(id);
-        await withTimeout(docRef.set(storedRecipe, { merge: true }));
+        const { userId: _, user_id: __, ...cleanFirestoreDoc } = storedRecipe as any;
+        await withTimeout(docRef.set(cleanFirestoreDoc, { merge: true }));
       } catch {
         // Fallback em memória
       }
@@ -128,22 +131,22 @@ export class RecipeService {
 
     this.recipes.set(id, storedRecipe);
 
-    // Sincroniza no foodCacheService
-    const foodItem = recipeToFoodItem({ ...input, id }, calculation, finalUserId);
+    // Sincroniza no foodCacheService usando blindUserId
+    const foodItem = recipeToFoodItem({ ...input, id }, calculation, blindUserId);
     await foodCacheService.saveFoodItem(foodItem);
 
     return storedRecipe;
   }
 
-  async getRecipes(userId?: string): Promise<StoredRecipe[]> {
-    const canonicalId = userId ? canonicalizeUserId(userId) : undefined;
+  async getRecipes(userIdOrBlindId?: string): Promise<StoredRecipe[]> {
+    const blindUserId = userIdOrBlindId ? this.getBlindUserId(userIdOrBlindId) : undefined;
     const db = this.getFirestore();
     if (db) {
       try {
         let snapshot;
-        if (canonicalId) {
+        if (blindUserId) {
           snapshot = await withTimeout(
-            db.collection('recipes').where('userId', '==', canonicalId).get()
+            db.collection('recipes').where('blindUserId', '==', blindUserId).get()
           );
         } else {
           snapshot = await withTimeout(db.collection('recipes').get());
@@ -160,14 +163,15 @@ export class RecipeService {
 
     const result: StoredRecipe[] = [];
     for (const recipe of this.recipes.values()) {
-      if (!canonicalId || !recipe.userId || recipe.userId === canonicalId || canonicalizeUserId(recipe.userId) === canonicalId) {
+      if (!blindUserId || recipe.blindUserId === blindUserId) {
         result.push(recipe);
       }
     }
     return result;
   }
 
-  async getRecipeById(id: string, userId?: string): Promise<StoredRecipe | null> {
+  async getRecipeById(id: string, userIdOrBlindId?: string): Promise<StoredRecipe | null> {
+    const blindUserId = userIdOrBlindId ? this.getBlindUserId(userIdOrBlindId) : undefined;
     const db = this.getFirestore();
     if (db) {
       try {
@@ -176,7 +180,7 @@ export class RecipeService {
         if (snapshot.exists) {
           const data = snapshot.data() as StoredRecipe;
           this.recipes.set(data.id, data);
-          if (data.userId && userId && data.userId !== userId) {
+          if (data.blindUserId && blindUserId && data.blindUserId !== blindUserId) {
             return null;
           }
           return data;
@@ -191,7 +195,7 @@ export class RecipeService {
 
     const recipe = this.recipes.get(id);
     if (!recipe) return null;
-    if (recipe.userId && (!userId || recipe.userId !== userId)) {
+    if (recipe.blindUserId && (!blindUserId || recipe.blindUserId !== blindUserId)) {
       return null;
     }
     return recipe;
@@ -200,12 +204,17 @@ export class RecipeService {
   async updateRecipe(
     id: string,
     input: RecipeInput,
-    userId?: string
+    userIdOrBlindId?: string
   ): Promise<StoredRecipe | null> {
-    const existing = await this.getRecipeById(id, userId);
+    const existing = await this.getRecipeById(id, userIdOrBlindId);
     if (!existing) return null;
 
-    const availableFoods = await foodCacheService.getAllFoods(userId, true);
+    if (!input.ingredients || !Array.isArray(input.ingredients) || input.ingredients.length === 0) {
+      throw new Error('A receita deve conter pelo menos um ingrediente.');
+    }
+
+    const blindUserId = userIdOrBlindId ? this.getBlindUserId(userIdOrBlindId) : existing.blindUserId;
+    const availableFoods = await foodCacheService.getAllFoods(blindUserId, true);
     const calculation = calculateRecipeMacros(input, availableFoods);
     const now = new Date().toISOString();
 
@@ -219,8 +228,11 @@ export class RecipeService {
       totalMacros: calculation.totalMacros,
       perServing: calculation.perServing,
       proteinDensity: calculation.proteinDensity,
+      blindUserId,
       updatedAt: now,
     };
+    delete (updatedRecipe as any).userId;
+    delete (updatedRecipe as any).user_id;
 
     const db = this.getFirestore();
     if (db) {
@@ -235,14 +247,14 @@ export class RecipeService {
     this.recipes.set(id, updatedRecipe);
 
     // Atualiza no cache de alimentos
-    const foodItem = recipeToFoodItem({ ...input, id }, calculation, userId);
+    const foodItem = recipeToFoodItem({ ...input, id }, calculation, blindUserId);
     await foodCacheService.saveFoodItem(foodItem);
 
     return updatedRecipe;
   }
 
-  async deleteRecipe(id: string, userId?: string): Promise<boolean> {
-    const existing = await this.getRecipeById(id, userId);
+  async deleteRecipe(id: string, userIdOrBlindId?: string): Promise<boolean> {
+    const existing = await this.getRecipeById(id, userIdOrBlindId);
     if (!existing) return false;
 
     this.recipes.delete(id);
@@ -259,26 +271,18 @@ export class RecipeService {
     return true;
   }
 
-  async purgeUserRecipes(userId: string): Promise<number> {
-    const canonicalId = canonicalizeUserId(userId);
-    const blindUserId = this.getBlindUserId(canonicalId);
+  async purgeUserRecipes(userIdOrBlindId: string): Promise<number> {
+    const blindUserId = this.getBlindUserId(userIdOrBlindId);
     let deleted = 0;
     const db = this.getFirestore();
     if (db) {
       try {
-        const [userSnap, canonSnap, blindSnap] = await Promise.all([
-          withTimeout(db.collection('recipes').where('userId', '==', userId).get()),
-          withTimeout(db.collection('recipes').where('userId', '==', canonicalId).get()),
-          withTimeout(db.collection('recipes').where('blindUserId', '==', blindUserId).get()),
-        ]);
-        const docsToDelete = new Map<string, FirebaseFirestore.DocumentReference>();
-        for (const doc of userSnap.docs) docsToDelete.set(doc.id, doc.ref);
-        for (const doc of canonSnap.docs) docsToDelete.set(doc.id, doc.ref);
-        for (const doc of blindSnap.docs) docsToDelete.set(doc.id, doc.ref);
-
+        const blindSnap = await withTimeout(
+          db.collection('recipes').where('blindUserId', '==', blindUserId).get()
+        );
         const batch = db.batch();
-        for (const ref of docsToDelete.values()) {
-          batch.delete(ref);
+        for (const doc of blindSnap.docs) {
+          batch.delete(doc.ref);
           deleted++;
         }
         if (deleted > 0) {
@@ -289,12 +293,7 @@ export class RecipeService {
       }
     }
     for (const [key, val] of this.recipes.entries()) {
-      if (
-        val.userId === userId ||
-        val.userId === canonicalId ||
-        (val.userId && canonicalizeUserId(val.userId) === canonicalId) ||
-        val.blindUserId === blindUserId
-      ) {
+      if (val.blindUserId === blindUserId) {
         this.recipes.delete(key);
         deleted++;
       }

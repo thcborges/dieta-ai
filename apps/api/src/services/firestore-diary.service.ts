@@ -26,14 +26,14 @@ export interface DiaryTotals {
 }
 
 export interface DailyDiaryDoc {
-  userId: string;
-  user_id?: string;
   blindUserId: string;
   date: string;
   meals: MealMap;
   totals: DiaryTotals;
   updatedAt: string;
   createdAt: string;
+  userId?: string;
+  user_id?: string;
 }
 
 export function calculateDiaryTotals(meals: MealMap): DiaryTotals {
@@ -154,8 +154,6 @@ export class FirestoreDiaryService {
         if (snapshot.exists) {
           const data = snapshot.data() as DailyDiaryDoc;
           return {
-            userId: data.userId || canonicalId,
-            user_id: data.user_id || canonicalId,
             blindUserId,
             date,
             meals: {
@@ -178,16 +176,13 @@ export class FirestoreDiaryService {
     if (cached) {
       return {
         ...cached,
-        userId: cached.userId || canonicalId,
-        user_id: cached.user_id || canonicalId,
+        blindUserId,
       };
     }
 
     // Se não existir, retorna um diário padrão vazio para aquela data
     const emptyMeals = getEmptyMeals();
     return {
-      userId: canonicalId,
-      user_id: canonicalId,
       blindUserId,
       date,
       meals: emptyMeals,
@@ -197,9 +192,8 @@ export class FirestoreDiaryService {
     };
   }
 
-  public async saveDiary(userId: string, date: string, meals: MealMap): Promise<DailyDiaryDoc> {
-    const canonicalId = canonicalizeUserId(userId);
-    const blindUserId = this.getBlindUserId(canonicalId);
+  public async saveDiary(userIdOrBlindId: string, date: string, meals: MealMap): Promise<DailyDiaryDoc> {
+    const blindUserId = this.getBlindUserId(userIdOrBlindId);
     const docId = this.getDocId(blindUserId, date);
     const totals = calculateDiaryTotals(meals);
     const now = new Date().toISOString();
@@ -212,8 +206,6 @@ export class FirestoreDiaryService {
     };
 
     const diaryDoc: DailyDiaryDoc = {
-      userId: canonicalId,
-      user_id: canonicalId,
       blindUserId,
       date,
       meals: normalizedMeals,

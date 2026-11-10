@@ -160,11 +160,11 @@ describe('Users Collection & Relational Linking Suite (BDD / TDD)', () => {
 
       expect(response.statusCode).toBe(200);
       const diary = await firestoreDiaryService.getDiary(canonicalUserId, date);
-      expect(diary.userId).toBe(canonicalUserId);
+      expect(diary.userId).toBeUndefined();
       expect(diary.blindUserId).toBe(authService.getBlindUserId(canonicalUserId));
     });
 
-    it('deve gravar o userId canônico ao criar uma nova receita', async () => {
+    it('deve gravar o blindUserId ao criar uma nova receita desvinculando userId em texto plano', async () => {
       const recipe = await recipeService.createRecipe(
         {
           name: 'Panqueca de Whey',
@@ -174,14 +174,15 @@ describe('Users Collection & Relational Linking Suite (BDD / TDD)', () => {
         canonicalUserId
       );
 
-      expect(recipe.userId).toBe(canonicalUserId);
-      expect(recipe.blindUserId).toBe(authService.getBlindUserId(canonicalUserId));
+      expect(recipe.userId).toBeUndefined();
+      const expectedBlindUserId = authService.getBlindUserId(canonicalUserId);
+      expect(recipe.blindUserId).toBe(expectedBlindUserId);
 
       const userRecipes = await recipeService.getRecipes(canonicalUserId);
-      expect(userRecipes.some((r) => r.id === recipe.id && r.userId === canonicalUserId)).toBe(true);
+      expect(userRecipes.some((r) => r.id === recipe.id && r.blindUserId === expectedBlindUserId)).toBe(true);
     });
 
-    it('deve associar o userId canônico ao salvar metas biométricas do usuário', async () => {
+    it('deve associar o blindUserId ao salvar metas biométricas do usuário desvinculando userId', async () => {
       const goals = await userGoalsService.saveGoals(canonicalUserId, {
         ageYears: 40,
         gender: 'male',
@@ -191,10 +192,12 @@ describe('Users Collection & Relational Linking Suite (BDD / TDD)', () => {
         dailyDeficitKcal: 500,
       });
 
-      expect(goals.userId).toBe(canonicalUserId);
+      expect(goals.userId).toBeUndefined();
+      expect(goals.blindUserId).toBe(authService.getBlindUserId(canonicalUserId));
 
       const retrieved = await userGoalsService.getGoals(canonicalUserId);
-      expect(retrieved.userId).toBe(canonicalUserId);
+      expect(retrieved.userId).toBeUndefined();
+      expect(retrieved.blindUserId).toBe(authService.getBlindUserId(canonicalUserId));
     });
   });
 

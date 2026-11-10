@@ -19,7 +19,7 @@ const recipeSchema = z.object({
 });
 
 function getUserId(req: FastifyRequest): string | undefined {
-  return req.user?.id || (req.headers['x-user-id'] as string | undefined);
+  return req.user?.blindUserId || req.user?.id || (req.headers['x-user-id'] as string | undefined);
 }
 
 export const recipeRoutes: FastifyPluginAsync = async (app) => {

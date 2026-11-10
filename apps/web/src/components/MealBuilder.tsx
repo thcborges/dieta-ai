@@ -40,6 +40,7 @@ import { RecipeListModal } from './RecipeListModal.js';
 import { RecipeBuilderModal } from './RecipeBuilderModal.js';
 import { LogRecipeModal } from './LogRecipeModal.js';
 import { PhotoMealModal } from './PhotoMealModal.js';
+import type { AuthUser } from './LoginPage.js';
 
 export interface LoggedFood {
   id: string;
@@ -69,7 +70,7 @@ interface MealBuilderProps {
   onDeleteRecipe?: (recipeId: string) => void;
   missingProtein: number;
   remainingCalories: number;
-  currentUser?: { id: string } | null;
+  currentUser?: AuthUser | null;
   selectedDate?: string;
   onLoadMealsForDate?: (date: string) => Promise<MealMap> | MealMap;
 }
@@ -236,6 +237,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
       let offFood: FoodItem | null = null;
       const headers: Record<string, string> = {};
       if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+      if (currentUser?.sessionToken) headers['authorization'] = `Bearer ${currentUser.sessionToken}`;
 
       // Consulta rota de código de barras
       const barcodeRes = await fetch(`/api/v1/foods/barcode/${encodeURIComponent(code)}`, { headers });
@@ -383,6 +385,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
     try {
       const headers: Record<string, string> = {};
       if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+      if (currentUser?.sessionToken) headers['authorization'] = `Bearer ${currentUser.sessionToken}`;
 
       const res = await fetch(`/api/v1/foods/search?q=${encodeURIComponent(query)}&include_remote=true`, { headers });
       if (res.ok) {
@@ -1281,6 +1284,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         onSave={handleSaveCustomFood}
         initialName={searchQuery}
         initialBarcode={prefillBarcode}
+        token={currentUser?.sessionToken}
+        userId={currentUser?.id}
       />
 
       {/* Modal de Auto-Completar Proteína Interativo */}
@@ -1369,6 +1374,8 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
           windowKey={photoModalWindow}
           onClose={() => setPhotoModalWindow(null)}
           onAddFood={onAddFood}
+          token={currentUser?.sessionToken}
+          userId={currentUser?.id}
         />
       )}
     </div>
