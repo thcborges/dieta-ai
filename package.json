@@ -16,6 +16,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "migrate:diaries": "tsx scripts/migrate-firestore-diaries.ts",
+    "sanitize:db": "tsx scripts/sanitize-collections-to-blind-user-id.ts",
     "lint": "pnpm -r lint"
   },
   "devDependencies": {

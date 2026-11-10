@@ -80,6 +80,8 @@ export interface FoodItemDto {
   servingUnit: string;
   defaultServingGrams: number;
   isSocialEventFood?: boolean;
+  isCustom?: boolean;
+  blindUserId?: string;
 }
 
 export type MealWindow = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner';

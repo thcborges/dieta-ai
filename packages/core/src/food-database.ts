@@ -10,6 +10,7 @@ export interface FoodItem {
   fiberPer100g: number;
   isCustom?: boolean;
   userId?: string;
+  blindUserId?: string;
   isValidated?: boolean;
   isRecipe?: boolean;
   recipeData?: RecipeInput & { totalWeightGrams?: number };
@@ -736,15 +737,19 @@ export function getCommonFoodsForMeal(
  */
 export function filterVisibleFoods(
   foods: FoodItem[],
-  userId?: string,
+  userIdOrBlindId?: string,
   isAdmin: boolean = false
 ): FoodItem[] {
   if (isAdmin) return foods;
   return foods.filter(food => {
-    if (!food.isCustom || food.isValidated || !food.userId) {
+    if (!food.isCustom || food.isValidated || (!food.userId && !food.blindUserId)) {
       return true;
     }
-    return Boolean(userId && food.userId === userId);
+    if (userIdOrBlindId) {
+      if (food.blindUserId && food.blindUserId === userIdOrBlindId) return true;
+      if (food.userId && food.userId === userIdOrBlindId) return true;
+    }
+    return false;
   });
 }
 

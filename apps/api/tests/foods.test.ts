@@ -348,7 +348,8 @@ describe('Foods & Open Food Facts Cache API', () => {
       const foodA = createRes.json();
       expect(foodA.id).toBeDefined();
       expect(foodA.isValidated).toBe(false);
-      expect(foodA.userId).toBe('usr_user_A');
+      expect(foodA.userId).toBeUndefined();
+      expect(foodA.blindUserId).toBeDefined();
 
       // 2. Usuário A busca alimentos -> deve ver o seu Muffin
       const searchResA = await app.inject({

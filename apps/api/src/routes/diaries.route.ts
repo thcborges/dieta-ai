@@ -65,7 +65,7 @@ function checkUserAccess(req: FastifyRequest, reply: FastifyReply): string | nul
     return null;
   }
 
-  return effectiveUserId;
+  return req.user?.blindUserId || effectiveUserId;
 }
 
 export const diaryRoutes: FastifyPluginAsync = async (app) => {

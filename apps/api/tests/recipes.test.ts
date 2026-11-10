@@ -62,7 +62,8 @@ describe('Recipe Management & Composition API (Módulo 3: Módulo de Receitas)',
     expect(body.totalMacros.proteinGrams).toBeCloseTo(35, 1);
     expect(body.perServing.proteinGrams).toBeCloseTo(17.5, 1);
     expect(body.totalWeightGrams).toBe(130);
-    expect(body.userId).toBe(userId);
+    expect(body.userId).toBeUndefined();
+    expect(body.blindUserId).toBeDefined();
 
     createdRecipeId = body.id;
 
