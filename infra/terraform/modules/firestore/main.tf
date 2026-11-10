@@ -47,6 +47,12 @@ locals {
   resolved_rules_path = var.rules_file_path != "" ? var.rules_file_path : local.default_rules_path
 }
 
+resource "google_project_service" "firestore" {
+  project            = var.project_id
+  service            = "firestore.googleapis.com"
+  disable_on_destroy = false
+}
+
 resource "google_firestore_database" "database" {
   project                     = var.project_id
   name                        = var.database_name
@@ -55,6 +61,8 @@ resource "google_firestore_database" "database" {
   concurrency_mode            = "OPTIMISTIC"
   app_engine_integration_mode = "DISABLED"
   delete_protection_state     = "DELETE_PROTECTION_ENABLED"
+
+  depends_on = [google_project_service.firestore]
 }
 
 resource "google_firebaserules_ruleset" "firestore" {
