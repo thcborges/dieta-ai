@@ -73,6 +73,7 @@ interface MealBuilderProps {
   currentUser?: AuthUser | null;
   selectedDate?: string;
   onLoadMealsForDate?: (date: string) => Promise<MealMap> | MealMap;
+  availableHistoryDates?: string[];
 }
 
 const WINDOW_META: Record<
@@ -109,6 +110,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
   currentUser,
   selectedDate,
   onLoadMealsForDate,
+  availableHistoryDates,
 }) => {
   const [internalFoods, setInternalFoods] = useState<FoodItem[]>(() => {
     return availableFoods && availableFoods.length > 0 ? availableFoods : PREPOPULATED_FOODS;
@@ -1252,6 +1254,7 @@ export const MealBuilder: React.FC<MealBuilderProps> = ({
         }}
         onLoadMealsForDate={onLoadMealsForDate}
         currentUser={currentUser}
+        availableHistoryDates={availableHistoryDates}
       />
 
       {/* Modal de Lançamento Rápido de Macros */}

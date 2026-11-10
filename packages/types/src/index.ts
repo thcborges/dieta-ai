@@ -185,3 +185,24 @@ export interface WeeklyThermometerReport {
   alerts: WeeklyThermometerAlert[];
 }
 
+export interface DiaryHistoryItem {
+  date: string;
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+}
+
+export interface DiaryDatesResponse {
+  dates: string[];
+  count: number;
+}
+
+export interface DiaryHistoryResponse {
+  history: DiaryHistoryItem[];
+  days: number;
+  endDate: string;
+}
+
+
