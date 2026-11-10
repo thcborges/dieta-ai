@@ -154,27 +154,26 @@ export class UserGoalsService {
   }
 
   public async getGoals(userId: string): Promise<UserBiometricGoals> {
-    const canonicalId = canonicalizeUserId(userId);
-    const blindUserId = this.getBlindUserId(canonicalId);
+    const blindUserId = this.getBlindUserId(userId);
     const db = this.getFirestore();
 
     if (db) {
       try {
-        let docRef = db.collection('user_goals').doc(canonicalId);
+        let docRef = db.collection('user_goals').doc(blindUserId);
         let snapshot = await withTimeout(docRef.get());
         if (!snapshot.exists) {
-          docRef = db.collection('user_goals').doc(blindUserId);
+          const canonicalId = canonicalizeUserId(userId);
+          docRef = db.collection('user_goals').doc(canonicalId);
           snapshot = await withTimeout(docRef.get());
         }
         if (snapshot.exists) {
           const data = snapshot.data() as UserBiometricGoals;
-          const fullData = {
+          const fullData: UserBiometricGoals = {
             ...data,
-            userId: canonicalId,
-            user_id: canonicalId,
             blindUserId,
           };
-          this.inMemoryGoals.set(canonicalId, fullData);
+          delete (fullData as any).userId;
+          delete (fullData as any).user_id;
           this.inMemoryGoals.set(blindUserId, fullData);
           return fullData;
         }
@@ -183,26 +182,24 @@ export class UserGoalsService {
       }
     }
 
-    const existing = this.inMemoryGoals.get(canonicalId) || this.inMemoryGoals.get(blindUserId);
+    const existing = this.inMemoryGoals.get(blindUserId) || this.inMemoryGoals.get(canonicalizeUserId(userId));
     if (existing) {
-      return {
+      const fullData: UserBiometricGoals = {
         ...existing,
-        userId: canonicalId,
-        user_id: canonicalId,
         blindUserId,
       };
+      delete (fullData as any).userId;
+      delete (fullData as any).user_id;
+      return fullData;
     }
     return {
       ...this.getDefaultGoals(),
-      userId: canonicalId,
-      user_id: canonicalId,
       blindUserId,
     };
   }
 
   public async saveGoals(userId: string, input: SaveGoalsInput): Promise<UserBiometricGoals> {
-    const canonicalId = canonicalizeUserId(userId);
-    const blindUserId = this.getBlindUserId(canonicalId);
+    const blindUserId = this.getBlindUserId(userId);
     const goal = input.goal || 'weight_loss';
     const deficit = Math.max(0, input.dailyDeficitKcal ?? 500);
 
@@ -237,8 +234,6 @@ export class UserGoalsService {
     });
 
     const goalsDoc: UserBiometricGoals = {
-      userId: canonicalId,
-      user_id: canonicalId,
       blindUserId,
       ageYears: input.ageYears,
       gender: input.gender,
@@ -262,16 +257,13 @@ export class UserGoalsService {
     const db = this.getFirestore();
     if (db) {
       try {
-        await Promise.all([
-          withTimeout(db.collection('user_goals').doc(canonicalId).set(goalsDoc, { merge: true })),
-          withTimeout(db.collection('user_goals').doc(blindUserId).set(goalsDoc, { merge: true })),
-        ]);
+        const { userId: _, user_id: __, ...cleanFirestoreDoc } = goalsDoc as any;
+        await withTimeout(db.collection('user_goals').doc(blindUserId).set(cleanFirestoreDoc, { merge: true }));
       } catch {
         // Fallback em memória
       }
     }
 
-    this.inMemoryGoals.set(canonicalId, goalsDoc);
     this.inMemoryGoals.set(blindUserId, goalsDoc);
     return goalsDoc;
   }

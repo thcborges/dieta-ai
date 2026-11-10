@@ -3,6 +3,7 @@ import { ShieldCheck, Activity, Target, Lock, Loader2, AlertCircle, UserCheck } 
 
 export interface AuthUser {
   id: string;
+  blindUserId?: string;
   email: string;
   name: string;
   avatarUrl?: string;
@@ -67,6 +68,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         const fallbackId = `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const authenticatedUser: AuthUser = {
           id: data.user?.id || fallbackId,
+          blindUserId: data.user?.blindUserId,
           email: data.user?.email || trimmedEmail,
           name: data.user?.name || name.trim() || 'Usuário MacroMetrics',
           isAdmin: Boolean(data.user?.isAdmin),

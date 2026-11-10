@@ -80,6 +80,23 @@
    - Operações administrativas requerem verificação de claims de administração atreladas à identidade autenticada ou listas de controle no servidor, jamais tokens compartilhados no cliente.
    - Nenhuma proteção de segurança pode ser desabilitada ou afrouxada para "fazer o código funcionar".
 
+### 2.4. Persistência Integral no Firestore & Proibição de Estado em Memória da API ou Apenas no Cliente
+
+> [!IMPORTANT]
+> **PROIBIÇÃO DE ESTADO EXCLUSIVO EM MEMÓRIA OU NO CLIENTE:**
+> Nada deve ficar salvo apenas na interface do usuário ou na memória da API. Absolutamente nenhuma informação ou estado de negócio deve residir em memória volátil da API. Toda e qualquer informação DEVE ser salva e recuperada diretamente do banco de dados oficial (Google Cloud Firestore).
+
+1. **Memória Zero na API (Cloud Run Stateless & Scale-to-Zero):**
+   - As instâncias do Cloud Run são descartáveis e escalam para zero. É terminantemente proibido manter dados de domínio em memória da API (como `Map`, variáveis globais ou singletons em memória para diários, receitas ou metas). Toda operação de leitura e escrita DEVE atingir o Firestore de forma síncrona e consistente.
+2. **Cliente Não É Fonte de Persistência:**
+   - O armazenamento local do navegador (`localStorage` / IndexedDB) atua exclusivamente como cache offline-first temporário. Nenhuma entidade (diários, alimentos cadastrados, receitas, configurações de metas) pode existir somente no dispositivo do cliente. Ao autenticar, o estado da UI DEVE ser hidratado e sincronizado a partir do Firestore.
+3. **Persistência Completa de Receitas com Ingredientes Auditáveis:**
+   - Todo registro de receita (`recipes`) DEVE obrigatoriamente persistir a lista detalhada de todos os seus ingredientes (`ingredients: RecipeIngredient[]`), contendo os identificadores de alimentos (`foodId`), gramaturas/unidades (`gramsOrUnits`) e proporções.
+   - Isso garante que qualquer receita possa ser reaberta, editada, auditada e recalculada dinamicamente pelo servidor sem perda de dados.
+4. **Anonimização Estrita por `blindUserId` entre Collections (LGPD):**
+   - Para garantir privacidade e evitar vazamento de dados de identidade, as coleções dependentes (`diaries`, `recipes`, `foods_cache`, `user_goals`) DEVEM ser relacionadas ao usuário EXCLUSIVAMENTE pelo campo `blindUserId` (HMAC-SHA256).
+   - É terminantemente proibido armazenar campos `userId` ou `user_id` contendo e-mails ou identificadores em texto plano nessas coleções. Apenas a collection central `users` mapeia o usuário autenticado ao seu respectivo `blindUserId`.
+
 ---
 
 ## 3. Arquitetura do Sistema e Stack Tecnológica
@@ -148,7 +165,7 @@ dieta-ai/
 * **UX Estilo Cronometer:** Campo de porção e peso sempre no topo para edição ágil e sem fricção.
 * **Cópia de Refeições:** Capacidade de duplicar refeições entre dias ou entre horários (ex: almoço de ontem para hoje, ou almoço para o jantar).
 * **Sugestões Contextuais por Refeição:** Alimentos sugeridos priorizam a frequência de consumo específica de cada janela (alimentos do café não poluem o almoço).
-* **Módulo de Receitas:** Criação de receitas compostas por ingredientes com porções customizadas, salvando o rendimento total e permitindo lançar no diário por frações ou porções consumidas.
+* **Módulo de Receitas:** Criação e edição de receitas compostas com persistência obrigatória no Firestore da lista completa de ingredientes com porções e gramaturas originais (`ingredients: RecipeIngredient[]`), salvando o rendimento total e permitindo reabrir, editar, recalcular dinamicamente e lançar no diário por frações ou porções consumidas.
 
 ### Módulo 4: Auditoria Lógica Implacável (Conselheiro Sênior)
 * **Alerta de Inviabilidade Matemática:** Disparado quando a proteína necessária exige mais calorias do que o orçamento restante ($P_{restante} \times 4 > Kcal_{restantes}$).

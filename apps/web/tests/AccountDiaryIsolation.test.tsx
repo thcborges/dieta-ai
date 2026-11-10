@@ -95,7 +95,7 @@ describe('Isolamento de Diário de Refeições por Conta de Usuário (Regressão
   it('deve sincronizar com a API /api/v1/diary isolada por conta do usuário', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       const urlStr = url.toString();
-      if (urlStr.includes('/api/v1/diary')) {
+      if (urlStr.includes('/api/v1/diary') || urlStr.includes('/api/v1/diaries')) {
         const headers = (init?.headers as Record<string, string>) || {};
         const userId = headers['x-user-id'];
 

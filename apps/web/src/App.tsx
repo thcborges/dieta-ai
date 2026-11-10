@@ -394,36 +394,6 @@ export default function App() {
           .catch(() => {
             // Mantém funcionamento offline-first
           });
-
-        // Sincroniza com /api/v1/diary na autenticação inicial da sessão
-        const today = getLocalDateString();
-        const savedMealsByDate = localStorage.getItem(`macrometrics_meals_${user.id}_${today}`);
-        const savedMeals = localStorage.getItem(`macrometrics_meals_${user.id}`);
-
-        fetch('/api/v1/diary', {
-          headers: {
-            'x-user-id': user.id,
-            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
-          },
-        })
-          .then(res => (res.ok ? res.json() : null))
-          .then(data => {
-            if (data?.meals && activeUserRef.current === user.id) {
-              const hasRemoteMeals = Object.values(data.meals).some(
-                (arr: unknown) => Array.isArray(arr) && arr.length > 0
-              );
-              // Apenas aplica na data de hoje se ainda não houver dados locais conflitantes
-              if (selectedDateRef.current === today && (hasRemoteMeals || (!savedMealsByDate && !savedMeals))) {
-                const normalized = normalizeMeals(data.meals);
-                setMeals(normalized);
-                localStorage.setItem(`macrometrics_meals_${user.id}_${today}`, JSON.stringify(normalized));
-                localStorage.setItem(`macrometrics_meals_${user.id}`, JSON.stringify(normalized));
-              }
-            }
-          })
-          .catch(() => {
-            // Mantém funcionamento offline-first
-          });
       } catch {
         // Ignora erro de storage
       }
@@ -617,6 +587,7 @@ export default function App() {
   };
 
   const handleSaveRecipe = async (newOrUpdatedRecipe: RecipeInput) => {
+    const isNew = !newOrUpdatedRecipe.id;
     const recipeId = newOrUpdatedRecipe.id || `recipe_${Date.now()}`;
     const recipeWithId: RecipeInput = { ...newOrUpdatedRecipe, id: recipeId };
 
@@ -638,8 +609,10 @@ export default function App() {
 
     if (user) {
       try {
-        await fetch(`/api/v1/recipes/${recipeId}`, {
-          method: 'PUT',
+        const url = isNew ? '/api/v1/recipes' : `/api/v1/recipes/${recipeId}`;
+        const method = isNew ? 'POST' : 'PUT';
+        await fetch(url, {
+          method,
           headers: {
             'Content-Type': 'application/json',
             'x-user-id': user.id,
