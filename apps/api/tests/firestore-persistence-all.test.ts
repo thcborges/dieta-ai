@@ -5,6 +5,7 @@ import { UserGoalsService } from '../src/services/user-goals.service.js';
 import { RecipeService } from '../src/services/recipe.service.js';
 import { FoodCacheService } from '../src/services/food-cache.service.js';
 import { FirestoreDiaryService } from '../src/services/firestore-diary.service.js';
+import { UserRepositoryService } from '../src/services/user-repository.service.js';
 import type { Firestore } from '@google-cloud/firestore';
 
 describe('Persistência Integral no Firestore (Zero-Trust & Multi-Dispositivo)', () => {
@@ -354,5 +355,123 @@ describe('Persistência Integral no Firestore (Zero-Trust & Multi-Dispositivo)',
     // Purge LGPD em lote
     const purged = await diaryServiceInstance.purgeUserDiaries(testUserId);
     expect(purged).toBeGreaterThanOrEqual(1);
+  });
+
+  it('UserRepositoryService: deve persistir na collection users do Firestore e expurgar em LGPD', async () => {
+    const firestoreMockUsers = new Map<string, any>();
+    const mockFirestore = {
+      collection: vi.fn((colName: string) => ({
+        doc: vi.fn((docId: string) => ({
+          id: docId,
+          set: vi.fn(async (data: any) => {
+            firestoreMockUsers.set(`${colName}/${docId}`, data);
+          }),
+          get: vi.fn(async () => {
+            const data = firestoreMockUsers.get(`${colName}/${docId}`);
+            return {
+              exists: Boolean(data),
+              data: () => data,
+            };
+          }),
+          delete: vi.fn(async () => {
+            firestoreMockUsers.delete(`${colName}/${docId}`);
+          }),
+        })),
+        where: vi.fn((field: string, _op: string, val: string) => ({
+          limit: vi.fn(() => ({
+            get: vi.fn(async () => {
+              const docs: any[] = [];
+              for (const [key, doc] of firestoreMockUsers.entries()) {
+                if (key.startsWith(`${colName}/`) && doc[field] === val) {
+                  docs.push({
+                    id: doc.id || key,
+                    data: () => doc,
+                  });
+                }
+              }
+              return { docs, empty: docs.length === 0 };
+            }),
+          })),
+        })),
+        get: vi.fn(async () => {
+          const docs: any[] = [];
+          for (const [key, doc] of firestoreMockUsers.entries()) {
+            if (key.startsWith(`${colName}/`)) {
+              docs.push({
+                id: doc.id || key,
+                data: () => doc,
+              });
+            }
+          }
+          return { docs, empty: docs.length === 0 };
+        }),
+      })),
+    } as unknown as Firestore;
+
+    const userService = new UserRepositoryService({ firestore: mockFirestore });
+    const user = await userService.upsertUser({
+      id: testUserId,
+      email: testEmail,
+      name: 'Thiago Borges',
+      blindUserId: 'blind_1234567890abcdef',
+      isAdmin: true,
+    });
+
+    expect(user.id).toBe(testUserId);
+    expect(mockFirestore.collection).toHaveBeenCalledWith('users');
+
+    const byId = await userService.getUserById(testUserId);
+    expect(byId).not.toBeNull();
+    expect(byId?.email).toBe(testEmail);
+
+    const byEmail = await userService.getUserByEmail(testEmail);
+    expect(byEmail).not.toBeNull();
+    expect(byEmail?.id).toBe(testUserId);
+
+    const all = await userService.listUsers();
+    expect(all.length).toBeGreaterThanOrEqual(1);
+
+    const deleted = await userService.deleteUser(testUserId);
+    expect(deleted).toBe(true);
+    expect(firestoreMockUsers.has(`users/${testUserId}`)).toBe(false);
+  });
+
+  it('UserRepositoryService: deve aplicar fallback gracioso para memória quando Firestore falha', async () => {
+    const errorFirestore = {
+      collection: vi.fn(() => ({
+        doc: vi.fn(() => ({
+          set: vi.fn(async () => { throw new Error('Firestore connection error'); }),
+          get: vi.fn(async () => { throw new Error('Firestore read error'); }),
+          delete: vi.fn(async () => { throw new Error('Firestore delete error'); }),
+        })),
+        where: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            get: vi.fn(async () => { throw new Error('Firestore query error'); }),
+          })),
+        })),
+        get: vi.fn(async () => { throw new Error('Firestore list error'); }),
+      })),
+    } as unknown as Firestore;
+
+    const userService = new UserRepositoryService({ firestore: errorFirestore });
+    const user = await userService.upsertUser({
+      id: 'usr_fallback_test',
+      email: 'fallback@test.com',
+      blindUserId: 'blind_fallback',
+    });
+    expect(user.id).toBe('usr_fallback_test');
+
+    const byId = await userService.getUserById('usr_fallback_test');
+    expect(byId).not.toBeNull();
+    expect(byId?.email).toBe('fallback@test.com');
+
+    const byEmail = await userService.getUserByEmail('fallback@test.com');
+    expect(byEmail).not.toBeNull();
+
+    const list = await userService.listUsers();
+    expect(list.some(u => u.id === 'usr_fallback_test')).toBe(true);
+
+    const del = await userService.deleteUser('usr_fallback_test');
+    expect(del).toBe(false);
   });
 });

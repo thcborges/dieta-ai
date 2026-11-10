@@ -98,15 +98,52 @@ async function main() {
 
   const targetBlindUserId = generateBlindIndex(targetUserId, pepper);
 
-  console.log('=== MacroMetrics Pro: Migração Direta de Diários no Firestore ===');
+  console.log('=== MacroMetrics Pro: Migração e Sincronização Relacional Firestore ===');
   console.log(`• Usuário Alvo: ${targetUserId}`);
+  console.log(`• E-mail: ${targetEmail}`);
   console.log(`• Blind User ID Canônico: ${targetBlindUserId}`);
   console.log(`• Projeto GCP Selecionado: ${projectId}`);
 
   const db = new Firestore({ projectId });
-  const diariesRef = db.collection('diaries');
 
-  console.log('\n[1/3] Consultando coleção "diaries"...');
+  // [1/4] Collection 'users': Garante persistência das informações do usuário
+  console.log('\n[1/4] Sincronizando coleção "users"...');
+  const userRef = db.collection('users').doc(targetUserId);
+  const userDoc = await userRef.get();
+  const now = new Date().toISOString();
+
+  if (!userDoc.exists) {
+    await userRef.set({
+      id: targetUserId,
+      user_id: targetUserId,
+      email: targetEmail,
+      name: 'Thiago Borges',
+      blindUserId: targetBlindUserId,
+      isAdmin: true,
+      createdAt: now,
+      updatedAt: now,
+      lastLoginAt: now,
+    });
+    console.log(`  ✓ Documento do usuário criado com sucesso em "users/${targetUserId}".`);
+  } else {
+    await userRef.set(
+      {
+        id: targetUserId,
+        user_id: targetUserId,
+        email: targetEmail,
+        blindUserId: targetBlindUserId,
+        isAdmin: true,
+        updatedAt: now,
+        lastLoginAt: now,
+      },
+      { merge: true }
+    );
+    console.log(`  ✓ Documento do usuário atualizado em "users/${targetUserId}".`);
+  }
+
+  // [2/4] Collection 'diaries': Sincroniza userId e blindUserId
+  console.log('\n[2/4] Consultando e atualizando coleção "diaries"...');
+  const diariesRef = db.collection('diaries');
   let snapshot;
   try {
     snapshot = await diariesRef.get();
@@ -118,15 +155,9 @@ async function main() {
   }
   console.log(`✓ Total de documentos encontrados na coleção diaries: ${snapshot.docs.length}`);
 
-  if (snapshot.empty) {
-    console.log('Nenhum documento encontrado na coleção. Encerrando migração.');
-    return;
-  }
-
   let migratedCount = 0;
   let alreadyCorrectCount = 0;
 
-  console.log('\n[2/3] Analisando e atualizando documentos...');
   for (const doc of snapshot.docs) {
     const data = doc.data();
     const currentDocId = doc.id;
@@ -135,36 +166,78 @@ async function main() {
 
     const targetDocId = `${targetBlindUserId}_${date}`;
 
-    if (currentDocId === targetDocId && currentBlindUserId === targetBlindUserId) {
-      alreadyCorrectCount++;
-      console.log(`  - [OK] ${currentDocId} já possui o ID canônico correto.`);
-      continue;
-    }
-
-    console.log(`  - [MIGRANDO] ${currentDocId} ➔ ${targetDocId}`);
-
     const updatedData = {
       ...data,
+      userId: targetUserId,
+      user_id: targetUserId,
       blindUserId: targetBlindUserId,
       date,
       updatedAt: new Date().toISOString(),
     };
 
-    // Cria/atualiza o documento com a chave canônica e remove o legado
+    if (currentDocId === targetDocId && currentBlindUserId === targetBlindUserId && data.userId === targetUserId) {
+      alreadyCorrectCount++;
+      continue;
+    }
+
+    console.log(`  - [MIGRANDO] ${currentDocId} ➔ ${targetDocId}`);
     await diariesRef.doc(targetDocId).set(updatedData, { merge: true });
     if (currentDocId !== targetDocId) {
       await doc.ref.delete();
     }
-
     migratedCount++;
-    console.log(`    ✓ Migrado com sucesso.`);
+  }
+  console.log(`  ✓ Diários já corretos: ${alreadyCorrectCount}, Diários migrados: ${migratedCount}`);
+
+  // [3/4] Collection 'recipes': Atualiza relacionamento userId
+  console.log('\n[3/4] Sincronizando relacionamento na coleção "recipes"...');
+  try {
+    const recipesSnap = await db.collection('recipes').get();
+    let recipesUpdated = 0;
+    for (const rDoc of recipesSnap.docs) {
+      const rData = rDoc.data();
+      if (rData.userId === targetEmail || !rData.user_id) {
+        await rDoc.ref.set(
+          {
+            userId: targetUserId,
+            user_id: targetUserId,
+            blindUserId: targetBlindUserId,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        recipesUpdated++;
+      }
+    }
+    console.log(`  ✓ Receitas analisadas: ${recipesSnap.docs.length}, atualizadas: ${recipesUpdated}`);
+  } catch (e: any) {
+    console.log(`  (Aviso receitas: ${e.message})`);
   }
 
-  console.log('\n[3/3] Resumo da Migração:');
-  console.log(`• Documentos já corretos: ${alreadyCorrectCount}`);
-  console.log(`• Documentos migrados para o ID canônico: ${migratedCount}`);
-  console.log(`• Total processado: ${snapshot.docs.length}`);
-  console.log('\n✓ Migração concluída com sucesso!');
+  // [4/4] Collection 'foods_cache': Atualiza alimentos customizados
+  console.log('\n[4/4] Sincronizando relacionamento em "foods_cache"...');
+  try {
+    const foodsSnap = await db.collection('foods_cache').get();
+    let foodsUpdated = 0;
+    for (const fDoc of foodsSnap.docs) {
+      const fData = fDoc.data();
+      if (fData.userId === targetEmail || (fData.userId && fData.userId.includes('@'))) {
+        await fDoc.ref.set(
+          {
+            userId: targetUserId,
+            user_id: targetUserId,
+          },
+          { merge: true }
+        );
+        foodsUpdated++;
+      }
+    }
+    console.log(`  ✓ Alimentos analisados: ${foodsSnap.docs.length}, customizados atualizados: ${foodsUpdated}`);
+  } catch (e: any) {
+    console.log(`  (Aviso foods_cache: ${e.message})`);
+  }
+
+  console.log('\n✓ Migração e sincronização relacional concluídas com sucesso!');
 }
 
 main().catch((err: any) => {
