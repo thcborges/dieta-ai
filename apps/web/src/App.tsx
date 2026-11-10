@@ -290,7 +290,76 @@ export default function App() {
           setAvailableFoods(PREPOPULATED_FOODS);
         }
 
-        // Sincroniza receitas do usuário
+        // Sincroniza Metas Biométricas da nuvem (Firestore)
+        fetch('/api/v1/users/me/goals', {
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data?.goals && activeUserRef.current === user.id) {
+              const cg = data.goals;
+              setMacroSettings(prev => {
+                const next: UserMacroSettings = {
+                  ...prev,
+                  ageYears: cg.ageYears ?? prev.ageYears,
+                  gender: cg.gender ?? prev.gender,
+                  heightCm: cg.heightCm ?? prev.heightCm,
+                  weightKg: cg.weightKg ?? prev.weightKg,
+                  activityLevel: cg.activityLevel ?? prev.activityLevel,
+                  bmrSource: cg.bmrSource ?? prev.bmrSource,
+                  manualBmr: cg.manualBmr ?? prev.manualBmr,
+                  goal: cg.goal ?? prev.goal,
+                  dailyDeficitKcal: cg.dailyDeficitKcal ?? prev.dailyDeficitKcal,
+                  calories: cg.calories ?? prev.calories,
+                  proteinGrams: cg.proteinGrams ?? prev.proteinGrams,
+                  carbGrams: cg.carbGrams ?? prev.carbGrams,
+                  fatGrams: cg.fatGrams ?? prev.fatGrams,
+                  fiberGrams: cg.fiberGrams ?? prev.fiberGrams,
+                };
+                try {
+                  localStorage.setItem(`macrometrics_profile_${user.id}`, JSON.stringify(next));
+                } catch {
+                  // Ignora erro de storage
+                }
+                return next;
+              });
+            }
+          })
+          .catch(() => {});
+
+        // Sincroniza Alimentos customizados e de cache da nuvem (Firestore)
+        fetch('/api/v1/foods', {
+          headers: {
+            'x-user-id': user.id,
+            ...(user.sessionToken ? { authorization: `Bearer ${user.sessionToken}` } : {}),
+          },
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            const list = Array.isArray(data) ? data : data?.foods;
+            if (Array.isArray(list) && list.length > 0 && activeUserRef.current === user.id) {
+              setAvailableFoods(prev => {
+                const map = new Map<string, FoodItem>();
+                for (const f of PREPOPULATED_FOODS) map.set(f.id, f);
+                for (const f of prev) map.set(f.id, f);
+                for (const f of list) map.set(f.id, f);
+                const merged = Array.from(map.values());
+                try {
+                  const customOnly = merged.filter(f => f.isCustom);
+                  localStorage.setItem(`macrometrics_custom_foods_${user.id}`, JSON.stringify(customOnly));
+                } catch {
+                  // Ignora erro de storage
+                }
+                return merged;
+              });
+            }
+          })
+          .catch(() => {});
+
+        // Sincroniza receitas do usuário da nuvem (Firestore)
         const savedRecipes = localStorage.getItem(`macrometrics_recipes_${user.id}`);
         if (savedRecipes) {
           setRecipes(JSON.parse(savedRecipes));
@@ -307,9 +376,13 @@ export default function App() {
           .then(res => (res.ok ? res.json() : null))
           .then(data => {
             const list = Array.isArray(data) ? data : data?.recipes;
-            if (Array.isArray(list) && list.length > 0 && activeUserRef.current === user.id) {
+            if (Array.isArray(list) && activeUserRef.current === user.id) {
               setRecipes(list);
-              localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(list));
+              try {
+                localStorage.setItem(`macrometrics_recipes_${user.id}`, JSON.stringify(list));
+              } catch {
+                // Ignora erro de storage
+              }
             }
           })
           .catch(() => {

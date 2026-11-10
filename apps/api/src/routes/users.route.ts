@@ -23,7 +23,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   // Consulta as metas biométricas do usuário autenticado
   app.get('/api/v1/users/me/goals', { preHandler: [requireAuth] }, async (req, reply) => {
     const userId = req.user!.id;
-    const goals = userGoalsService.getGoals(userId);
+    const goals = await userGoalsService.getGoals(userId);
     return reply.status(200).send({
       success: true,
       goals,
@@ -43,7 +43,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const savedGoals = userGoalsService.saveGoals(userId, parseResult.data as SaveGoalsInput);
+    const savedGoals = await userGoalsService.saveGoals(userId, parseResult.data as SaveGoalsInput);
     return reply.status(200).send({
       success: true,
       goals: savedGoals,
