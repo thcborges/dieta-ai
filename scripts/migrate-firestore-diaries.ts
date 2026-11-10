@@ -14,6 +14,35 @@
 import { Firestore } from '@google-cloud/firestore';
 import { generateBlindIndex } from '@dieta-ai/core';
 
+// Tenta carregar variáveis de ambiente de arquivos .env locais se existirem
+try {
+  process.loadEnvFile();
+} catch {
+  // Ignora se não existir
+}
+try {
+  process.loadEnvFile('apps/api/.env');
+} catch {
+  // Ignora se não existir
+}
+
+process.on('uncaughtException', (err: any) => {
+  if (err?.message?.includes('default credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+    console.error('\n❌ Erro de Autenticação GCP: Credenciais do Google Cloud não encontradas no ambiente local.');
+    console.error('\nPara conectar e atualizar o Firestore no GCP dev/prd:');
+    console.error('  1. Execute no terminal a autenticação do Google Cloud CLI:');
+    console.error('     gcloud auth application-default login');
+    console.error('  2. Em seguida, re-execute o script:');
+    console.error('     pnpm migrate:diaries thcborges@gmail.com');
+    console.error('\nOu se estiver testando com o Firestore Emulator local:');
+    console.error('  export FIRESTORE_EMULATOR_HOST=localhost:8080');
+    console.error('  pnpm migrate:diaries thcborges@gmail.com');
+    process.exit(1);
+  }
+  console.error(err);
+  process.exit(1);
+});
+
 async function main() {
   const targetInput = process.argv[2] || process.env.TARGET_USER_EMAIL || 'thcborges@gmail.com';
   const targetEmail = targetInput.includes('@') ? targetInput.trim().toLowerCase() : targetInput;
@@ -42,7 +71,24 @@ async function main() {
   const diariesRef = db.collection('diaries');
 
   console.log('\n[1/3] Consultando coleção "diaries"...');
-  const snapshot = await diariesRef.get();
+  let snapshot;
+  try {
+    snapshot = await diariesRef.get();
+  } catch (err: any) {
+    if (err?.message?.includes('default credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+      console.error('\n❌ Erro de Autenticação GCP: Credenciais do Google Cloud não encontradas no ambiente local.');
+      console.error('\nPara conectar e atualizar o Firestore no GCP dev/prd:');
+      console.error('  1. Execute no terminal:');
+      console.error('     gcloud auth application-default login');
+      console.error('  2. Em seguida, re-execute o script:');
+      console.error('     pnpm migrate:diaries thcborges@gmail.com');
+      console.error('\nOu se estiver usando o Firestore Emulator local:');
+      console.error('  export FIRESTORE_EMULATOR_HOST=localhost:8080');
+      console.error('  pnpm migrate:diaries thcborges@gmail.com');
+      process.exit(1);
+    }
+    throw err;
+  }
   console.log(`✓ Total de documentos encontrados na coleção diaries: ${snapshot.docs.length}`);
 
   if (snapshot.empty) {
@@ -94,7 +140,19 @@ async function main() {
   console.log('\n✓ Migração concluída com sucesso!');
 }
 
-main().catch((err) => {
-  console.error('\n❌ Erro durante a execução da migração:', err);
+main().catch((err: any) => {
+  console.error('\n❌ Erro durante a execução da migração:');
+  if (err?.message?.includes('default credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+    console.error('Credenciais do Google Cloud não encontradas no ambiente local.');
+    console.error('\nPara conectar ao Firestore no projeto GCP dev/prd:');
+    console.error('  1. Execute a autenticação padrão do Google Cloud CLI:');
+    console.error('     gcloud auth application-default login');
+    console.error('  2. Em seguida, re-execute este script.');
+    console.error('\nAlternativamente, para conectar ao Firestore Emulator local:');
+    console.error('  export FIRESTORE_EMULATOR_HOST=localhost:8080');
+    console.error('  pnpm migrate:diaries thcborges@gmail.com');
+  } else {
+    console.error(err);
+  }
   process.exit(1);
 });
