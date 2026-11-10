@@ -3,10 +3,19 @@ import {
   calculateLgpdDeletionDeadline,
   generateBlindIndex,
   validateDeletionRequest,
+  canonicalizeUserId,
   LGPD_STATUTORY_DAYS,
 } from '../src/lgpd.js';
 
 describe('LGPD & Privacy Engine (Módulo 6: Conformidade e Exclusão)', () => {
+  it('deve canonicalizar e-mails e formatos de usuário para usr_<email_sanitizado>', () => {
+    expect(canonicalizeUserId('thcborges@gmail.com')).toBe('usr_thcborges_gmail_com');
+    expect(canonicalizeUserId('Thc.Borges@Gmail.Com')).toBe('usr_thc_borges_gmail_com');
+    expect(canonicalizeUserId('usr_thcborges_gmail_com')).toBe('usr_thcborges_gmail_com');
+    expect(canonicalizeUserId('Bearer thcborges@gmail.com')).toBe('usr_thcborges_gmail_com');
+    expect(canonicalizeUserId('')).toBe('');
+  });
+
   it('deve calcular o prazo legal estrito de 15 dias conforme Art. 19 da LGPD', () => {
     const requestDate = new Date('2026-10-15T12:00:00Z');
     const deadline = calculateLgpdDeletionDeadline(requestDate);

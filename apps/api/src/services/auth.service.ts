@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { generateBlindIndex } from '@dieta-ai/core';
+import { generateBlindIndex, canonicalizeUserId } from '@dieta-ai/core';
 
 export interface AuthenticatedUser {
   id: string; // Google Subject ID (sub)
@@ -168,7 +168,11 @@ export class AuthService {
   }
 
   public getBlindUserId(subOrEmail: string): string {
-    return generateBlindIndex(subOrEmail, this.getSecretPepper());
+    const canonical = canonicalizeUserId(subOrEmail);
+    if (/^[a-f0-9]{64}$/i.test(canonical)) {
+      return canonical;
+    }
+    return generateBlindIndex(canonical, this.getSecretPepper());
   }
 }
 

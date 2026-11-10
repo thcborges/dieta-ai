@@ -5,6 +5,7 @@ import {
   calculateRecommendedFiber,
   calculateMacrosForGoal,
   generateBlindIndex,
+  canonicalizeUserId,
   type Gender,
   type ActivityLevel,
   type DietGoal,
@@ -100,7 +101,11 @@ export class UserGoalsService {
   }
 
   public getBlindUserId(userId: string): string {
-    return generateBlindIndex(userId, this.pepper);
+    const canonical = canonicalizeUserId(userId);
+    if (/^[a-f0-9]{64}$/i.test(canonical)) {
+      return canonical;
+    }
+    return generateBlindIndex(canonical, this.pepper);
   }
 
   public getDefaultGoals(): UserBiometricGoals {
