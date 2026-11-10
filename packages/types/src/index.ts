@@ -112,6 +112,19 @@ export interface UserProfileDto {
   customMacros?: UserMacroTargetsDto;
 }
 
+export interface UserDocumentDto {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  googleSub?: string;
+  blindUserId: string;
+  isAdmin: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
+}
+
 export interface LgpdDeletionRequestDto {
   userId: string;
   pseudonymId: string;

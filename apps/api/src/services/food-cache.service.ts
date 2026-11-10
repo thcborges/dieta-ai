@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import { PREPOPULATED_FOODS, filterVisibleFoods, normalizeSearchText, type FoodItem } from '@dieta-ai/core';
+import { PREPOPULATED_FOODS, filterVisibleFoods, normalizeSearchText, canonicalizeUserId, type FoodItem } from '@dieta-ai/core';
 
 export interface CachedFood extends FoodItem {
   barcode?: string;
@@ -9,6 +9,7 @@ export interface CachedFood extends FoodItem {
 
 async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
   let timeoutId: NodeJS.Timeout;
+  promise.catch(() => {});
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
   });
@@ -404,8 +405,10 @@ export class FoodCacheService {
   }
 
   async saveFoodItem(food: FoodItem): Promise<CachedFood> {
+    const canonicalUserId = food.userId ? canonicalizeUserId(food.userId) : undefined;
     const cached: CachedFood = {
       ...food,
+      userId: canonicalUserId,
       source: 'manual',
       updatedAt: new Date().toISOString(),
     };
@@ -422,6 +425,45 @@ export class FoodCacheService {
     }
 
     return cached;
+  }
+
+  async purgeUserFoods(userId: string): Promise<number> {
+    const canonicalId = canonicalizeUserId(userId);
+    let deleted = 0;
+    const db = this.getFirestore();
+    if (db) {
+      try {
+        const [rawSnap, canonSnap] = await Promise.all([
+          withTimeout(db.collection('foods_cache').where('userId', '==', userId).get()),
+          withTimeout(db.collection('foods_cache').where('userId', '==', canonicalId).get()),
+        ]);
+        const docsToDelete = new Map<string, FirebaseFirestore.DocumentReference>();
+        for (const doc of rawSnap.docs) docsToDelete.set(doc.id, doc.ref);
+        for (const doc of canonSnap.docs) docsToDelete.set(doc.id, doc.ref);
+
+        const batch = db.batch();
+        for (const ref of docsToDelete.values()) {
+          batch.delete(ref);
+          deleted++;
+        }
+        if (deleted > 0) {
+          await withTimeout(batch.commit());
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    for (const [key, val] of this.inMemoryCache.entries()) {
+      if (
+        val.userId === userId ||
+        val.userId === canonicalId ||
+        (val.userId && canonicalizeUserId(val.userId) === canonicalId)
+      ) {
+        this.inMemoryCache.delete(key);
+        deleted++;
+      }
+    }
+    return deleted;
   }
 
   async deleteFoodItem(foodId: string): Promise<boolean> {

@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { canonicalizeUserId } from '@dieta-ai/core';
 import { authService } from '../services/auth.service.js';
+import { userRepository } from '../services/user-repository.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 
 const googleAuthSchema = z.object({
@@ -33,36 +35,53 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const blindIndex = authService.getBlindUserId(verified.sub);
+    const canonicalId = canonicalizeUserId(verified.email);
+    const blindIndex = authService.getBlindUserId(canonicalId);
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const isAdmin = authService.isEmailAdmin(verified.email);
 
-    const sessionToken = authService.createSessionToken({
-      sub: verified.sub,
+    // Persiste e atualiza as informações do usuário na collection 'users' do Firestore
+    const userDoc = await userRepository.upsertUser({
+      id: canonicalId,
       email: verified.email,
       name: name || verified.name,
-      isAdmin,
+      picture: verified.picture,
+      googleSub: verified.sub,
       blindUserId: blindIndex,
+      isAdmin,
+    });
+
+    const sessionToken = authService.createSessionToken({
+      sub: userDoc.id,
+      email: userDoc.email,
+      name: userDoc.name,
+      isAdmin: userDoc.isAdmin,
+      blindUserId: userDoc.blindUserId,
     });
 
     return reply.status(200).send({
       sessionId,
       sessionToken,
-      blindIndex,
+      blindIndex: userDoc.blindUserId,
       user: {
-        id: verified.sub,
-        email: verified.email,
-        name: name || verified.name,
+        id: userDoc.id,
+        email: userDoc.email,
+        name: userDoc.name,
+        picture: userDoc.picture,
         googleIdTokenVerified: true,
-        isAdmin,
+        isAdmin: userDoc.isAdmin,
+        createdAt: userDoc.createdAt,
+        updatedAt: userDoc.updatedAt,
+        lastLoginAt: userDoc.lastLoginAt,
       },
     });
   });
 
   // Consulta dados e perfil de autorização do usuário logado via Bearer token
   app.get('/api/v1/auth/me', { preHandler: [requireAuth] }, async (req, reply) => {
+    const storedUser = req.user?.id ? await userRepository.getUserById(req.user.id) : null;
     return reply.status(200).send({
-      user: req.user,
+      user: storedUser || req.user,
     });
   });
 };

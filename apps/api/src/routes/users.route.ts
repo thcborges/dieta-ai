@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validateDeletionRequest } from '@dieta-ai/core';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { userGoalsService, type SaveGoalsInput } from '../services/user-goals.service.js';
+import { userRepository } from '../services/user-repository.service.js';
 
 const goalsSchema = z.object({
   ageYears: z.number().int().min(1, 'Idade deve ser maior que zero').max(120, 'Idade máxima permitida é 120 anos'),
@@ -20,6 +21,16 @@ const goalsSchema = z.object({
 });
 
 export const userRoutes: FastifyPluginAsync = async (app) => {
+  // Consulta as informações do usuário autenticado a partir da collection 'users'
+  app.get('/api/v1/users/me', { preHandler: [requireAuth] }, async (req, reply) => {
+    const userId = req.user!.id;
+    const storedUser = await userRepository.getUserById(userId);
+    return reply.status(200).send({
+      success: true,
+      user: storedUser || req.user,
+    });
+  });
+
   // Consulta as metas biométricas do usuário autenticado
   app.get('/api/v1/users/me/goals', { preHandler: [requireAuth] }, async (req, reply) => {
     const userId = req.user!.id;

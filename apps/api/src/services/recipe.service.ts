@@ -20,6 +20,7 @@ export interface StoredRecipe {
   perServing: RecipeCalculationResult['perServing'];
   proteinDensity: number;
   userId?: string;
+  user_id?: string;
   blindUserId?: string;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,7 @@ export interface StoredRecipe {
 
 async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
   let timeoutId: NodeJS.Timeout;
+  promise.catch(() => {});
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`Firestore operation timed out (${ms}ms)`)), ms);
   });
@@ -90,11 +92,12 @@ export class RecipeService {
     const id = input.id || `recipe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    const availableFoods = await foodCacheService.getAllFoods(userId, true);
+    const canonicalId = userId ? canonicalizeUserId(userId) : (input.userId ? canonicalizeUserId(input.userId) : undefined);
+    const availableFoods = await foodCacheService.getAllFoods(canonicalId, true);
     const calculation = calculateRecipeMacros(input, availableFoods);
 
-    const blindUserId = userId ? this.getBlindUserId(userId) : undefined;
-    const finalUserId = userId || input.userId;
+    const blindUserId = canonicalId ? this.getBlindUserId(canonicalId) : undefined;
+    const finalUserId = canonicalId;
 
     const storedRecipe: StoredRecipe = {
       id,
@@ -107,6 +110,7 @@ export class RecipeService {
       perServing: calculation.perServing,
       proteinDensity: calculation.proteinDensity,
       userId: finalUserId,
+      user_id: finalUserId,
       blindUserId,
       createdAt: now,
       updatedAt: now,
@@ -132,13 +136,14 @@ export class RecipeService {
   }
 
   async getRecipes(userId?: string): Promise<StoredRecipe[]> {
+    const canonicalId = userId ? canonicalizeUserId(userId) : undefined;
     const db = this.getFirestore();
     if (db) {
       try {
         let snapshot;
-        if (userId) {
+        if (canonicalId) {
           snapshot = await withTimeout(
-            db.collection('recipes').where('userId', '==', userId).get()
+            db.collection('recipes').where('userId', '==', canonicalId).get()
           );
         } else {
           snapshot = await withTimeout(db.collection('recipes').get());
@@ -155,7 +160,7 @@ export class RecipeService {
 
     const result: StoredRecipe[] = [];
     for (const recipe of this.recipes.values()) {
-      if (!userId || !recipe.userId || recipe.userId === userId) {
+      if (!canonicalId || !recipe.userId || recipe.userId === canonicalId || canonicalizeUserId(recipe.userId) === canonicalId) {
         result.push(recipe);
       }
     }
@@ -255,16 +260,25 @@ export class RecipeService {
   }
 
   async purgeUserRecipes(userId: string): Promise<number> {
+    const canonicalId = canonicalizeUserId(userId);
+    const blindUserId = this.getBlindUserId(canonicalId);
     let deleted = 0;
     const db = this.getFirestore();
     if (db) {
       try {
-        const snapshot = await withTimeout(
-          db.collection('recipes').where('userId', '==', userId).get()
-        );
+        const [userSnap, canonSnap, blindSnap] = await Promise.all([
+          withTimeout(db.collection('recipes').where('userId', '==', userId).get()),
+          withTimeout(db.collection('recipes').where('userId', '==', canonicalId).get()),
+          withTimeout(db.collection('recipes').where('blindUserId', '==', blindUserId).get()),
+        ]);
+        const docsToDelete = new Map<string, FirebaseFirestore.DocumentReference>();
+        for (const doc of userSnap.docs) docsToDelete.set(doc.id, doc.ref);
+        for (const doc of canonSnap.docs) docsToDelete.set(doc.id, doc.ref);
+        for (const doc of blindSnap.docs) docsToDelete.set(doc.id, doc.ref);
+
         const batch = db.batch();
-        for (const doc of snapshot.docs) {
-          batch.delete(doc.ref);
+        for (const ref of docsToDelete.values()) {
+          batch.delete(ref);
           deleted++;
         }
         if (deleted > 0) {
@@ -275,7 +289,12 @@ export class RecipeService {
       }
     }
     for (const [key, val] of this.recipes.entries()) {
-      if (val.userId === userId) {
+      if (
+        val.userId === userId ||
+        val.userId === canonicalId ||
+        (val.userId && canonicalizeUserId(val.userId) === canonicalId) ||
+        val.blindUserId === blindUserId
+      ) {
         this.recipes.delete(key);
         deleted++;
       }
