@@ -73,9 +73,11 @@ function getInitialUserFromStorage(): AuthUser | null {
     const savedUser = localStorage.getItem('macrometrics_auth_user');
     if (savedUser) {
       const parsed = JSON.parse(savedUser) as AuthUser;
-      if (parsed.email) {
-        const canonical = canonicalizeUserId(parsed.email);
-        if (parsed.id !== canonical) {
+      if (parsed.id && !parsed.id.startsWith('usr_')) {
+        const canonical = parsed.email
+          ? canonicalizeUserId(parsed.email)
+          : canonicalizeUserId(parsed.id);
+        if (canonical && parsed.id !== canonical) {
           parsed.id = canonical;
           try {
             localStorage.setItem('macrometrics_auth_user', JSON.stringify(parsed));
