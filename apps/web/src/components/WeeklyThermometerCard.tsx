@@ -53,9 +53,18 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
     dailySurplusKcal,
     tolerancePercent,
     days: safeDays,
+    imputeMissingDays: true,
   });
 
   const getStatusBadge = () => {
+    if (report.hasSufficientData === false) {
+      return {
+        label: 'AGUARDANDO REGISTROS DA SEMANA',
+        classes: 'bg-m3-surface-container-high text-m3-outline border-m3-outline-variant',
+        icon: <Activity className="w-3.5 h-3.5 text-m3-outline" />,
+      };
+    }
+
     switch (report.status) {
       case 'blown':
         return {
@@ -140,6 +149,14 @@ export const WeeklyThermometerCard: React.FC<WeeklyThermometerCardProps> = ({
                   ? 'Ganho de Peso'
                   : 'Manutenção'}
               </span>
+              {Boolean(report.imputedDaysCount && report.imputedDaysCount > 0) && (
+                <span
+                  title="Dias não preenchidos foram preenchidos com a média dos dias registrados na semana"
+                  className="text-xs font-mono px-2 py-0.5 rounded-md bg-m3-surface-container-high text-m3-primary border border-m3-primary/30"
+                >
+                  Média: {report.imputedDaysCount} dia(s)
+                </span>
+              )}
             </div>
             <p className="text-xs text-m3-outline font-mono">
               Janela Móvel • Adesão Contínua & Blindagem Contra Deslizes Temporais

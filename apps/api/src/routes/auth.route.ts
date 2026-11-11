@@ -49,6 +49,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       googleSub: verified.sub,
       blindUserId: blindIndex,
       isAdmin,
+      rawGooglePayload: verified.rawPayload,
     });
 
     const sessionToken = authService.createSessionToken({

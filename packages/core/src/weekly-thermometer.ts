@@ -11,6 +11,80 @@ export interface RollingDayLog {
   date: string;
   calories: number;
   proteinGrams?: number;
+  isFasting?: boolean;
+  isImputed?: boolean;
+}
+
+export interface ImputeMissingWeeklyDaysResult {
+  days: RollingDayLog[];
+  imputedCount: number;
+  recordedCount: number;
+  averageCalories: number;
+  averageProtein: number;
+  hasSufficientData: boolean;
+}
+
+/**
+ * Preenche dias não registrados na janela móvel de 7 dias com a média aritmética dos dias registrados.
+ * - Dias de jejum explícito (isFasting === true) são contabilizados como 0 kcal reais na média.
+ * - Dias não registrados (calories === 0 e sem isFasting) recebem a média calculada e isImputed: true.
+ * - Se nenhum dia for registrado (0 dias preenchidos), retorna hasSufficientData: false e média 0.
+ */
+export function imputeMissingWeeklyDays(days: RollingDayLog[]): ImputeMissingWeeklyDaysResult {
+  if (!days || days.length === 0) {
+    return {
+      days: [],
+      imputedCount: 0,
+      recordedCount: 0,
+      averageCalories: 0,
+      averageProtein: 0,
+      hasSufficientData: false,
+    };
+  }
+
+  const recordedDays = days.filter(d => Boolean(d.isFasting) || d.calories > 0);
+  const recordedCount = recordedDays.length;
+
+  if (recordedCount === 0) {
+    return {
+      days: days.map(d => ({ ...d })),
+      imputedCount: 0,
+      recordedCount: 0,
+      averageCalories: 0,
+      averageProtein: 0,
+      hasSufficientData: false,
+    };
+  }
+
+  const totalCalories = recordedDays.reduce((acc, d) => acc + d.calories, 0);
+  const avgCalories = Math.round(totalCalories / recordedCount);
+
+  const totalProtein = recordedDays.reduce((acc, d) => acc + (d.proteinGrams || 0), 0);
+  const avgProtein = Math.round((totalProtein / recordedCount) * 10) / 10;
+
+  let imputedCount = 0;
+  const filledDays = days.map(d => {
+    const isRecorded = Boolean(d.isFasting) || d.calories > 0;
+    if (!isRecorded) {
+      imputedCount++;
+      return {
+        ...d,
+        calories: avgCalories,
+        proteinGrams: avgProtein,
+        isImputed: true,
+      };
+    }
+    return { ...d };
+  });
+
+  return {
+    days: filledDays,
+    imputedCount,
+    recordedCount,
+    averageCalories: avgCalories,
+    averageProtein: avgProtein,
+    hasSufficientData: true,
+  };
 }
 
 export interface WeeklyThermometerInput {
@@ -22,6 +96,7 @@ export interface WeeklyThermometerInput {
   dailySurplusKcal?: number;
   tolerancePercent?: number; // default: 3 (%)
   days: RollingDayLog[]; // Up to 7 days
+  imputeMissingDays?: boolean; // Se true, preenche dias não registrados com a média dos dias registrados
 }
 
 export interface WeeklyThermometerAlert {
@@ -48,6 +123,8 @@ export interface WeeklyThermometerReport {
   projectedWeightDeltaKg: number;
   neutralizedDeficitDays?: number;
   alerts: WeeklyThermometerAlert[];
+  imputedDaysCount?: number;
+  hasSufficientData?: boolean;
 }
 
 /**
@@ -64,7 +141,34 @@ export function evaluateWeeklyThermometer(
   }
 
   // Janela móvel: restringe estritamente aos 7 dias mais recentes
-  const windowDays = input.days.slice(-7);
+  let windowDays = input.days.slice(-7);
+  let imputedDaysCount = 0;
+  let hasSufficientData = true;
+
+  if (input.imputeMissingDays) {
+    const imputationResult = imputeMissingWeeklyDays(windowDays);
+    windowDays = imputationResult.days;
+    imputedDaysCount = imputationResult.imputedCount;
+    hasSufficientData = imputationResult.hasSufficientData;
+
+    if (!hasSufficientData) {
+      return {
+        goal: input.goal,
+        daysCount: windowDays.length,
+        totalTargetCalories: windowDays.length * input.dailyTargetCalories,
+        totalActualCalories: 0,
+        weeklySlipKcal: 0,
+        thermalRatioPercent: 0,
+        adherenceScorePercent: 0,
+        status: 'optimal',
+        projectedWeightDeltaKg: 0,
+        alerts: [],
+        imputedDaysCount: 0,
+        hasSufficientData: false,
+      };
+    }
+  }
+
   const daysCount = windowDays.length;
 
   const totalTargetCalories = daysCount * input.dailyTargetCalories;
@@ -187,5 +291,7 @@ export function evaluateWeeklyThermometer(
     projectedWeightDeltaKg,
     neutralizedDeficitDays,
     alerts,
+    imputedDaysCount,
+    hasSufficientData,
   };
 }

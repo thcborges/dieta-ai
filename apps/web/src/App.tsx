@@ -13,6 +13,7 @@ import {
   type RecipeInput,
   recipeToFoodItem,
   calculateRecipeMacros,
+  imputeMissingWeeklyDays,
 } from '@dieta-ai/core';
 import { MacroSummary } from './components/MacroSummary.js';
 import { AuditorBanner } from './components/AuditorBanner.js';
@@ -197,6 +198,41 @@ export default function App() {
   const [recordedDates, setRecordedDates] = useState<string[]>([]);
   const [weeklyHistoryMap, setWeeklyHistoryMap] = useState<Record<string, { calories: number; proteinGrams: number }>>({});
   const [isLoadingMeals, setIsLoadingMeals] = useState<boolean>(false);
+
+  // Auto-seleção do conteúdo em inputs e textareas no primeiro foco/clique (substituição rápida)
+  useEffect(() => {
+    let justFocusedElement: HTMLElement | null = null;
+
+    const handleFocus = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        if (target.dataset.noAutoSelect) return;
+        const type = (target as HTMLInputElement).type || '';
+        if (['text', 'number', 'email', 'search', 'tel', 'url', 'password', ''].includes(type)) {
+          justFocusedElement = target;
+          try {
+            target.select();
+          } catch {
+            // Ignora erro em tipos não suportados
+          }
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (justFocusedElement && e.target === justFocusedElement) {
+        justFocusedElement = null;
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('focusin', handleFocus);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('focusin', handleFocus);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Função para persistir refeições de uma data específica sem poluir outras datas
   const persistMeals = (mealsToSave: MealMap, date: string) => {
@@ -816,9 +852,9 @@ export default function App() {
   const userTdee = calculateTDEE(userBmr, macroSettings.activityLevel);
 
   // Janela móvel dos últimos 7 dias (terminando em selectedDate) no fuso local
-  const rolling7Days = (() => {
+  const rawRolling7Days = (() => {
     const daysList = getRollingDays(selectedDate, 7);
-    const list: Array<{ date: string; calories: number; proteinGrams?: number }> = [];
+    const list: Array<{ date: string; calories: number; proteinGrams?: number; isFasting?: boolean }> = [];
 
     for (const dateStr of daysList) {
       if (dateStr === selectedDate) {
@@ -854,6 +890,9 @@ export default function App() {
     }
     return list;
   })();
+
+  // Preenche dias não registrados com a média aritmética dos dias registrados
+  const { days: rolling7Days } = imputeMissingWeeklyDays(rawRolling7Days);
 
   const weeklySlipKcal =
     rolling7Days.reduce((acc, d) => acc + d.calories, 0) -
@@ -982,30 +1021,36 @@ export default function App() {
               M
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight text-sm sm:text-base text-m3-on-surface whitespace-nowrap">
-                  MacroMetrics Pro
-                </span>
-                <span className="text-xs font-mono bg-m3-surface-container-highest text-m3-tertiary px-1.5 py-0.5 rounded border border-m3-outline-variant/50 shrink-0">
-                  v0.1.0-dev
-                </span>
-              </div>
-              <p className="text-xs text-m3-outline font-mono hidden sm:block">
-                Engenharia Reversa • Auditoria Matemática
-              </p>
+              <span className="font-bold tracking-tight text-sm sm:text-base text-m3-on-surface whitespace-nowrap">
+                MacroMetrics Pro
+              </span>
             </div>
           </div>
 
           {/* Ações / Botões do Cabeçalho (Posicionados à direita na linha superior no mobile, e à direita da data no desktop) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 order-2 md:order-3">
-            {/* Indicador da Conta Ativa */}
+            {/* Indicador da Conta Ativa com Foto / Avatar */}
             {user && (
               <div
-                className="flex items-center gap-1.5 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2.5 py-1.5 rounded-xl text-xs font-mono text-m3-on-surface shrink-0"
-                title={`Conectado como: ${user.email}`}
+                className="flex items-center gap-2 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-mono text-m3-on-surface shrink-0"
+                title={`Conectado como: ${user.name || user.email} (${user.email})`}
               >
+                {user.avatarUrl || (user as any).picture ? (
+                  <img
+                    src={user.avatarUrl || (user as any).picture}
+                    alt={`Avatar de ${user.name || user.email}`}
+                    className="w-6 h-6 rounded-full object-cover border border-m3-outline-variant/80 shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    data-testid="user-avatar-fallback"
+                    className="w-6 h-6 rounded-full bg-m3-primary/20 text-m3-primary font-bold flex items-center justify-center text-xs border border-m3-primary/40 shrink-0"
+                  >
+                    {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-                <span className="max-w-[150px] truncate">{user.email}</span>
               </div>
             )}
 

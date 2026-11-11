@@ -123,8 +123,8 @@ describe('BDD: Dynamic User Authentication & UI Flow (No Default User)', () => {
 
     render(<App />);
 
-    // Verifica que o e-mail do usuário autenticado está visível no cabeçalho
-    expect(screen.getByText('thcborges@gmail.com')).toBeInTheDocument();
+    // Verifica que o avatar / indicador do usuário autenticado está presente no cabeçalho
+    expect(screen.getByTitle(/thcborges@gmail\.com/i)).toBeInTheDocument();
 
     // Clica em Sair
     const logoutBtn = screen.getByRole('button', { name: /Sair/i });
