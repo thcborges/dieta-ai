@@ -49,7 +49,7 @@ DIRETRIZES CENTRAIS:
    }`;
 
 export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-3.8-flash';
-export const FALLBACK_FOOD_ESTIMATE_MODELS = ['gemini-flash-latest'];
+export const FALLBACK_FOOD_ESTIMATE_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
 export class VertexFoodEstimateService {
   private readonly vertexAI: VertexAI;

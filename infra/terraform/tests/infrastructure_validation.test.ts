@@ -11,6 +11,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
   const firestoreModule = resolve(terraformRoot, 'modules/firestore/main.tf');
   const pubsubModule = resolve(terraformRoot, 'modules/pubsub/main.tf');
   const loggingSinkModule = resolve(terraformRoot, 'modules/logging_sink/main.tf');
+  const vertexAiModule = resolve(terraformRoot, 'modules/vertex_ai/main.tf');
 
   let gcloudToken = process.env.GOOGLE_OAUTH_ACCESS_TOKEN || '';
   if (!gcloudToken && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
@@ -78,6 +79,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(existsSync(firestoreModule)).toBe(true);
     expect(existsSync(pubsubModule)).toBe(true);
     expect(existsSync(loggingSinkModule)).toBe(true);
+    expect(existsSync(vertexAiModule)).toBe(true);
     expect(existsSync(resolve(devEnvPath, 'main.tf'))).toBe(true);
     expect(existsSync(resolve(prdEnvPath, 'main.tf'))).toBe(true);
   });
@@ -146,36 +148,53 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(prdValidate).toContain('The configuration is valid');
   }, 120000);
 
-  it('deve auditar provisionamento IaC do Vertex AI para análise de fotos com Gemini Flash', () => {
+  it('deve auditar provisionamento IaC do Vertex AI com módulo dedicado, IAM explícito e variáveis de modelo Gemini Flash', () => {
     const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
     const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
     const cloudRunHcl = readFileSync(cloudRunModule, 'utf-8');
+    expect(existsSync(vertexAiModule)).toBe(true);
+    const vertexAiHcl = readFileSync(vertexAiModule, 'utf-8');
 
-    // Regra: API aiplatform.googleapis.com deve estar declarada nos ambientes dev e prd
-    expect(devHcl).toContain('"aiplatform.googleapis.com"');
-    expect(prdHcl).toContain('"aiplatform.googleapis.com"');
+    // Regra: API aiplatform.googleapis.com deve estar declarada no módulo vertex_ai
+    expect(vertexAiHcl).toContain('"aiplatform.googleapis.com"');
 
-    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL, VERTEX_AI_PHOTO_MODEL, VERTEX_AI_FOOD_ESTIMATE_MODEL e documentar conformidade com roles/aiplatform.user
+    // Regra: Cloud Resource Manager API habilitada no módulo vertex_ai para permitir IAM
+    expect(vertexAiHcl).toContain('"cloudresourcemanager.googleapis.com"');
+
+    // Regra: IAM roles/aiplatform.user concedido explicitamente ao Service Account do Cloud Run
+    expect(vertexAiHcl).toContain('google_project_iam_member');
+    expect(vertexAiHcl).toContain('roles/aiplatform.user');
+
+    // Regra: ambientes dev e prd devem usar o módulo vertex_ai
+    expect(devHcl).toContain('module "vertex_ai"');
+    expect(prdHcl).toContain('module "vertex_ai"');
+
+    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL, VERTEX_AI_PHOTO_MODEL, VERTEX_AI_FOOD_ESTIMATE_MODEL
     expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_PHOTO_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_FOOD_ESTIMATE_MODEL');
     expect(cloudRunHcl).toContain('gemini-3.8-flash');
+    // Nota de conformidade referenciando o módulo vertex_ai
     expect(cloudRunHcl).toContain('roles/aiplatform.user');
   });
 
-  it('deve prevenir regressão de falha no terraform plan por dependência indevida da Cloud Resource Manager API', () => {
+  it('deve prevenir regressão de falha no terraform plan por dependência indevida da Cloud Resource Manager API nos módulos cloud_run e environments', () => {
     const cloudRunHcl = readFileSync(cloudRunModule, 'utf-8');
     const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
     const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
 
     // Regressão do bug 403 SERVICE_DISABLED:
     // data "google_project" e google_project_iam_member invocam cloudresourcemanager.googleapis.com
-    // que não está habilitada nos projetos Dev/Prd do Free Tier.
-    // Nenhum módulo deve declarar data "google_project" ou recursos google_project_iam_member.
+    // que não está habilitada por padrão nos projetos Dev/Prd do Free Tier.
+    // O módulo cloud_run e os environments NÃO devem declarar esses recursos diretamente.
+    // A gestão de IAM para Vertex AI é delegada ao módulo vertex_ai, que habilita
+    // a Cloud Resource Manager API antes de criar o IAM binding.
     expect(cloudRunHcl).not.toContain('data "google_project"');
     expect(cloudRunHcl).not.toContain('resource "google_project_iam_member"');
     expect(devHcl).not.toContain('data "google_project"');
     expect(prdHcl).not.toContain('data "google_project"');
+    expect(devHcl).not.toContain('resource "google_project_iam_member"');
+    expect(prdHcl).not.toContain('resource "google_project_iam_member"');
   });
 
   it('deve garantir que os workflows de CI/CD utilizam terraform_wrapper: false no setup-terraform', () => {

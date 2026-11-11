@@ -215,12 +215,12 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
 }
 
 # Nota de arquitetura e conformidade IAM do Vertex AI:
-# O Cloud Run opera por padrão utilizando a Google Compute Engine Default Service Account
-# (<project_number>-compute@developer.gserviceaccount.com), que já possui permissão de Editor
-# com privilégios compatíveis com roles/aiplatform.user para consumo do Gemini Flash.
-# Evita-se declarações de google_project_iam_member para dispensar dependências desnecessárias
-# da Cloud Resource Manager API (cloudresourcemanager.googleapis.com), prevenindo falhas de 403
-# SERVICE_DISABLED durante a execução de terraform plan em projetos herméticos de Free Tier.
+# A concessão de roles/aiplatform.user ao Service Account do Cloud Run é realizada
+# pelo módulo dedicado vertex_ai (modules/vertex_ai/main.tf), que também habilita
+# a API aiplatform.googleapis.com e a Cloud Resource Manager API necessária para
+# gerenciamento IAM via Terraform. Isso evita dependências circulares e falhas de
+# 403 SERVICE_DISABLED no módulo cloud_run durante terraform plan em projetos
+# herméticos de Free Tier.
 
 output "service_name" {
   value       = google_cloud_run_v2_service.api_service.name
