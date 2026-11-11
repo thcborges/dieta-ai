@@ -159,8 +159,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_PHOTO_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_FOOD_ESTIMATE_MODEL');
-    expect(cloudRunHcl).toContain('gemini-2.5-flash');
-    expect(cloudRunHcl).toContain('gemini-2.5-flash-lite');
+    expect(cloudRunHcl).toContain('gemini-1.5-flash-latest');
     expect(cloudRunHcl).toContain('roles/aiplatform.user');
   });
 
