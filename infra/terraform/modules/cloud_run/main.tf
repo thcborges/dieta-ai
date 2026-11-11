@@ -71,13 +71,13 @@ variable "admin_token" {
 variable "vertex_ai_model" {
   type        = string
   description = "Modelo padrão do Vertex AI Gemini Flash para análise multimodal de fotos"
-  default     = "gemini-2.5-flash"
+  default     = "gemini-1.5-flash-latest"
 }
 
 variable "vertex_ai_food_estimate_model" {
   type        = string
-  description = "Modelo padrão do Vertex AI Gemini Flash Lite para estimativa de alimentos"
-  default     = "gemini-2.5-flash-lite"
+  description = "Modelo padrão do Vertex AI Gemini Flash para estimativa de alimentos"
+  default     = "gemini-1.5-flash-latest"
 }
 
 locals {
