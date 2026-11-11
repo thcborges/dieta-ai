@@ -15,6 +15,7 @@ export interface VerifiedGooglePayload {
   email: string;
   name: string;
   picture?: string;
+  rawPayload?: Record<string, unknown>;
 }
 
 export interface SessionJwtPayload {
@@ -82,10 +83,21 @@ export class AuthService {
     ) {
       const email = expectedEmail || 'techlead@dataeng.io';
       const canonicalUserId = `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const defaultPicture = 'https://lh3.googleusercontent.com/a/default-user';
       return {
         sub: canonicalUserId,
         email,
         name: email.split('@')[0],
+        picture: defaultPicture,
+        rawPayload: {
+          sub: canonicalUserId,
+          email,
+          name: email.split('@')[0],
+          picture: defaultPicture,
+          email_verified: true,
+          iss: 'https://accounts.google.com',
+          aud: this.googleClientId || 'mock-client-id',
+        },
       };
     }
 
@@ -109,6 +121,7 @@ export class AuthService {
         email: payload.email,
         name: payload.name || payload.email.split('@')[0],
         picture: payload.picture,
+        rawPayload: { ...payload },
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Falha na validação do token';

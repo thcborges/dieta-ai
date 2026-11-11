@@ -50,6 +50,30 @@ describe('Users Collection & Relational Linking Suite (BDD / TDD)', () => {
       expect(storedUser?.lastLoginAt).toBeDefined();
     });
 
+    it('deve persistir todas as informações do payload de autenticação (rawGooglePayload) e foto na collection "users"', async () => {
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/google',
+        payload: {
+          googleIdToken: `mock-google-id-token-${Date.now()}`,
+          email: testEmail,
+          name: 'Lead Engineer Photo Test',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json();
+      expect(data.user.id).toBe(canonicalUserId);
+
+      const storedUser = await userRepository.getUserById(canonicalUserId);
+      expect(storedUser).not.toBeNull();
+      expect(storedUser?.rawGooglePayload).toBeDefined();
+      expect(typeof storedUser?.rawGooglePayload).toBe('object');
+      expect(storedUser?.rawGooglePayload?.email).toBe(testEmail);
+    });
+
     it('deve atualizar lastLoginAt e dados ao realizar logins subsequentes preservando createdAt', async () => {
       const first = await userRepository.upsertUser({
         id: canonicalUserId,
