@@ -40,8 +40,8 @@ describe('Regressão de Layout: Cabeçalho Responsivo Mobile vs Desktop (Bug Fix
     const logoutText = screen.getByText('Sair');
     expect(logoutText).toHaveClass('hidden');
 
-    // 5. O subtítulo descritivo deve ser ocultado em telas muito pequenas para poupar espaço vertical
-    const subtitle = screen.getByText(/Engenharia Reversa • Auditoria Matemática/i);
-    expect(subtitle).toHaveClass('hidden');
+    // 5. O subtítulo descritivo foi removido do cabeçalho conforme diretriz de design
+    const subtitle = screen.queryByText(/Engenharia Reversa • Auditoria Matemática/i);
+    expect(subtitle).toBeNull();
   });
 });

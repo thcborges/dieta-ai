@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl?: string;
+  picture?: string;
   isAdmin?: boolean;
   sessionToken?: string;
 }
@@ -125,6 +126,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           blindUserId: data.user?.blindUserId || data.blindIndex,
           email: data.user?.email || trimmedEmail,
           name: data.user?.name || displayName || 'Usuário MacroMetrics',
+          avatarUrl: data.user?.picture || data.user?.avatarUrl,
+          picture: data.user?.picture || data.user?.avatarUrl,
           isAdmin: Boolean(data.user?.isAdmin),
           sessionToken: data.sessionToken || '',
         };

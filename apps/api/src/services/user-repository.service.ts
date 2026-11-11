@@ -13,6 +13,7 @@ export interface UserDoc {
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string;
+  rawGooglePayload?: Record<string, unknown>;
 }
 
 export interface UpsertUserInput {
@@ -23,6 +24,7 @@ export interface UpsertUserInput {
   googleSub?: string;
   blindUserId: string;
   isAdmin?: boolean;
+  rawGooglePayload?: Record<string, unknown>;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
@@ -84,6 +86,7 @@ export class UserRepositoryService {
 
     const now = new Date().toISOString();
     const createdAt = existing?.createdAt || now;
+    const rawGooglePayload = input.rawGooglePayload || existing?.rawGooglePayload;
 
     const userDoc: UserDoc = {
       id: canonicalId,
@@ -97,6 +100,7 @@ export class UserRepositoryService {
       createdAt,
       updatedAt: now,
       lastLoginAt: now,
+      ...(rawGooglePayload ? { rawGooglePayload } : {}),
     };
 
     const db = this.getFirestore();
