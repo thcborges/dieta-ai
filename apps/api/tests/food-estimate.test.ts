@@ -10,7 +10,7 @@ import { authService } from '../src/services/auth.service.js';
 describe('VertexFoodEstimateService Unit Suite', () => {
   it('deve instanciar o serviço com valores padrão de região e modelo', () => {
     const service = new VertexFoodEstimateService();
-    expect(service.getModelName()).toBe('gemini-1.5-flash');
+    expect(service.getModelName()).toBe('gemini-2.5-flash-lite');
     expect(service.getRegion()).toBe('us-central1');
   });
 
