@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VertexFoodEstimateService } from '../src/services/vertex-food-estimate.service.js';
 import { VertexPhotoAnalysisService } from '../src/services/vertex-photo-analysis.service.js';
 
-describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tokens', () => {
+describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para gemini-flash-latest', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -15,10 +15,10 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
     process.env = { ...originalEnv };
   });
 
-  describe('VertexFoodEstimateService (Cadastro de Alimentos via Gemini Flash Latest)', () => {
-    it('deve adotar por padrão o modelo gemini flash latest (gemini-1.5-flash-latest)', () => {
+  describe('VertexFoodEstimateService (Cadastro de Alimentos via gemini-3.8-flash)', () => {
+    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
       const service = new VertexFoodEstimateService();
-      expect(service.getModelName()).toBe('gemini-1.5-flash-latest');
+      expect(service.getModelName()).toBe('gemini-3.8-flash');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_FOOD_ESTIMATE_MODEL quando definida', () => {
@@ -33,10 +33,10 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
       expect(service.getModelName()).toBe('gemini-env-flash');
     });
 
-    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback automático caso o modelo primário retorne 404', async () => {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-flash-latest caso gemini-3.8-flash retorne 404', async () => {
       const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-1.5-flash-latest` was not found or your project does not have access to it.',
+          message: 'Publisher model `projects/.../models/gemini-3.8-flash` was not found or your project does not have access to it.',
           status: 404,
         }),
       };
@@ -71,7 +71,7 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
 
       const mockVertexAI = {
         getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-1.5-flash-latest') return mockPrimaryModel;
+          if (model === 'gemini-3.8-flash') return mockPrimaryModel;
           return mockFallbackModel;
         }),
       };
@@ -85,7 +85,7 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
       expect(result.caloriesPer100g).toBe(143);
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-1.5-flash-latest',
+          model: 'gemini-3.8-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );
@@ -98,10 +98,10 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
     });
   });
 
-  describe('VertexPhotoAnalysisService (Fotos de Refeição via Gemini Flash Latest)', () => {
-    it('deve adotar por padrão o modelo gemini flash latest (gemini-1.5-flash-latest)', () => {
+  describe('VertexPhotoAnalysisService (Fotos de Refeição via gemini-3.8-flash)', () => {
+    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
       const service = new VertexPhotoAnalysisService();
-      expect(service.getModelName()).toBe('gemini-1.5-flash-latest');
+      expect(service.getModelName()).toBe('gemini-3.8-flash');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_PHOTO_MODEL quando definida', () => {
@@ -116,10 +116,10 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
       expect(service.getModelName()).toBe('gemini-env-photo-flash');
     });
 
-    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback automático caso o modelo primário retorne 404', async () => {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-flash-latest caso gemini-3.8-flash retorne 404', async () => {
       const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-1.5-flash-latest` was not found or your project does not have access to it.',
+          message: 'Publisher model `projects/.../models/gemini-3.8-flash` was not found or your project does not have access to it.',
           status: 404,
         }),
       };
@@ -161,7 +161,7 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
 
       const mockVertexAI = {
         getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-1.5-flash-latest') return mockPrimaryModel;
+          if (model === 'gemini-3.8-flash') return mockPrimaryModel;
           return mockFallbackModel;
         }),
       };
@@ -179,7 +179,7 @@ describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tok
       expect(result.items[0].name).toBe('Arroz Branco');
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-1.5-flash-latest',
+          model: 'gemini-3.8-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );

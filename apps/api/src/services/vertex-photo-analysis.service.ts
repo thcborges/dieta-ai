@@ -77,13 +77,8 @@ DIRETRIZES CENTRAIS E REGRAS DE EXECUÇÃO:
      ]
    }`;
 
-export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-1.5-flash-latest';
-export const FALLBACK_PHOTO_ANALYSIS_MODELS = [
-  'gemini-flash-latest',
-  'gemini-1.5-flash-002',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-001',
-];
+export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-3.8-flash';
+export const FALLBACK_PHOTO_ANALYSIS_MODELS = ['gemini-flash-latest'];
 
 export class VertexPhotoAnalysisService {
   private readonly vertexAI: VertexAI;
