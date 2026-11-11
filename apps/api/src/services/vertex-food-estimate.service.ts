@@ -48,8 +48,13 @@ DIRETRIZES CENTRAIS:
      "sourceNote": string
    }`;
 
-export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-2.5-flash-lite';
-export const FALLBACK_FOOD_ESTIMATE_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash-lite-001'];
+export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-1.5-flash-latest';
+export const FALLBACK_FOOD_ESTIMATE_MODELS = [
+  'gemini-flash-latest',
+  'gemini-1.5-flash-002',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-001',
+];
 
 export class VertexFoodEstimateService {
   private readonly vertexAI: VertexAI;
@@ -97,6 +102,7 @@ export class VertexFoodEstimateService {
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.1,
+            maxOutputTokens: 150,
           },
         });
 

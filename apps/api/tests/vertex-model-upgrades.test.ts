@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VertexFoodEstimateService } from '../src/services/vertex-food-estimate.service.js';
 import { VertexPhotoAnalysisService } from '../src/services/vertex-photo-analysis.service.js';
 
-describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-Lite', () => {
+describe('BDD & Regression: Modelos Latest do Gemini Flash com limite de 150 tokens', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -15,28 +15,28 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
     process.env = { ...originalEnv };
   });
 
-  describe('VertexFoodEstimateService (Cadastro de Alimentos via Flash-Lite)', () => {
-    it('deve adotar por padrão o modelo gemini flash-lite mais recente (gemini-2.5-flash-lite)', () => {
+  describe('VertexFoodEstimateService (Cadastro de Alimentos via Gemini Flash Latest)', () => {
+    it('deve adotar por padrão o modelo gemini flash latest (gemini-1.5-flash-latest)', () => {
       const service = new VertexFoodEstimateService();
-      expect(service.getModelName()).toBe('gemini-2.5-flash-lite');
+      expect(service.getModelName()).toBe('gemini-1.5-flash-latest');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_FOOD_ESTIMATE_MODEL quando definida', () => {
-      process.env.VERTEX_AI_FOOD_ESTIMATE_MODEL = 'gemini-custom-flash-lite';
+      process.env.VERTEX_AI_FOOD_ESTIMATE_MODEL = 'gemini-custom-flash';
       const service = new VertexFoodEstimateService();
-      expect(service.getModelName()).toBe('gemini-custom-flash-lite');
+      expect(service.getModelName()).toBe('gemini-custom-flash');
     });
 
     it('deve usar VERTEX_AI_MODEL como fallback caso VERTEX_AI_FOOD_ESTIMATE_MODEL não exista', () => {
-      process.env.VERTEX_AI_MODEL = 'gemini-general-flash';
+      process.env.VERTEX_AI_MODEL = 'gemini-env-flash';
       const service = new VertexFoodEstimateService();
-      expect(service.getModelName()).toBe('gemini-general-flash');
+      expect(service.getModelName()).toBe('gemini-env-flash');
     });
 
-    it('deve realizar fallback automático para gemini-2.0-flash-lite caso o modelo primário retorne 404 NOT_FOUND', async () => {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback automático caso o modelo primário retorne 404', async () => {
       const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-2.5-flash-lite` was not found or your project does not have access to it.',
+          message: 'Publisher model `projects/.../models/gemini-1.5-flash-latest` was not found or your project does not have access to it.',
           status: 404,
         }),
       };
@@ -58,7 +58,7 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
                         fatPer100g: 9.5,
                         fiberPer100g: 0,
                         confidence: 'high',
-                        sourceNote: 'Fallback 2.0 bem sucedido',
+                        sourceNote: 'Fallback bem sucedido',
                       }),
                     },
                   ],
@@ -71,7 +71,7 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
 
       const mockVertexAI = {
         getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-2.5-flash-lite') return mockPrimaryModel;
+          if (model === 'gemini-1.5-flash-latest') return mockPrimaryModel;
           return mockFallbackModel;
         }),
       };
@@ -84,36 +84,42 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
       expect(result.foodName).toBe('Ovo Poché');
       expect(result.caloriesPer100g).toBe(143);
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-2.5-flash-lite' })
+        expect.objectContaining({
+          model: 'gemini-1.5-flash-latest',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+        })
       );
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-2.0-flash-lite' })
+        expect.objectContaining({
+          model: 'gemini-flash-latest',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+        })
       );
     });
   });
 
-  describe('VertexPhotoAnalysisService (Processamento de Fotos de Refeição via Flash)', () => {
-    it('deve adotar por padrão a versão mais recente do gemini flash (gemini-2.5-flash)', () => {
+  describe('VertexPhotoAnalysisService (Fotos de Refeição via Gemini Flash Latest)', () => {
+    it('deve adotar por padrão o modelo gemini flash latest (gemini-1.5-flash-latest)', () => {
       const service = new VertexPhotoAnalysisService();
-      expect(service.getModelName()).toBe('gemini-2.5-flash');
+      expect(service.getModelName()).toBe('gemini-1.5-flash-latest');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_PHOTO_MODEL quando definida', () => {
-      process.env.VERTEX_AI_PHOTO_MODEL = 'gemini-custom-flash';
+      process.env.VERTEX_AI_PHOTO_MODEL = 'gemini-custom-photo-flash';
       const service = new VertexPhotoAnalysisService();
-      expect(service.getModelName()).toBe('gemini-custom-flash');
+      expect(service.getModelName()).toBe('gemini-custom-photo-flash');
     });
 
     it('deve usar VERTEX_AI_MODEL como fallback caso VERTEX_AI_PHOTO_MODEL não exista', () => {
-      process.env.VERTEX_AI_MODEL = 'gemini-general-flash';
+      process.env.VERTEX_AI_MODEL = 'gemini-env-photo-flash';
       const service = new VertexPhotoAnalysisService();
-      expect(service.getModelName()).toBe('gemini-general-flash');
+      expect(service.getModelName()).toBe('gemini-env-photo-flash');
     });
 
-    it('deve realizar fallback automático para gemini-2.0-flash caso o modelo primário retorne 404 NOT_FOUND', async () => {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback automático caso o modelo primário retorne 404', async () => {
       const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-2.5-flash` was not found or your project does not have access to it.',
+          message: 'Publisher model `projects/.../models/gemini-1.5-flash-latest` was not found or your project does not have access to it.',
           status: 404,
         }),
       };
@@ -155,7 +161,7 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
 
       const mockVertexAI = {
         getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-2.5-flash') return mockPrimaryModel;
+          if (model === 'gemini-1.5-flash-latest') return mockPrimaryModel;
           return mockFallbackModel;
         }),
       };
@@ -172,10 +178,16 @@ describe('BDD & Regression: Upgrade dos Modelos Vertex AI Gemini Flash e Flash-L
       expect(result.isFoodIdentified).toBe(true);
       expect(result.items[0].name).toBe('Arroz Branco');
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-2.5-flash' })
+        expect.objectContaining({
+          model: 'gemini-1.5-flash-latest',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+        })
       );
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-2.0-flash' })
+        expect.objectContaining({
+          model: 'gemini-flash-latest',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+        })
       );
     });
   });
