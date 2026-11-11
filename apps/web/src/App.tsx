@@ -277,6 +277,7 @@ export default function App() {
             if (data && data.sessionToken) {
               const upgradedUser: AuthUser = {
                 ...user,
+                blindUserId: data.user?.blindUserId || data.blindIndex || user.blindUserId,
                 sessionToken: data.sessionToken,
               };
               setUser(upgradedUser);
@@ -997,6 +998,17 @@ export default function App() {
 
           {/* Ações / Botões do Cabeçalho (Posicionados à direita na linha superior no mobile, e à direita da data no desktop) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 order-2 md:order-3">
+            {/* Indicador da Conta Ativa */}
+            {user && (
+              <div
+                className="flex items-center gap-1.5 bg-m3-surface-container-high border border-m3-outline-variant/60 px-2.5 py-1.5 rounded-xl text-xs font-mono text-m3-on-surface shrink-0"
+                title={`Conectado como: ${user.email}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                <span className="max-w-[150px] truncate">{user.email}</span>
+              </div>
+            )}
+
             {/* Botão de Controle de Macros */}
             <button
               type="button"

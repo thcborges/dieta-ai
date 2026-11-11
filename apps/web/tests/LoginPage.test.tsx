@@ -37,6 +37,9 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
 
     render(<LoginPage onLogin={onLogin} />);
 
+    const emailInput = screen.getByLabelText(/Conta Google \(E-mail\)/i);
+    fireEvent.change(emailInput, { target: { value: 'thcborges@example.com' } });
+
     const loginButton = screen.getByRole('button', { name: /Entrar com Google/i });
     fireEvent.click(loginButton);
 
@@ -118,6 +121,9 @@ describe('LoginPage (Página Principal de Login com Google Auth)', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
     render(<LoginPage onLogin={onLogin} />);
+
+    const emailInput = screen.getByLabelText(/Conta Google \(E-mail\)/i);
+    fireEvent.change(emailInput, { target: { value: 'thcborges@example.com' } });
 
     const loginButton = screen.getByRole('button', { name: /Entrar com Google/i });
     fireEvent.click(loginButton);

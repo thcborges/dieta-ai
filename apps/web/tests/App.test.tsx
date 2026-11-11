@@ -23,6 +23,9 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
   it('deve permitir realizar o login com Google, acessando o dashboard e liberando lançamento de alimentos', async () => {
     render(<App />);
 
+    const emailInput = screen.getByLabelText(/Conta Google \(E-mail\)/i);
+    fireEvent.change(emailInput, { target: { value: 'thcborges@gmail.com' } });
+
     const loginBtn = screen.getByRole('button', { name: /Entrar com Google/i });
     fireEvent.click(loginBtn);
 
@@ -229,6 +232,18 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       const urlStr = url.toString();
       const method = init?.method?.toUpperCase() || 'GET';
+      if (urlStr.includes('/api/v1/diaries/dates') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ dates: ['2026-10-16'], count: 1 }),
+        } as Response;
+      }
+      if (urlStr.includes('/api/v1/diaries/history') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ history: [], days: 7, endDate: '2026-10-16' }),
+        } as Response;
+      }
       if (urlStr.includes('/api/v1/diaries') && method === 'GET') {
         return {
           ok: true,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import App from '../src/App.js';
 import { LoginPage, type AuthUser } from '../src/components/LoginPage.js';
 
@@ -41,7 +41,10 @@ describe('Frontend Regression: Recuperação de Dados do Usuário (Receitas, Di�
 
     render(<LoginPage onLogin={onLoginMock} />);
 
-    // Simula login clicando em Entrar com Google
+    // Simula preenchimento do email e clique em Entrar com Google
+    const emailInput = screen.getByPlaceholderText(/seu.email@gmail.com/i);
+    fireEvent.change(emailInput, { target: { value: testEmail } });
+
     const loginButton = screen.getByText('Entrar com Google');
     loginButton.click();
 
