@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Activity, Target, Lock, Loader2, AlertCircle, UserCheck } from 'lucide-react';
+import { Lock, Loader2, AlertCircle } from 'lucide-react';
 
 export interface AuthUser {
   id: string;
@@ -15,33 +15,84 @@ interface LoginPageProps {
   onLogin: (user: AuthUser) => void;
 }
 
+interface GoogleCredentialResponse {
+  credential?: string;
+}
+
+function decodeJwtPayload(jwtToken: string): any {
+  try {
+    const base64Url = jwtToken.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('thcborges@example.com');
-  const [name, setName] = useState('Líder Técnico em Engenharia de Dados');
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Inicialização opcional do Google Identity Services (GIS) no navegador quando disponível
+  // Inicialização do Google Identity Services (GIS) no navegador quando disponível
   useEffect(() => {
     try {
       const gWindow = window as unknown as {
-        google?: { accounts?: { id?: { initialize: (cfg: unknown) => void } } };
+        google?: {
+          accounts?: {
+            id?: {
+              initialize: (cfg: {
+                client_id: string;
+                callback: (res: GoogleCredentialResponse) => void;
+              }) => void;
+              renderButton?: (
+                parent: HTMLElement,
+                options: { theme?: string; size?: string; width?: number; text?: string }
+              ) => void;
+            };
+          };
+        };
       };
       if (gWindow.google?.accounts?.id) {
         gWindow.google.accounts.id.initialize({
           client_id: 'dieta-ai-google-client-id',
-          callback: () => {
-            handleGoogleLogin();
+          callback: (res: GoogleCredentialResponse) => {
+            if (res.credential) {
+              const payload = decodeJwtPayload(res.credential);
+              if (payload && payload.email) {
+                submitLogin(res.credential, payload.email, payload.name || '');
+                return;
+              }
+            }
+            handleManualLogin();
           },
         });
+
+        const btnContainer = document.getElementById('google-signin-btn-container');
+        if (btnContainer && gWindow.google.accounts.id.renderButton) {
+          gWindow.google.accounts.id.renderButton(btnContainer, {
+            theme: 'filled_black',
+            size: 'large',
+            width: 340,
+            text: 'signin_with',
+          });
+        }
       }
     } catch {
       // Ignora erro em ambiente headless / teste
     }
-  }, []);
+  }, [email]);
 
-  const handleGoogleLogin = async () => {
-    const trimmedEmail = email.trim();
+  const submitLogin = async (rawGoogleToken: string | null, targetEmail: string, targetName?: string) => {
+    const trimmedEmail = targetEmail.trim().toLowerCase();
     if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
       setError('Por favor, informe uma conta Google com endereço de e-mail válido.');
       return;
@@ -50,6 +101,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
 
+    const tokenToSend = rawGoogleToken || `mock-google-id-token-${Date.now()}`;
+    const displayName = targetName?.trim() || trimmedEmail.split('@')[0];
+
     try {
       const response = await fetch('/api/v1/auth/google', {
         method: 'POST',
@@ -57,9 +111,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          googleIdToken: `mock-google-id-token-${Date.now()}`,
+          googleIdToken: tokenToSend,
           email: trimmedEmail,
-          name: name.trim() || trimmedEmail.split('@')[0],
+          name: displayName,
         }),
       });
 
@@ -68,9 +122,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         const fallbackId = `usr_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const authenticatedUser: AuthUser = {
           id: data.user?.id || fallbackId,
-          blindUserId: data.user?.blindUserId,
+          blindUserId: data.user?.blindUserId || data.blindIndex,
           email: data.user?.email || trimmedEmail,
-          name: data.user?.name || name.trim() || 'Usuário MacroMetrics',
+          name: data.user?.name || displayName || 'Usuário MacroMetrics',
           isAdmin: Boolean(data.user?.isAdmin),
           sessionToken: data.sessionToken || '',
         };
@@ -81,7 +135,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         const fallbackUser: AuthUser = {
           id: fallbackId,
           email: trimmedEmail,
-          name: name.trim() || 'Usuário MacroMetrics',
+          name: displayName || 'Usuário MacroMetrics',
           sessionToken: `offline_session_${fallbackId}`,
         };
         onLogin(fallbackUser);
@@ -92,13 +146,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       const offlineUser: AuthUser = {
         id: fallbackId,
         email: trimmedEmail,
-        name: name.trim() || 'Usuário MacroMetrics',
+        name: displayName || 'Usuário MacroMetrics',
         sessionToken: `offline_session_${fallbackId}`,
       };
       onLogin(offlineUser);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleManualLogin = async () => {
+    await submitLogin(null, email);
   };
 
   return (
@@ -128,7 +186,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           </p>
         </div>
 
-        {/* Seleção/Edição de Conta Google */}
+        {/* Container para o botão oficial do Google GIS se suportado */}
+        <div id="google-signin-btn-container" className="flex justify-center" />
+
+        {/* Entrada Manual de Conta Google */}
         <div className="space-y-3 text-left">
           <label htmlFor="google-email" className="block text-xs font-semibold text-m3-on-surface">
             Conta Google (E-mail)
@@ -141,36 +202,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               setEmail(e.target.value);
               if (error) setError(null);
             }}
-            placeholder="seu-email@gmail.com"
+            placeholder="seu.email@gmail.com"
             className="w-full bg-m3-surface-container-lowest border border-m3-outline-variant focus:border-m3-primary rounded-xl px-3.5 py-2.5 text-xs text-m3-on-surface outline-none transition-colors"
           />
-
-          {/* Troca Rápida de Conta para Teste e Homologação */}
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] text-m3-outline font-mono">Contas rápidas:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('thcborges@example.com');
-                setName('Líder Técnico');
-              }}
-              className="text-[11px] bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant/60 text-m3-on-surface px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <UserCheck className="w-3 h-3 text-m3-primary" />
-              <span>thcborges</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('outro.usuario@gmail.com');
-                setName('Outro Usuário');
-              }}
-              className="text-[11px] bg-m3-surface-container-high hover:bg-m3-surface-variant border border-m3-outline-variant/60 text-m3-on-surface px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <UserCheck className="w-3 h-3 text-m3-tertiary" />
-              <span>outro.usuario</span>
-            </button>
-          </div>
 
           {error && (
             <div className="p-2.5 rounded-xl bg-red-950/40 text-red-300 border border-red-800/50 text-xs flex items-center gap-2">
@@ -180,72 +214,50 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           )}
         </div>
 
-        {/* Destaques das Funcionalidades */}
-        <div className="grid grid-cols-2 gap-3 text-left">
-          <div className="bg-m3-surface-container-highest/40 p-3 rounded-xl border border-m3-outline-variant/40">
-            <div className="flex items-center gap-1.5 text-m3-metric-protein text-xs font-semibold mb-1">
-              <Target className="w-3.5 h-3.5" />
-              <span>Metas Pessoais</span>
-            </div>
-            <p className="text-[11px] text-m3-outline">
-              Controle customizado de calorias, proteínas, carbos, gorduras e fibras.
-            </p>
-          </div>
+        {/* Botão de Ação Primária M3 */}
+        <button
+          type="button"
+          onClick={handleManualLogin}
+          disabled={isLoading}
+          className="w-full py-3.5 px-4 rounded-xl bg-m3-primary hover:bg-m3-primary/90 text-m3-on-primary font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Autenticando...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>Entrar com Google</span>
+            </>
+          )}
+        </button>
 
-          <div className="bg-m3-surface-container-highest/40 p-3 rounded-xl border border-m3-outline-variant/40">
-            <div className="flex items-center gap-1.5 text-m3-tertiary text-xs font-semibold mb-1">
-              <Activity className="w-3.5 h-3.5" />
-              <span>Engenharia Reversa</span>
-            </div>
-            <p className="text-[11px] text-m3-outline">
-              Simulador de buffer pré-evento para blindagem de déficit semanal.
-            </p>
-          </div>
-        </div>
-
-        {/* Botão de Login com Google Oficial */}
-        <div className="space-y-3 pt-2">
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-m3-surface-container-highest hover:bg-m3-surface-variant disabled:opacity-50 text-m3-on-surface border border-m3-outline-variant font-medium text-sm py-3 px-4 rounded-2xl transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin text-m3-primary" />
-                <span>Autenticando com Google...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span className="font-semibold">Entrar com Google</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Rodapé LGPD e Blind Indexing */}
-        <div className="pt-2 border-t border-m3-outline-variant/40 flex items-center justify-center gap-1.5 text-[11px] text-m3-outline">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Conformidade Estrita LGPD • Blind Indexing HMAC-SHA256</span>
+        {/* Rodapé LGPD e Segurança Zero-Trust */}
+        <div className="pt-2 border-t border-m3-outline-variant/40 text-[11px] text-m3-outline space-y-1.5 text-center font-mono">
+          <p className="flex items-center justify-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Conformidade Estrita LGPD (Lei 13.709/2018)
+          </p>
+          <p>Blind Indexing determinístico por HMAC-SHA256.</p>
         </div>
       </div>
     </div>

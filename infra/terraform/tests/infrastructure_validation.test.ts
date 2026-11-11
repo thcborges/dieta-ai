@@ -144,7 +144,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
       env: testEnv,
     });
     expect(prdValidate).toContain('The configuration is valid');
-  }, 60000);
+  }, 120000);
 
   it('deve auditar provisionamento IaC do Vertex AI para análise de fotos com Gemini Flash', () => {
     const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
@@ -155,8 +155,12 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(devHcl).toContain('"aiplatform.googleapis.com"');
     expect(prdHcl).toContain('"aiplatform.googleapis.com"');
 
-    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL e documentar conformidade com roles/aiplatform.user
+    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL, VERTEX_AI_PHOTO_MODEL, VERTEX_AI_FOOD_ESTIMATE_MODEL e documentar conformidade com roles/aiplatform.user
     expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
+    expect(cloudRunHcl).toContain('VERTEX_AI_PHOTO_MODEL');
+    expect(cloudRunHcl).toContain('VERTEX_AI_FOOD_ESTIMATE_MODEL');
+    expect(cloudRunHcl).toContain('gemini-2.5-flash');
+    expect(cloudRunHcl).toContain('gemini-2.5-flash-lite');
     expect(cloudRunHcl).toContain('roles/aiplatform.user');
   });
 

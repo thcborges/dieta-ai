@@ -65,6 +65,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       blindIndex: userDoc.blindUserId,
       user: {
         id: userDoc.id,
+        blindUserId: userDoc.blindUserId,
         email: userDoc.email,
         name: userDoc.name,
         picture: userDoc.picture,

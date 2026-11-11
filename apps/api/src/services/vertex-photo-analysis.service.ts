@@ -77,6 +77,9 @@ DIRETRIZES CENTRAIS E REGRAS DE EXECUÇÃO:
      ]
    }`;
 
+export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-2.5-flash';
+export const FALLBACK_PHOTO_ANALYSIS_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-001'];
+
 export class VertexPhotoAnalysisService {
   private readonly vertexAI: VertexAI;
   private readonly region: string;
@@ -86,7 +89,11 @@ export class VertexPhotoAnalysisService {
   constructor(options: VertexPhotoAnalysisServiceOptions = {}) {
     this.region = options.region || process.env.GCP_REGION || 'us-central1';
     this.projectId = options.projectId || process.env.GCP_PROJECT_ID || 'thcborges-dieta-ai-dev';
-    this.modelName = options.modelName || process.env.VERTEX_AI_MODEL || 'gemini-1.5-flash';
+    this.modelName =
+      options.modelName ||
+      process.env.VERTEX_AI_PHOTO_MODEL ||
+      process.env.VERTEX_AI_MODEL ||
+      DEFAULT_PHOTO_ANALYSIS_MODEL;
 
     this.vertexAI =
       options.vertexAIClient ||
@@ -105,82 +112,99 @@ export class VertexPhotoAnalysisService {
   }
 
   public async analyzeMealPhoto(input: AnalyzePhotoInput): Promise<PhotoAnalysisResult> {
-    try {
-      const generativeModel = this.vertexAI.getGenerativeModel({
-        model: this.modelName,
-        systemInstruction: PHOTO_ANALYSIS_SYSTEM_INSTRUCTION,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.1, // Temperatura baixa para consistência analítica
-        },
-      });
-
-      // Sanitiza base64 removendo prefixos data:image/...;base64, se existirem
-      const cleanBase64 = input.imageBase64.includes(',')
-        ? input.imageBase64.split(',')[1]
-        : input.imageBase64;
-
-      const promptParts: any[] = [
-        {
-          inlineData: {
-            mimeType: input.mimeType || 'image/jpeg',
-            data: cleanBase64,
-          },
-        },
-      ];
-
-      const userText = input.description
-        ? `Descrição prévia informada pelo usuário sobre o prato: "${input.description}". Avalie a imagem e extraia os itens nutricionais.`
-        : 'Avalie a imagem do prato em anexo e extraia os itens e macronutrientes conforme as instruções.';
-
-      promptParts.push({ text: userText });
-
-      const response = await generativeModel.generateContent({
-        contents: [{ role: 'user', parts: promptParts }],
-      });
-
-      const responseContent =
-        response.response?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-
-      // Remove eventuais marcadores markdown ```json ... ``` se retornados
-      const sanitizedText = responseContent
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      const parsed = JSON.parse(sanitizedText);
-
-      return {
-        isFoodIdentified: Boolean(parsed.isFoodIdentified),
-        feedbackMessage:
-          parsed.feedbackMessage ||
-          (parsed.isFoodIdentified
-            ? 'Alimentos identificados com sucesso.'
-            : 'Nenhum alimento detectado na imagem.'),
-        items: Array.isArray(parsed.items)
-          ? parsed.items.map((item: any) => ({
-              name: String(item.name || 'Alimento').trim(),
-              estimatedGrams: Math.max(0, Number(item.estimatedGrams) || 0),
-              confidence: ['high', 'medium', 'low'].includes(item.confidence)
-                ? item.confidence
-                : 'medium',
-              clarificationNote: item.clarificationNote
-                ? String(item.clarificationNote).trim()
-                : undefined,
-              per100g: {
-                calories: Math.max(0, Math.round(Number(item.per100g?.calories) || 0)),
-                protein: Math.max(0, Math.round((Number(item.per100g?.protein) || 0) * 10) / 10),
-                carbs: Math.max(0, Math.round((Number(item.per100g?.carbs) || 0) * 10) / 10),
-                fat: Math.max(0, Math.round((Number(item.per100g?.fat) || 0) * 10) / 10),
-                fiber: Math.max(0, Math.round((Number(item.per100g?.fiber) || 0) * 10) / 10),
-              },
-            }))
-          : [],
-      };
-    } catch (err: any) {
-      throw new Error(`Falha na análise da foto pelo Vertex AI: ${err.message || String(err)}`);
+    const modelsToTry = [this.modelName];
+    if (this.modelName === DEFAULT_PHOTO_ANALYSIS_MODEL) {
+      modelsToTry.push(...FALLBACK_PHOTO_ANALYSIS_MODELS);
     }
+
+    let lastError: any = null;
+    for (const candidate of modelsToTry) {
+      try {
+        const generativeModel = this.vertexAI.getGenerativeModel({
+          model: candidate,
+          systemInstruction: PHOTO_ANALYSIS_SYSTEM_INSTRUCTION,
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.1, // Temperatura baixa para consistência analítica
+          },
+        });
+
+        // Sanitiza base64 removendo prefixos data:image/...;base64, se existirem
+        const cleanBase64 = input.imageBase64.includes(',')
+          ? input.imageBase64.split(',')[1]
+          : input.imageBase64;
+
+        const promptParts: any[] = [
+          {
+            inlineData: {
+              mimeType: input.mimeType || 'image/jpeg',
+              data: cleanBase64,
+            },
+          },
+        ];
+
+        const userText = input.description
+          ? `Descrição prévia informada pelo usuário sobre o prato: "${input.description}". Avalie a imagem e extraia os itens nutricionais.`
+          : 'Avalie a imagem do prato em anexo e extraia os itens e macronutrientes conforme as instruções.';
+
+        promptParts.push({ text: userText });
+
+        const response = await generativeModel.generateContent({
+          contents: [{ role: 'user', parts: promptParts }],
+        });
+
+        const responseContent =
+          response.response?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+
+        // Remove eventuais marcadores markdown ```json ... ``` se retornados
+        const sanitizedText = responseContent
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .trim();
+
+        const parsed = JSON.parse(sanitizedText);
+
+        return {
+          isFoodIdentified: Boolean(parsed.isFoodIdentified),
+          feedbackMessage:
+            parsed.feedbackMessage ||
+            (parsed.isFoodIdentified
+              ? 'Alimentos identificados com sucesso.'
+              : 'Nenhum alimento detectado na imagem.'),
+          items: Array.isArray(parsed.items)
+            ? parsed.items.map((item: any) => ({
+                name: String(item.name || 'Alimento').trim(),
+                estimatedGrams: Math.max(0, Number(item.estimatedGrams) || 0),
+                confidence: ['high', 'medium', 'low'].includes(item.confidence)
+                  ? item.confidence
+                  : 'medium',
+                clarificationNote: item.clarificationNote
+                  ? String(item.clarificationNote).trim()
+                  : undefined,
+                per100g: {
+                  calories: Math.max(0, Math.round(Number(item.per100g?.calories) || 0)),
+                  protein: Math.max(0, Math.round((Number(item.per100g?.protein) || 0) * 10) / 10),
+                  carbs: Math.max(0, Math.round((Number(item.per100g?.carbs) || 0) * 10) / 10),
+                  fat: Math.max(0, Math.round((Number(item.per100g?.fat) || 0) * 10) / 10),
+                  fiber: Math.max(0, Math.round((Number(item.per100g?.fiber) || 0) * 10) / 10),
+                },
+              }))
+            : [],
+        };
+      } catch (err: any) {
+        lastError = err;
+        const isNotFound =
+          err?.status === 404 ||
+          String(err?.message || '').includes('not found') ||
+          String(err?.message || '').includes('NOT_FOUND');
+        if (!isNotFound) {
+          throw new Error(`Falha na análise da foto pelo Vertex AI: ${err.message || String(err)}`);
+        }
+      }
+    }
+
+    throw new Error(`Falha na análise da foto pelo Vertex AI: ${lastError?.message || String(lastError)}`);
   }
 }
 
