@@ -23,10 +23,10 @@ describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () =
   });
 
   describe('VertexFoodEstimateService (Cadastro de Alimentos)', () => {
-    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
+    it('deve adotar por padrão o modelo gemini-2.5-flash-image', () => {
       const service = new VertexFoodEstimateService();
       expect(service.getModelName()).toBe(DEFAULT_FOOD_ESTIMATE_MODEL);
-      expect(service.getModelName()).toBe('gemini-3.8-flash');
+      expect(service.getModelName()).toBe('gemini-2.5-flash-image');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_FOOD_ESTIMATE_MODEL quando definida', () => {
@@ -55,7 +55,7 @@ describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () =
 
       const service = new VertexFoodEstimateService({
         vertexAIClient: mockVertexAI as any,
-        modelName: 'gemini-3.8-flash',
+        modelName: 'gemini-2.5-flash-image',
       });
 
       await expect(
@@ -64,18 +64,18 @@ describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () =
 
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.8-flash',
-          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+          model: 'gemini-2.5-flash-image',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 250 }),
         })
       );
     });
   });
 
   describe('VertexPhotoAnalysisService (Fotos de Refeição)', () => {
-    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
+    it('deve adotar por padrão o modelo gemini-2.5-flash-image', () => {
       const service = new VertexPhotoAnalysisService();
       expect(service.getModelName()).toBe(DEFAULT_PHOTO_ANALYSIS_MODEL);
-      expect(service.getModelName()).toBe('gemini-3.8-flash');
+      expect(service.getModelName()).toBe('gemini-2.5-flash-image');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_PHOTO_MODEL quando definida', () => {
@@ -104,7 +104,7 @@ describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () =
 
       const service = new VertexPhotoAnalysisService({
         vertexAIClient: mockVertexAI as any,
-        modelName: 'gemini-3.8-flash',
+        modelName: 'gemini-2.5-flash-image',
       });
 
       await expect(
@@ -116,8 +116,8 @@ describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () =
 
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.8-flash',
-          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+          model: 'gemini-2.5-flash-image',
+          generationConfig: expect.objectContaining({ maxOutputTokens: 1000 }),
         })
       );
     });

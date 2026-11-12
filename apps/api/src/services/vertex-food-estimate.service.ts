@@ -48,7 +48,7 @@ DIRETRIZES CENTRAIS:
      "sourceNote": string
    }`;
 
-export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-2.5-flash-image';
 
 export class VertexFoodEstimateService {
   private readonly vertexAI: VertexAI;
@@ -82,14 +82,18 @@ export class VertexFoodEstimateService {
   }
 
   public async estimateFoodNutrition(input: FoodEstimateInput): Promise<FoodEstimateResult> {
+    const generationConfig: Record<string, any> = {
+      temperature: 0.1,
+      maxOutputTokens: 250,
+    };
+    if (!this.modelName.includes('flash-image')) {
+      generationConfig.responseMimeType = 'application/json';
+    }
+
     const generativeModel = this.vertexAI.getGenerativeModel({
       model: this.modelName,
       systemInstruction: FOOD_ESTIMATE_SYSTEM_INSTRUCTION,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        maxOutputTokens: 150,
-      },
+      generationConfig,
     });
 
     const userText = input.portionGrams
