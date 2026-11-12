@@ -77,7 +77,7 @@ DIRETRIZES CENTRAIS E REGRAS DE EXECUÇÃO:
      ]
    }`;
 
-export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-2.5-flash-image';
 
 export class VertexPhotoAnalysisService {
   private readonly vertexAI: VertexAI;
@@ -111,14 +111,18 @@ export class VertexPhotoAnalysisService {
   }
 
   public async analyzeMealPhoto(input: AnalyzePhotoInput): Promise<PhotoAnalysisResult> {
+    const generationConfig: Record<string, any> = {
+      temperature: 0.1, // Temperatura baixa para consistência analítica
+      maxOutputTokens: 1000,
+    };
+    if (!this.modelName.includes('flash-image')) {
+      generationConfig.responseMimeType = 'application/json';
+    }
+
     const generativeModel = this.vertexAI.getGenerativeModel({
       model: this.modelName,
       systemInstruction: PHOTO_ANALYSIS_SYSTEM_INSTRUCTION,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1, // Temperatura baixa para consistência analítica
-        maxOutputTokens: 150,
-      },
+      generationConfig,
     });
 
     // Sanitiza base64 removendo prefixos data:image/...;base64, se existirem
