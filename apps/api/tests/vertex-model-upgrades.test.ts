@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VertexFoodEstimateService } from '../src/services/vertex-food-estimate.service.js';
 import { VertexPhotoAnalysisService } from '../src/services/vertex-photo-analysis.service.js';
 
-describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para gemini-flash-latest', () => {
+describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para gemini-2.5-flash e gemini-2.0-flash', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -33,8 +33,7 @@ describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para g
       expect(service.getModelName()).toBe('gemini-env-flash');
     });
 
-    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-flash-latest caso gemini-3.8-flash retorne 404', async () => {
-      const mockPrimaryModel = {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-2.5-flash caso gemini-3.8-flash retorne 404', async () => {      const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
           message: 'Publisher model `projects/.../models/gemini-3.8-flash` was not found or your project does not have access to it.',
           status: 404,
@@ -91,7 +90,7 @@ describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para g
       );
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-flash-latest',
+          model: 'gemini-2.5-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );
@@ -116,8 +115,7 @@ describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para g
       expect(service.getModelName()).toBe('gemini-env-photo-flash');
     });
 
-    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-flash-latest caso gemini-3.8-flash retorne 404', async () => {
-      const mockPrimaryModel = {
+    it('deve configurar generationConfig com maxOutputTokens: 150 e executar fallback para gemini-2.5-flash caso gemini-3.8-flash retorne 404', async () => {      const mockPrimaryModel = {
         generateContent: vi.fn().mockRejectedValue({
           message: 'Publisher model `projects/.../models/gemini-3.8-flash` was not found or your project does not have access to it.',
           status: 404,
@@ -185,7 +183,7 @@ describe('BDD & Regression: Migração para gemini-3.8-flash com fallback para g
       );
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-flash-latest',
+          model: 'gemini-2.5-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );
