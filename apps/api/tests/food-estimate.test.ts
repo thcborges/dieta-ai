@@ -10,7 +10,7 @@ import { authService } from '../src/services/auth.service.js';
 describe('VertexFoodEstimateService Unit Suite', () => {
   it('deve instanciar o serviço com valores padrão de região e modelo', () => {
     const service = new VertexFoodEstimateService();
-    expect(service.getModelName()).toBe('gemini-1.5-flash');
+    expect(service.getModelName()).toBe('gemini-3.8-flash');
     expect(service.getRegion()).toBe('us-central1');
   });
 
@@ -77,7 +77,7 @@ describe('VertexFoodEstimateService Unit Suite', () => {
     expect(result.servingSizeGrams).toBe(100);
   });
 
-  it('deve lançar erro descritivo quando a resposta do Vertex AI falhar', async () => {
+  it('deve propagar erro quando a resposta do Vertex AI falhar', async () => {
     const mockGenerativeModel = {
       generateContent: vi.fn().mockRejectedValue(new Error('Vertex AI Quota exceeded')),
     };
@@ -91,7 +91,7 @@ describe('VertexFoodEstimateService Unit Suite', () => {
 
     await expect(
       service.estimateFoodNutrition({ foodName: 'Alimento Inexistente' })
-    ).rejects.toThrow(/Falha na estimativa nutricional pelo Vertex AI/i);
+    ).rejects.toThrow('Vertex AI Quota exceeded');
   });
 });
 

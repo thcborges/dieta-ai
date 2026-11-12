@@ -2,15 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   VertexFoodEstimateService,
   DEFAULT_FOOD_ESTIMATE_MODEL,
-  FALLBACK_FOOD_ESTIMATE_MODELS,
 } from '../src/services/vertex-food-estimate.service.js';
 import {
   VertexPhotoAnalysisService,
   DEFAULT_PHOTO_ANALYSIS_MODEL,
-  FALLBACK_PHOTO_ANALYSIS_MODELS,
 } from '../src/services/vertex-photo-analysis.service.js';
 
-describe('BDD & Regression: Catálogo de Modelos Vertex AI com Fallbacks Automáticos', () => {
+describe('BDD & Regression: Invocação Direta do Vertex AI sem Try/Catch', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -25,11 +23,10 @@ describe('BDD & Regression: Catálogo de Modelos Vertex AI com Fallbacks Automá
   });
 
   describe('VertexFoodEstimateService (Cadastro de Alimentos)', () => {
-    it('deve adotar por padrão o modelo estável gemini-1.5-flash', () => {
+    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
       const service = new VertexFoodEstimateService();
       expect(service.getModelName()).toBe(DEFAULT_FOOD_ESTIMATE_MODEL);
-      expect(service.getModelName()).toBe('gemini-1.5-flash');
-      expect(service.getFallbackModels()).toEqual(FALLBACK_FOOD_ESTIMATE_MODELS);
+      expect(service.getModelName()).toBe('gemini-3.8-flash');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_FOOD_ESTIMATE_MODEL quando definida', () => {
@@ -44,72 +41,30 @@ describe('BDD & Regression: Catálogo de Modelos Vertex AI com Fallbacks Automá
       expect(service.getModelName()).toBe('gemini-env-flash');
     });
 
-    it('deve carregar VERTEX_AI_FALLBACK_MODELS da variável de ambiente quando definida', () => {
-      process.env.VERTEX_AI_FALLBACK_MODELS = 'gemini-custom-1, gemini-custom-2';
-      const service = new VertexFoodEstimateService();
-      expect(service.getFallbackModels()).toEqual(['gemini-custom-1', 'gemini-custom-2']);
-    });
+    it('deve executar chamada direta ao modelo configurado e propagar o erro original na íntegra (sem try/catch)', async () => {
+      const originalError = new Error('Original Vertex AI Error: 404 Model Not Found or Project Access Denied');
+      (originalError as any).status = 404;
 
-    it('deve executar fallback automático caso o modelo primário retorne 404', async () => {
-      const mockPrimaryModel = {
-        generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-custom-flash` was not found or your project does not have access to it.',
-          status: 404,
-        }),
-      };
-
-      const mockFallbackModel = {
-        generateContent: vi.fn().mockResolvedValue({
-          response: {
-            candidates: [
-              {
-                content: {
-                  parts: [
-                    {
-                      text: JSON.stringify({
-                        foodName: 'Ovo Poché',
-                        servingSizeGrams: 50,
-                        caloriesPer100g: 143,
-                        proteinPer100g: 12.6,
-                        carbsPer100g: 0.8,
-                        fatPer100g: 9.5,
-                        fiberPer100g: 0,
-                        confidence: 'high',
-                        sourceNote: 'Fallback bem sucedido',
-                      }),
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        }),
+      const mockGenerativeModel = {
+        generateContent: vi.fn().mockRejectedValue(originalError),
       };
 
       const mockVertexAI = {
-        getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-custom-flash') return mockPrimaryModel;
-          return mockFallbackModel;
-        }),
+        getGenerativeModel: vi.fn().mockReturnValue(mockGenerativeModel),
       };
 
       const service = new VertexFoodEstimateService({
         vertexAIClient: mockVertexAI as any,
-        modelName: 'gemini-custom-flash',
+        modelName: 'gemini-3.8-flash',
       });
 
-      const result = await service.estimateFoodNutrition({ foodName: 'Ovo Poché' });
-      expect(result.foodName).toBe('Ovo Poché');
-      expect(result.caloriesPer100g).toBe(143);
+      await expect(
+        service.estimateFoodNutrition({ foodName: 'Ovo Poché' })
+      ).rejects.toThrow('Original Vertex AI Error: 404 Model Not Found or Project Access Denied');
+
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-custom-flash',
-          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
-        })
-      );
-      expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'gemini-1.5-flash-002',
+          model: 'gemini-3.8-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );
@@ -117,11 +72,10 @@ describe('BDD & Regression: Catálogo de Modelos Vertex AI com Fallbacks Automá
   });
 
   describe('VertexPhotoAnalysisService (Fotos de Refeição)', () => {
-    it('deve adotar por padrão o modelo estável gemini-1.5-flash', () => {
+    it('deve adotar por padrão o modelo gemini-3.8-flash', () => {
       const service = new VertexPhotoAnalysisService();
       expect(service.getModelName()).toBe(DEFAULT_PHOTO_ANALYSIS_MODEL);
-      expect(service.getModelName()).toBe('gemini-1.5-flash');
-      expect(service.getFallbackModels()).toEqual(FALLBACK_PHOTO_ANALYSIS_MODELS);
+      expect(service.getModelName()).toBe('gemini-3.8-flash');
     });
 
     it('deve priorizar a variável de ambiente VERTEX_AI_PHOTO_MODEL quando definida', () => {
@@ -136,83 +90,33 @@ describe('BDD & Regression: Catálogo de Modelos Vertex AI com Fallbacks Automá
       expect(service.getModelName()).toBe('gemini-env-photo-flash');
     });
 
-    it('deve carregar VERTEX_AI_FALLBACK_MODELS da variável de ambiente quando definida', () => {
-      process.env.VERTEX_AI_FALLBACK_MODELS = 'gemini-photo-fb1, gemini-photo-fb2';
-      const service = new VertexPhotoAnalysisService();
-      expect(service.getFallbackModels()).toEqual(['gemini-photo-fb1', 'gemini-photo-fb2']);
-    });
+    it('deve executar chamada direta ao modelo configurado e propagar o erro original na íntegra (sem try/catch)', async () => {
+      const originalError = new Error('Original Vertex AI Photo Error: 404 Location us-central1 not accessible');
+      (originalError as any).status = 404;
 
-    it('deve executar fallback automático caso o modelo primário retorne 404', async () => {
-      const mockPrimaryModel = {
-        generateContent: vi.fn().mockRejectedValue({
-          message: 'Publisher model `projects/.../models/gemini-custom-photo-flash` was not found or your project does not have access to it.',
-          status: 404,
-        }),
-      };
-
-      const mockFallbackModel = {
-        generateContent: vi.fn().mockResolvedValue({
-          response: {
-            candidates: [
-              {
-                content: {
-                  parts: [
-                    {
-                      text: JSON.stringify({
-                        isFoodIdentified: true,
-                        feedbackMessage: '1 item identificado.',
-                        items: [
-                          {
-                            name: 'Arroz Branco',
-                            estimatedGrams: 150,
-                            confidence: 'high',
-                            per100g: {
-                              calories: 130,
-                              protein: 2.7,
-                              carbs: 28.2,
-                              fat: 0.3,
-                              fiber: 0.4,
-                            },
-                          },
-                        ],
-                      }),
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        }),
+      const mockGenerativeModel = {
+        generateContent: vi.fn().mockRejectedValue(originalError),
       };
 
       const mockVertexAI = {
-        getGenerativeModel: vi.fn().mockImplementation(({ model }: { model: string }) => {
-          if (model === 'gemini-custom-photo-flash') return mockPrimaryModel;
-          return mockFallbackModel;
-        }),
+        getGenerativeModel: vi.fn().mockReturnValue(mockGenerativeModel),
       };
 
       const service = new VertexPhotoAnalysisService({
         vertexAIClient: mockVertexAI as any,
-        modelName: 'gemini-custom-photo-flash',
+        modelName: 'gemini-3.8-flash',
       });
 
-      const result = await service.analyzeMealPhoto({
-        imageBase64: 'data:image/jpeg;base64,12345',
-        mimeType: 'image/jpeg',
-      });
-
-      expect(result.isFoodIdentified).toBe(true);
-      expect(result.items[0].name).toBe('Arroz Branco');
-      expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'gemini-custom-photo-flash',
-          generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
+      await expect(
+        service.analyzeMealPhoto({
+          imageBase64: 'data:image/jpeg;base64,12345',
+          mimeType: 'image/jpeg',
         })
-      );
+      ).rejects.toThrow('Original Vertex AI Photo Error: 404 Location us-central1 not accessible');
+
       expect(mockVertexAI.getGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-1.5-flash-002',
+          model: 'gemini-3.8-flash',
           generationConfig: expect.objectContaining({ maxOutputTokens: 150 }),
         })
       );
