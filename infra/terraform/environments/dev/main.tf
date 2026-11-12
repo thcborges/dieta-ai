@@ -54,22 +54,26 @@ module "logging_sink" {
   pubsub_topic_id = module.pubsub.topic_id
 }
 
-# 5. Serviço Cloud Run (Fastify API, scale-to-zero, 256MB RAM)
-module "cloud_run" {
-  source                = "../../modules/cloud_run"
-  project_id            = var.project_id
-  region                = var.region
-  service_name          = "dieta-ai-api-dev"
-  image_url             = "${module.artifact_registry.repository_url}/api:latest"
-  node_env              = "development"
-  allow_unauthenticated = true
-}
-
-# 6. Vertex AI: Habilitação da API aiplatform + IAM roles/aiplatform.user para Cloud Run
+# 5. Vertex AI: Habilitação da API aiplatform, catálogo de modelos Gemini e IAM para Cloud Run
 module "vertex_ai" {
   source     = "../../modules/vertex_ai"
   project_id = var.project_id
   region     = var.region
+}
+
+# 6. Serviço Cloud Run (Fastify API, scale-to-zero, 256MB RAM) com modelos Vertex AI injetados
+module "cloud_run" {
+  source                        = "../../modules/cloud_run"
+  project_id                    = var.project_id
+  region                        = var.region
+  service_name                  = "dieta-ai-api-dev"
+  image_url                     = "${module.artifact_registry.repository_url}/api:latest"
+  node_env                      = "development"
+  allow_unauthenticated         = true
+  vertex_ai_model               = module.vertex_ai.primary_model
+  vertex_ai_food_estimate_model = module.vertex_ai.food_estimate_model
+  vertex_ai_photo_model         = module.vertex_ai.photo_analysis_model
+  vertex_ai_fallback_models     = module.vertex_ai.fallback_models
 }
 
 output "dev_cloud_run_uri" {

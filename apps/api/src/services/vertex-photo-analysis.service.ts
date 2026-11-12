@@ -77,13 +77,19 @@ DIRETRIZES CENTRAIS E REGRAS DE EXECUÇÃO:
      ]
    }`;
 
-export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-3.8-flash';
-export const FALLBACK_PHOTO_ANALYSIS_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+export const DEFAULT_PHOTO_ANALYSIS_MODEL = 'gemini-1.5-flash';
+export const FALLBACK_PHOTO_ANALYSIS_MODELS = [
+  'gemini-1.5-flash-002',
+  'gemini-1.5-flash-001',
+  'gemini-2.0-flash-001',
+  'gemini-2.0-flash',
+];
 
 export class VertexPhotoAnalysisService {
   private readonly vertexAI: VertexAI;
   private readonly region: string;
   private readonly modelName: string;
+  private readonly fallbackModels: string[];
   private readonly projectId: string;
 
   constructor(options: VertexPhotoAnalysisServiceOptions = {}) {
@@ -94,6 +100,11 @@ export class VertexPhotoAnalysisService {
       process.env.VERTEX_AI_PHOTO_MODEL ||
       process.env.VERTEX_AI_MODEL ||
       DEFAULT_PHOTO_ANALYSIS_MODEL;
+
+    const envFallbacks = process.env.VERTEX_AI_FALLBACK_MODELS
+      ? process.env.VERTEX_AI_FALLBACK_MODELS.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    this.fallbackModels = envFallbacks.length > 0 ? envFallbacks : FALLBACK_PHOTO_ANALYSIS_MODELS;
 
     this.vertexAI =
       options.vertexAIClient ||
@@ -107,15 +118,19 @@ export class VertexPhotoAnalysisService {
     return this.modelName;
   }
 
+  public getFallbackModels(): string[] {
+    return [...this.fallbackModels];
+  }
+
   public getRegion(): string {
     return this.region;
   }
 
   public async analyzeMealPhoto(input: AnalyzePhotoInput): Promise<PhotoAnalysisResult> {
-    const modelsToTry = [this.modelName];
-    if (this.modelName === DEFAULT_PHOTO_ANALYSIS_MODEL) {
-      modelsToTry.push(...FALLBACK_PHOTO_ANALYSIS_MODELS);
-    }
+    const modelsToTry = [
+      this.modelName,
+      ...this.fallbackModels.filter((m) => m !== this.modelName),
+    ];
 
     let lastError: any = null;
     for (const candidate of modelsToTry) {
