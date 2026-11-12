@@ -148,7 +148,7 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(prdValidate).toContain('The configuration is valid');
   }, 120000);
 
-  it('deve auditar provisionamento IaC do Vertex AI com módulo dedicado, IAM explícito e variáveis de modelo Gemini Flash', () => {
+  it('deve auditar provisionamento IaC do Vertex AI com módulo dedicado, IAM explícito e catálogo de modelos Gemini Flash disponibilizados', () => {
     const devHcl = readFileSync(resolve(devEnvPath, 'main.tf'), 'utf-8');
     const prdHcl = readFileSync(resolve(prdEnvPath, 'main.tf'), 'utf-8');
     const cloudRunHcl = readFileSync(cloudRunModule, 'utf-8');
@@ -165,15 +165,28 @@ describe('Terraform Infrastructure Policy & Integration Suite', () => {
     expect(vertexAiHcl).toContain('google_project_iam_member');
     expect(vertexAiHcl).toContain('roles/aiplatform.user');
 
-    // Regra: ambientes dev e prd devem usar o módulo vertex_ai
+    // Regra: Módulo vertex_ai disponibiliza variáveis e outputs para catálogo de modelos
+    expect(vertexAiHcl).toContain('variable "primary_model"');
+    expect(vertexAiHcl).toContain('variable "food_estimate_model"');
+    expect(vertexAiHcl).toContain('variable "photo_analysis_model"');
+    expect(vertexAiHcl).toContain('variable "fallback_models"');
+    expect(vertexAiHcl).toContain('output "primary_model"');
+    expect(vertexAiHcl).toContain('output "fallback_models"');
+
+    // Regra: ambientes dev e prd devem usar o módulo vertex_ai e repassar modelos para o cloud_run
     expect(devHcl).toContain('module "vertex_ai"');
     expect(prdHcl).toContain('module "vertex_ai"');
+    expect(devHcl).toContain('vertex_ai_model               = module.vertex_ai.primary_model');
+    expect(prdHcl).toContain('vertex_ai_model               = module.vertex_ai.primary_model');
+    expect(devHcl).toContain('vertex_ai_fallback_models     = module.vertex_ai.fallback_models');
+    expect(prdHcl).toContain('vertex_ai_fallback_models     = module.vertex_ai.fallback_models');
 
-    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL, VERTEX_AI_PHOTO_MODEL, VERTEX_AI_FOOD_ESTIMATE_MODEL
+    // Regra: Cloud Run deve injetar VERTEX_AI_MODEL, VERTEX_AI_PHOTO_MODEL, VERTEX_AI_FOOD_ESTIMATE_MODEL, VERTEX_AI_FALLBACK_MODELS
     expect(cloudRunHcl).toContain('VERTEX_AI_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_PHOTO_MODEL');
     expect(cloudRunHcl).toContain('VERTEX_AI_FOOD_ESTIMATE_MODEL');
-    expect(cloudRunHcl).toContain('gemini-3.8-flash');
+    expect(cloudRunHcl).toContain('VERTEX_AI_FALLBACK_MODELS');
+    expect(cloudRunHcl).toContain('gemini-1.5-flash');
     // Nota de conformidade referenciando o módulo vertex_ai
     expect(cloudRunHcl).toContain('roles/aiplatform.user');
   });

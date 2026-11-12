@@ -48,13 +48,19 @@ DIRETRIZES CENTRAIS:
      "sourceNote": string
    }`;
 
-export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-3.8-flash';
-export const FALLBACK_FOOD_ESTIMATE_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+export const DEFAULT_FOOD_ESTIMATE_MODEL = 'gemini-1.5-flash';
+export const FALLBACK_FOOD_ESTIMATE_MODELS = [
+  'gemini-1.5-flash-002',
+  'gemini-1.5-flash-001',
+  'gemini-2.0-flash-001',
+  'gemini-2.0-flash',
+];
 
 export class VertexFoodEstimateService {
   private readonly vertexAI: VertexAI;
   private readonly region: string;
   private readonly modelName: string;
+  private readonly fallbackModels: string[];
   private readonly projectId: string;
 
   constructor(options: VertexFoodEstimateServiceOptions = {}) {
@@ -65,6 +71,11 @@ export class VertexFoodEstimateService {
       process.env.VERTEX_AI_FOOD_ESTIMATE_MODEL ||
       process.env.VERTEX_AI_MODEL ||
       DEFAULT_FOOD_ESTIMATE_MODEL;
+
+    const envFallbacks = process.env.VERTEX_AI_FALLBACK_MODELS
+      ? process.env.VERTEX_AI_FALLBACK_MODELS.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    this.fallbackModels = envFallbacks.length > 0 ? envFallbacks : FALLBACK_FOOD_ESTIMATE_MODELS;
 
     this.vertexAI =
       options.vertexAIClient ||
@@ -78,15 +89,19 @@ export class VertexFoodEstimateService {
     return this.modelName;
   }
 
+  public getFallbackModels(): string[] {
+    return [...this.fallbackModels];
+  }
+
   public getRegion(): string {
     return this.region;
   }
 
   public async estimateFoodNutrition(input: FoodEstimateInput): Promise<FoodEstimateResult> {
-    const modelsToTry = [this.modelName];
-    if (this.modelName === DEFAULT_FOOD_ESTIMATE_MODEL) {
-      modelsToTry.push(...FALLBACK_FOOD_ESTIMATE_MODELS);
-    }
+    const modelsToTry = [
+      this.modelName,
+      ...this.fallbackModels.filter((m) => m !== this.modelName),
+    ];
 
     let lastError: any = null;
     for (const candidate of modelsToTry) {

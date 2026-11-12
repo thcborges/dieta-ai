@@ -70,14 +70,26 @@ variable "admin_token" {
 
 variable "vertex_ai_model" {
   type        = string
+  description = "Modelo padrão do Vertex AI Gemini Flash para inferência"
+  default     = "gemini-1.5-flash"
+}
+
+variable "vertex_ai_photo_model" {
+  type        = string
   description = "Modelo padrão do Vertex AI Gemini Flash para análise multimodal de fotos"
-  default     = "gemini-3.8-flash"
+  default     = "gemini-1.5-flash"
 }
 
 variable "vertex_ai_food_estimate_model" {
   type        = string
   description = "Modelo padrão do Vertex AI Gemini Flash para estimativa de alimentos"
-  default     = "gemini-3.8-flash"
+  default     = "gemini-1.5-flash"
+}
+
+variable "vertex_ai_fallback_models" {
+  type        = string
+  description = "Modelos de fallback disponibilizados, separados por vírgula para injeção no container"
+  default     = "gemini-1.5-flash-002,gemini-1.5-flash-001,gemini-2.0-flash-001,gemini-2.0-flash"
 }
 
 locals {
@@ -162,12 +174,17 @@ resource "google_cloud_run_v2_service" "api_service" {
 
       env {
         name  = "VERTEX_AI_PHOTO_MODEL"
-        value = var.vertex_ai_model
+        value = var.vertex_ai_photo_model
       }
 
       env {
         name  = "VERTEX_AI_FOOD_ESTIMATE_MODEL"
         value = var.vertex_ai_food_estimate_model
+      }
+
+      env {
+        name  = "VERTEX_AI_FALLBACK_MODELS"
+        value = var.vertex_ai_fallback_models
       }
 
       ports {
