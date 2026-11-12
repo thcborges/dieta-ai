@@ -175,6 +175,6 @@ describe('VertexPhotoAnalysisService Unit Suite', () => {
         imageBase64: 'abc',
         mimeType: 'image/jpeg',
       })
-    ).rejects.toThrow('Falha na análise da foto pelo Vertex AI: Vertex AI Quota exceeded');
+    ).rejects.toThrow('Vertex AI Quota exceeded');
   });
 });
