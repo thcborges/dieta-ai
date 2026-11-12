@@ -172,12 +172,14 @@ export const PhotoMealModal: React.FC<PhotoMealModalProps> = ({
       setImagePreview(base64);
       setSelectedMimeType(mimeType);
     } catch {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-        setSelectedMimeType(file.type || 'image/jpeg');
-      };
-      reader.readAsDataURL(file);
+      if (typeof FileReader !== 'undefined') {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setImagePreview(reader.result as string);
+          setSelectedMimeType(file.type || 'image/jpeg');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

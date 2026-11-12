@@ -37,29 +37,29 @@ variable "cloud_run_service_account" {
 variable "primary_model" {
   type        = string
   description = "Modelo padrão do Vertex AI Gemini Flash disponibilizado para inferência"
-  default     = "gemini-1.5-flash"
+  default     = "gemini-3.8-flash"
 }
 
 variable "food_estimate_model" {
   type        = string
   description = "Modelo padrão do Vertex AI disponibilizado para estimativa nutricional de alimentos"
-  default     = "gemini-1.5-flash"
+  default     = "gemini-3.8-flash"
 }
 
 variable "photo_analysis_model" {
   type        = string
   description = "Modelo padrão do Vertex AI disponibilizado para análise multimodal de fotos de refeições"
-  default     = "gemini-1.5-flash"
+  default     = "gemini-3.8-flash"
 }
 
 variable "fallback_models" {
   type        = list(string)
-  description = "Lista ordenada de modelos de contingência (fallback) do Vertex AI disponíveis na região us-central1"
+  description = "Lista ordenada de modelos do Vertex AI disponíveis na região us-central1"
   default = [
-    "gemini-1.5-flash-002",
-    "gemini-1.5-flash-001",
-    "gemini-2.0-flash-001",
-    "gemini-2.0-flash"
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash"
   ]
 }
 

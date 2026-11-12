@@ -4,7 +4,7 @@ import { VertexPhotoAnalysisService } from '../src/services/vertex-photo-analysi
 describe('VertexPhotoAnalysisService Unit Suite', () => {
   it('deve instanciar o serviço com valores padrão de região e modelo', () => {
     const service = new VertexPhotoAnalysisService();
-    expect(service.getModelName()).toBe('gemini-1.5-flash');
+    expect(service.getModelName()).toBe('gemini-3.8-flash');
     expect(service.getRegion()).toBe('us-central1');
   });
 
@@ -175,6 +175,6 @@ describe('VertexPhotoAnalysisService Unit Suite', () => {
         imageBase64: 'abc',
         mimeType: 'image/jpeg',
       })
-    ).rejects.toThrow('Falha na análise da foto pelo Vertex AI: Vertex AI Quota exceeded');
+    ).rejects.toThrow('Vertex AI Quota exceeded');
   });
 });
