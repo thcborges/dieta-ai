@@ -4,6 +4,7 @@ import { userGoalsService } from '../services/user-goals.service.js';
 import { recipeService } from '../services/recipe.service.js';
 import { foodCacheService } from '../services/food-cache.service.js';
 import { userRepository } from '../services/user-repository.service.js';
+import { tokenUsageService } from '../services/token-usage.service.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 
 function getAdminToken(): string | undefined {
@@ -11,6 +12,38 @@ function getAdminToken(): string | undefined {
 }
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
+  // Painel analítico de telemetria e uso de tokens por IA (Vertex AI / Gemini)
+  app.get<{
+    Querystring: {
+      startDate?: string;
+      endDate?: string;
+      userHash?: string;
+    };
+  }>(
+    '/api/v1/admin/token-usage',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const isTokenAdmin = Boolean(getAdminToken() && req.headers['x-admin-token'] === getAdminToken());
+      const isSessionAdmin = Boolean(req.user?.isAdmin);
+
+      if (!isSessionAdmin && !isTokenAdmin) {
+        return reply.status(403).send({
+          error: 'UNAUTHORIZED_ADMIN',
+          message: 'Acesso negado ao painel de administração.',
+        });
+      }
+
+      const { startDate, endDate, userHash } = req.query;
+      const stats = await tokenUsageService.getUsageStats({
+        startDate,
+        endDate,
+        userHash,
+      });
+
+      return reply.status(200).send(stats);
+    }
+  );
+
   // Exclusão irreversível de conta e dados por administrador
   app.delete<{ Params: { userId: string } }>(
     '/api/v1/admin/users/:userId',
@@ -27,6 +60,10 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const { userId } = req.params;
+      const blindUserId = firestoreDiaryService.getBlindUserId(userId);
+
+      // Desvincula registros de tokens para 'purged_user' preservando histórico volumétrico agregado
+      await tokenUsageService.anonymizeUserUsage(blindUserId);
 
       // Remove registros do Firestore permanentemente em conformidade com a LGPD
       const deletedCount = await firestoreDiaryService.purgeUserDiaries(userId);

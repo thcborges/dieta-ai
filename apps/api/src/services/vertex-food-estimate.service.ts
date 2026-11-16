@@ -1,8 +1,10 @@
 import { VertexAI } from '@google-cloud/vertexai';
+import { tokenUsageService } from './token-usage.service.js';
 
 export interface FoodEstimateInput {
   foodName: string;
   portionGrams?: number;
+  blindUserId?: string;
 }
 
 export interface FoodEstimateResult {
@@ -103,6 +105,18 @@ export class VertexFoodEstimateService {
     const response = await generativeModel.generateContent({
       contents: [{ role: 'user', parts: [{ text: userText }] }],
     });
+
+    const usageMetadata = response.response?.usageMetadata;
+    if (usageMetadata) {
+      await tokenUsageService.recordUsage({
+        blindUserId: input.blindUserId,
+        feature: 'food_estimate',
+        model: this.modelName,
+        promptTokens: usageMetadata.promptTokenCount || 0,
+        candidatesTokens: usageMetadata.candidatesTokenCount || 0,
+        totalTokens: usageMetadata.totalTokenCount || 0,
+      }).catch(() => {});
+    }
 
     const responseContent =
       response.response?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
