@@ -20,14 +20,17 @@ describe('AccountManagementModal (Módulo 6: LGPD & Painel Admin)', () => {
 
     expect(screen.getByText(/Gerenciamento de Conta & LGPD/i)).toBeInTheDocument();
     expect(screen.getByText(/15 \(quinze\) dias/i)).toBeInTheDocument();
+    // Usuário comum NÃO deve ver link para painel de tokens
+    expect(screen.queryByText(/Uso de Tokens/i)).not.toBeInTheDocument();
 
     const requestButton = screen.getByRole('button', { name: /Solicitar Exclusão da Conta/i });
     fireEvent.click(requestButton);
     expect(onRequestDeletion).toHaveBeenCalled();
   });
 
-  it('deve exibir controles restritos de Admin quando o usuário for administrador', () => {
+  it('deve exibir controles restritos de Admin e link para Painel de Tokens quando o usuário for administrador', () => {
     const onAdminPurge = vi.fn();
+    const onOpenTokenDashboard = vi.fn();
 
     render(
       <AccountManagementModal
@@ -36,12 +39,19 @@ describe('AccountManagementModal (Módulo 6: LGPD & Painel Admin)', () => {
         isAdmin={true}
         onRequestDeletion={vi.fn()}
         onAdminPurge={onAdminPurge}
+        onOpenTokenDashboard={onOpenTokenDashboard}
       />
     );
 
     expect(screen.getByText(/Painel de Administração \(Acesso Restrito\)/i)).toBeInTheDocument();
     const purgeButton = screen.getByRole('button', { name: /Exclusão Imediata e Irreversível/i });
     expect(purgeButton).toBeInTheDocument();
+
+    // Link do painel de tokens deve ser exibido para admin
+    const tokenButton = screen.getByRole('button', { name: /Auditoria de Tokens IA/i });
+    expect(tokenButton).toBeInTheDocument();
+    fireEvent.click(tokenButton);
+    expect(onOpenTokenDashboard).toHaveBeenCalled();
 
     fireEvent.click(purgeButton);
     expect(onAdminPurge).toHaveBeenCalled();

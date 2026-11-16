@@ -6,3 +6,4 @@ export * from './lgpd.js';
 export * from './food-database.js';
 export * from './weekly-thermometer.js';
 export * from './date-time.js';
+export * from './token-usage.js';

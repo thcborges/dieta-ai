@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldAlert, UserX, Clock, Check } from 'lucide-react';
+import { X, ShieldAlert, UserX, Clock, Check, BarChart3 } from 'lucide-react';
 import { LGPD_STATUTORY_DAYS } from '@dieta-ai/core';
 
 interface AccountManagementModalProps {
@@ -8,6 +8,7 @@ interface AccountManagementModalProps {
   isAdmin: boolean;
   onRequestDeletion: () => void;
   onAdminPurge: (targetUserId?: string) => void;
+  onOpenTokenDashboard?: () => void;
 }
 
 export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
@@ -16,6 +17,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
   isAdmin,
   onRequestDeletion,
   onAdminPurge,
+  onOpenTokenDashboard,
 }) => {
   const [targetUserId, setTargetUserId] = useState('');
   const [purgeRequested, setPurgeRequested] = useState(false);
@@ -101,6 +103,22 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
                 ADMIN
               </span>
             </div>
+
+            {/* Link para o Dashboard de Tokens */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenTokenDashboard?.();
+                  onClose();
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-m3-surface-container hover:bg-m3-surface-container-highest border border-m3-outline text-m3-primary font-semibold text-xs py-2.5 px-4 rounded-xl shadow transition-colors"
+              >
+                <BarChart3 className="w-4 h-4 text-m3-primary" />
+                Auditoria de Tokens IA (Painel Admin)
+              </button>
+            </div>
+
             <p className="text-xs text-m3-outline mb-3">
               Permite a remoção imediata, forçada e irreversível de qualquer conta ou usuário de teste/produção.
             </p>

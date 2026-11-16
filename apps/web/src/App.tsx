@@ -21,6 +21,7 @@ import { WeeklyThermometerCard } from './components/WeeklyThermometerCard.js';
 import { ReverseBufferCard } from './components/ReverseBufferCard.js';
 import { MealBuilder, type LoggedFood, type MealMap } from './components/MealBuilder.js';
 import { AccountManagementModal } from './components/AccountManagementModal.js';
+import { AdminTokenDashboard } from './components/AdminTokenDashboard.js';
 import { LoginPage, type AuthUser } from './components/LoginPage.js';
 import { MacroSettingsModal, type UserMacroSettings } from './components/MacroSettingsModal.js';
 import { User, Sliders, LogOut, Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
@@ -190,6 +191,33 @@ export default function App() {
   const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const isAdmin = Boolean(user?.isAdmin);
+
+  // Roteamento leve SPA / Hash para PWA e Capacitor
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace(/^#/, '');
+      return hash || window.location.pathname;
+    }
+    return '/';
+  });
+
+  useEffect(() => {
+    const handleRouteChange = () => {
+      const hash = window.location.hash.replace(/^#/, '');
+      setCurrentPath(hash || window.location.pathname);
+    };
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('hashchange', handleRouteChange);
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('hashchange', handleRouteChange);
+    };
+  }, []);
+
+  const navigateTo = (path: string) => {
+    window.location.hash = path;
+    setCurrentPath(path);
+  };
 
   // Evento Social Alocado (Buffer Reverso)
   const [activeEvent, setActiveEvent] = useState<EventBufferInput | null>(null);
@@ -791,6 +819,18 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />;
   }
 
+  // Rota administrativa do Painel de Tokens (acesso exclusivo do admin)
+  if (currentPath === '/admin/tokens') {
+    return (
+      <AdminTokenDashboard
+        isAdmin={isAdmin}
+        onBack={() => navigateTo('/')}
+        sessionToken={user.sessionToken}
+        adminEmail={user.email || 'thcborges@gmail.com'}
+      />
+    );
+  }
+
   const targetMacros = {
     calories: macroSettings.calories,
     proteinGrams: macroSettings.proteinGrams,
@@ -1243,6 +1283,7 @@ export default function App() {
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
         isAdmin={isAdmin}
+        onOpenTokenDashboard={() => navigateTo('/admin/tokens')}
         onRequestDeletion={async () => {
           if (user) {
             try {

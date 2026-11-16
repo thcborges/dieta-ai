@@ -556,5 +556,39 @@ describe('MacroMetrics Pro App (Fluxo de Autenticação, Controle de Macros & La
     // O item lançado deve aparecer no diário
     expect(await screen.findByText(/Bolo Proteico de Frango \(1 porção\)/i)).toBeInTheDocument();
   });
+
+  it('deve permitir ao admin navegar para o Painel de Tokens de IA via modal de conta e retornar ao diário', async () => {
+    localStorage.setItem(
+      'macrometrics_auth_user',
+      JSON.stringify({
+        id: 'usr_thcborges_gmail_com',
+        email: 'thcborges@gmail.com',
+        name: 'Thiago Borges',
+        isAdmin: true,
+        sessionToken: 'test-admin-session-token',
+      })
+    );
+
+    render(<App />);
+
+    // Abre o modal de gerenciamento de conta
+    const accountBtn = screen.getByRole('button', { name: /Conta & LGPD/i });
+    fireEvent.click(accountBtn);
+
+    // Como é admin, o botão de auditoria de tokens deve existir
+    const tokenBtn = screen.getByRole('button', { name: /Auditoria de Tokens IA/i });
+    fireEvent.click(tokenBtn);
+
+    // Deve renderizar a tela de AdminTokenDashboard
+    expect(await screen.findByText(/Auditoria de Tokens IA \(Vertex AI \/ Gemini\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/thcborges@gmail.com/i)).toBeInTheDocument();
+
+    // Clica em voltar
+    const backBtn = screen.getByRole('button', { name: /Voltar ao MacroMetrics/i });
+    fireEvent.click(backBtn);
+
+    // Retorna para a tela principal do diário
+    expect(await screen.findByText(/Buffer de Evento Social/i)).toBeInTheDocument();
+  });
 });
 

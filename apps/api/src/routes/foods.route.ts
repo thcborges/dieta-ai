@@ -51,7 +51,10 @@ export const foodRoutes: FastifyPluginAsync<FoodRoutesOptions> = async (app, opt
       }
 
       try {
-        const result = await estimateService.estimateFoodNutrition(parseResult.data);
+        const result = await estimateService.estimateFoodNutrition({
+          ...parseResult.data,
+          blindUserId: req.user?.blindUserId,
+        });
         return reply.status(200).send(result);
       } catch (err: any) {
         req.log.error(err, 'Erro durante estimativa nutricional no Vertex AI');

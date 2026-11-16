@@ -44,7 +44,10 @@ export const photoAnalysisRoutes: FastifyPluginAsync<PhotoAnalysisRouteOptions> 
       }
 
       try {
-        const result = await service.analyzeMealPhoto(parseResult.data);
+        const result = await service.analyzeMealPhoto({
+          ...parseResult.data,
+          blindUserId: req.user?.blindUserId,
+        });
         return reply.status(200).send(result);
       } catch (err: any) {
         req.log.error(err, 'Erro durante análise de foto no Vertex AI');
